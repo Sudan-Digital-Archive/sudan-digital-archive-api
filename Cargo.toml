@@ -1,0 +1,31 @@
+[package]
+name = "sudan-digital-archive-api"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = [".", "entity", "migration"]
+
+[dependencies]
+entity = { path = "entity"}
+axum = { version="0.8.1", features=["macros"] }
+tokio = { version = "1.42.0", features = ["macros", "rt-multi-thread"] }
+tower-http = { version = "0.6.2", features = ["timeout", "trace", "validate-request", "set-header", "propagate-header", "compression-full", "cors"] }
+tower = "0.5.2"
+tracing-subscriber = "0.3.19"
+tracing = "0.1.41"
+http-body-util = "0.1.2"
+sea-orm = {version = "1.1.0", features=["macros", "runtime-tokio-native-tls", "sqlx-postgres"]}
+async-trait = "0.1.83"
+serde_json = "1.0.134"
+validator = { version = "0.19.0", features = ["derive"] }
+serde = { version = "1.0.216", features = ["derive"] }
+reqwest = { version = "0.12.11", features=["json"] }
+uuid = { version="1.11.0", features=["v4"] }
+chrono = "0.4.39"
+http = "1.2.0"
+tower_governor = { version = "0.6.0", features = ["axum"] }
+
+[dev-dependencies]
+mime = "0.3.17"
+pretty_assertions = "1.4.1"

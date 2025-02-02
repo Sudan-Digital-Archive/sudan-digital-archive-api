@@ -1,0 +1,170 @@
+//! Configuration module for Browsertrix web archiving integration and application settings.
+//! Handles environment variables and configuration structures for the archiving service.
+
+use http::HeaderValue;
+use serde::Serialize;
+use std::env;
+use uuid::Uuid;
+
+/// Configuration for Browsertrix web archiving service
+#[derive(Debug, Clone, Default)]
+pub struct BrowsertrixConfig {
+    pub username: String,
+    pub password: String,
+    pub org_id: Uuid,
+    pub base_url: String,
+    pub login_url: String,
+    pub create_crawl_url: String,
+}
+
+/// Global application configuration
+#[derive(Debug, Clone, Default)]
+pub struct AppConfig {
+    pub browsertrix: BrowsertrixConfig,
+    pub cors_urls: Vec<HeaderValue>,
+    pub postgres_url: String,
+    pub listener_address: String,
+}
+
+/// Builds application configuration from environment variables
+pub fn build_app_config() -> AppConfig {
+    let postgres_url = env::var("POSTGRES_URL").expect("Missing POSTGRES_URL env var");
+    let username = env::var("BROWSERTRIX_USERNAME").expect("Missing BROWSERTRIX_USERNAME env var");
+    let password = env::var("BROWSERTRIX_PASSWORD").expect("Missing BROWSERTRIX_PASSWORD env var");
+    let org_id = env::var("BROWSERTRIX_ORGID").expect("Missing BROWSERTRIX_ORGID env var");
+    let org_uuid = Uuid::parse_str(&org_id).expect("Could not parse browsertrix org id to uuid");
+    let base_url = env::var("BROWSERTRIX_BROWSERTRIX_URL")
+        .expect("Missing BROWSERTRIX_BROWSERTRIX_URL env var");
+    let login_url = format!("{}/auth/jwt/login", base_url);
+    let create_crawl_url = format!("{}/orgs/{}/crawlconfigs/", base_url, org_uuid);
+    let browsertrix = BrowsertrixConfig {
+        username,
+        password,
+        org_id: org_uuid,
+        base_url,
+        login_url,
+        create_crawl_url,
+    };
+    let cors_urls_env_var = env::var("CORS_URL").expect("Missing CORS_URL env var");
+    let cors_urls = cors_urls_env_var
+        .split(",")
+        .map(|s| {
+            HeaderValue::from_str(s)
+                .expect("CORS_URL env var should contain comma separated origins")
+        })
+        .collect();
+    let listener_address = env::var("LISTENER_ADDRESS")
+    .expect("Missing LISTENER_ADDRESS env var");
+
+    AppConfig {
+        browsertrix,
+        cors_urls,
+        postgres_url,
+        listener_address,
+    }
+}
+
+/// Single URL seed configuration for Browsertrix crawl
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OneSeed {
+    url: String,
+    scope_type: String,
+}
+
+/// Configuration for URL crawling behavior and scope
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SeedsConfig {
+    seeds: Vec<OneSeed>,
+    scope_type: String,
+    extra_hops: i32,
+    use_sitemap: bool,
+    fail_on_failed_seed: bool,
+    behavior_timeout: Option<i32>,
+    page_load_timeout: Option<i32>,
+    page_extra_delay: Option<i32>,
+    post_load_delay: i32,
+    user_agent: Option<String>,
+    limit: Option<i32>,
+    lang: String,
+    exclude: Vec<String>,
+    behaviors: String,
+}
+
+/// Complete crawl configuration for Browsertrix service
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowsertrixCrawlConfig {
+    job_type: String,
+    name: String,
+    description: Option<String>,
+    scale: i8,
+    profileid: String,
+    run_now: bool,
+    schedule: String,
+    crawl_timeout: i32,
+    max_crawl_size: i32,
+    tags: Vec<String>,
+    auto_add_collections: Vec<String>,
+    config: SeedsConfig,
+    crawler_channel: String,
+    proxy_id: Option<String>,
+}
+
+impl BrowsertrixCrawlConfig {
+    /// Creates a new crawl configuration for a single URL with default settings
+    pub fn new(url: String) -> Self {
+        let one_seed = OneSeed {
+            url,
+            scope_type: "page".to_string(),
+        };
+        let seeds_config = SeedsConfig {
+            seeds: vec![one_seed],
+            scope_type: "page".to_string(),
+            extra_hops: 0,
+            use_sitemap: false,
+            fail_on_failed_seed: false,
+            behavior_timeout: None,
+            page_load_timeout: None,
+            page_extra_delay: None,
+            post_load_delay: 120,
+            user_agent: None,
+            limit: None,
+            lang: "en".to_string(),
+            exclude: vec![],
+            behaviors: "autoscroll,autoplay,autofetch,siteSpecific".to_string(),
+        };
+        BrowsertrixCrawlConfig {
+            job_type: "custom".to_string(),
+            name: "".to_string(),
+            description: None,
+            scale: 1,
+            profileid: "".to_string(),
+            run_now: true,
+            schedule: "".to_string(),
+            crawl_timeout: 0,
+            max_crawl_size: 1000000000,
+            tags: vec![],
+            auto_add_collections: vec![],
+            config: seeds_config,
+            crawler_channel: "default".to_string(),
+            proxy_id: None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_crawl_config_new_different_urls() {
+        let config1 = BrowsertrixCrawlConfig::new("https://example.com".to_string());
+        let config2 = BrowsertrixCrawlConfig::new("https://different.com".to_string());
+
+        assert_eq!(config1.config.seeds[0].url, "https://example.com");
+        assert_eq!(config2.config.seeds[0].url, "https://different.com");
+        assert_ne!(config1.config.seeds[0].url, config2.config.seeds[0].url);
+    }
+}
