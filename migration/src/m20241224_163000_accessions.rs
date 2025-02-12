@@ -19,7 +19,7 @@ enum Accession {
 }
 
 #[derive(DeriveIden)]
-enum DublinMetadataEn {
+pub(crate) enum DublinMetadataEn {
     Table,
     Id,
     Title,
@@ -28,7 +28,7 @@ enum DublinMetadataEn {
 }
 
 #[derive(DeriveIden)]
-enum DublinMetadataAr {
+pub(crate) enum DublinMetadataAr {
     Table,
     Id,
     Title,
