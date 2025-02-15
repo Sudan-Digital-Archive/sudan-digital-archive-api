@@ -154,7 +154,7 @@ fn one_dublin_metadata_en() -> DublinMetadataEnModel {
         id: 1,
         title: "my metadata".to_string(),
         subject: "some cool archive".to_string(),
-        description: "archival stuff yo".to_string(),
+        description: Some("archival stuff yo".to_string()),
     }
 }
 
@@ -163,7 +163,7 @@ fn one_dublin_metadata_ar() -> DublinMetataArModel {
         id: 1,
         title: "بيانات وصفية خاصة بي".to_string(),
         subject: "بعض الأرشيف الرائع".to_string(),
-        description: "مواد أرشيفية".to_string(),
+        description: Some("مواد أرشيفية".to_string()),
     }
 }
 
