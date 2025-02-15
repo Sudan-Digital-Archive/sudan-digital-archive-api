@@ -19,7 +19,7 @@ pub struct CreateAccessionRequest {
     #[validate(length(min = 1))]
     pub metadata_subject: String,
     #[validate(length(min = 1, max = 2000))]
-    pub metadata_description: String,
+    pub metadata_description: Option<String>,
     pub metadata_time: NaiveDateTime,
 }
 

@@ -97,7 +97,22 @@ mod tests {
                 metadata_language: MetadataLanguage::English,
                 metadata_title: "".to_string(),
                 metadata_subject: "".to_string(),
-                metadata_description: "".to_string(),
+                metadata_description: Some("".to_string()),
+                metadata_time: Default::default(),
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn run_one_crawl_without_description() {
+        let accessions_service = build_test_accessions_service();
+        accessions_service
+            .create_one(CreateAccessionRequest {
+                url: "".to_string(),
+                metadata_language: MetadataLanguage::English,
+                metadata_title: "".to_string(),
+                metadata_subject: "".to_string(),
+                metadata_description: None,
                 metadata_time: Default::default(),
             })
             .await;
@@ -118,6 +133,37 @@ mod tests {
     "metadata_title": "Guardian piece",
     "metadata_subject": "UK energy costs",
     "metadata_description": "Blah de blah",
+    "metadata_time": "2024-11-01T23:32:00"
+})).unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let actual = String::from_utf8((&body).to_vec()).unwrap();
+        let expected = "Started browsertrix crawl task!".to_string();
+        assert_eq!(actual, expected)
+    }
+
+    #[tokio::test]
+    async fn create_one_accession_no_description() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/api/v1/accessions")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(Body::from(
+                        serde_json::to_vec(&json!({
+    "url": "https://www.theguardian.com/business/2025/jan/10/britain-energy-costs-labour-power-plants-uk-cold-weather?utm_source=firefox-newtab-en-gb",
+    "metadata_language": "english",
+    "metadata_title": "Guardian piece",
+    "metadata_subject": "UK energy costs",
+    "metadata_description": null,
     "metadata_time": "2024-11-01T23:32:00"
 })).unwrap(),
                     ))
