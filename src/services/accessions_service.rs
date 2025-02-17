@@ -153,7 +153,7 @@ impl AccessionsService {
     ///
     /// # Arguments
     /// * `payload` - The creation request containing URL and metadata
-    pub async fn create_one(self, payload: CreateAccessionRequest) {
+    pub async fn create_one(self, mut payload: CreateAccessionRequest) {
         let create_crawl_request = CreateCrawlRequest {
             url: payload.url.clone(),
             browser_profile: payload.browser_profile.clone(),
@@ -180,13 +180,18 @@ impl AccessionsService {
                             if valid_crawl_resp == "complete" {
                                 let crawl_time_secs = (time_to_sleep * count).as_secs();
                                 info!(%valid_crawl_resp, %count, "Crawl complete after {crawl_time_secs}s");
+                                let trimmed_title = payload.metadata_title.trim().to_string();
+                                let trimmed_description = match payload.metadata_description {
+                                    Some(description) => Some(description.trim().to_string()),
+                                    None => None,
+                                };
                                 let create_accessions_request = CreateAccessionRequest {
                                     url: payload.url,
                                     browser_profile: payload.browser_profile,
                                     metadata_language: payload.metadata_language,
-                                    metadata_title: payload.metadata_title,
+                                    metadata_title: trimmed_title,
                                     metadata_subject: payload.metadata_subject,
-                                    metadata_description: payload.metadata_description,
+                                    metadata_description: trimmed_description,
                                     metadata_time: payload.metadata_time,
                                 };
                                 let write_result = self

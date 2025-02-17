@@ -1,6 +1,7 @@
 pub use sea_orm_migration::prelude::*;
 mod m20241224_163000_accessions;
 mod m20250212_014525_optional_metadata_description;
+mod m20250217_012314_subjects_more_like_tags;
 
 pub struct Migrator;
 
@@ -10,6 +11,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20241224_163000_accessions::Migration),
             Box::new(m20250212_014525_optional_metadata_description::Migration),
+            Box::new(m20250217_012314_subjects_more_like_tags::Migration),
         ]
     }
 }

@@ -1,3 +1,13 @@
+# TODOs
+
+- Make subject a one to many relationship from metadata for each one
+- Two tables, subject en and subject ar
+- Add migrations + entities for that
+- Create a view which you will query; limit number of subjects on each record to like idk 200 and make sure you have
+  this when writing to db; can't have more than 200 subjects on a given accession. This should be static in config.
+- Then change filter to query the view versus what it is currently
+- Add create subject endpoints and list subject endpoints for up to 200.
+
 # Overview
 
 This is the API for the Sudan Digital Archive.

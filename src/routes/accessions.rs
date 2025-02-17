@@ -33,6 +33,7 @@ async fn create_accession(
     if let Err(err) = payload.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }
+
     let cloned_state = state.clone();
     tokio::spawn(async move {
         cloned_state.accessions_service.create_one(payload).await;
