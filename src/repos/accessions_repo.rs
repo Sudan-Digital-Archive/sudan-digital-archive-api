@@ -121,8 +121,9 @@ impl AccessionsRepo for DBAccessionsRepo {
             MetadataLanguage::English => {
                 let metadata = DublinMetadataEnActiveModel {
                     id: Default::default(),
+                    // TODO: This should write an actual subject id
+                    subject_id: ActiveValue::Set(None),
                     title: ActiveValue::Set(create_accession_request.metadata_title),
-                    subject: ActiveValue::Set(create_accession_request.metadata_subject),
                     description: ActiveValue::Set(create_accession_request.metadata_description),
                 };
                 let inserted_metadata = metadata.save(&txn).await?;
@@ -131,8 +132,9 @@ impl AccessionsRepo for DBAccessionsRepo {
             MetadataLanguage::Arabic => {
                 let metadata = DublinMetadataArActiveModel {
                     id: Default::default(),
+                    // TODO: This should write an actual subject id
+                    subject_id: ActiveValue::Set(None),
                     title: ActiveValue::Set(create_accession_request.metadata_title),
-                    subject: ActiveValue::Set(create_accession_request.metadata_subject),
                     description: ActiveValue::Set(create_accession_request.metadata_description),
                 };
                 let inserted_metadata = metadata.save(&txn).await?;

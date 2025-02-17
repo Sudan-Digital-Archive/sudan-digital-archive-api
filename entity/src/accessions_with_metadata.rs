@@ -1,6 +1,6 @@
+use super::sea_orm_active_enums::CrawlStatus;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
-use super::sea_orm_active_enums::CrawlStatus;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
 #[sea_orm(table_name = "accessions_with_metadata")]

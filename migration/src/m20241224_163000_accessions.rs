@@ -175,9 +175,6 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_type(Type::drop().name(CrawlStatus::Enum).to_owned())
-            .await?;
-        manager
             .drop_table(Table::drop().table(Accession::Table).to_owned())
             .await?;
         manager
@@ -185,6 +182,9 @@ impl MigrationTrait for Migration {
             .await?;
         manager
             .drop_table(Table::drop().table(DublinMetadataAr::Table).to_owned())
+            .await?;
+        manager
+            .drop_type(Type::drop().name(CrawlStatus::Enum).to_owned())
             .await?;
         Ok(())
     }

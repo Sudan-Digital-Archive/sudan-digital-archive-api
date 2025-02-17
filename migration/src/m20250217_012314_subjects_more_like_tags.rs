@@ -20,15 +20,15 @@ enum DublinMetadataSubjectAr {
 #[derive(DeriveIden)]
 enum DublinMetadataEn {
     Table,
-    Id,
     Subject,
+    SubjectId,
 }
 
 #[derive(DeriveIden)]
 enum DublinMetadataAr {
     Table,
-    Id,
     Subject,
+    SubjectId,
 }
 
 #[async_trait::async_trait]
@@ -59,6 +59,9 @@ impl MigrationTrait for Migration {
                 Table::alter()
                     .table(DublinMetadataEn::Table)
                     .drop_column(DublinMetadataEn::Subject)
+                    .add_column_if_not_exists(
+                        ColumnDef::new(DublinMetadataEn::SubjectId).integer().null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -67,20 +70,23 @@ impl MigrationTrait for Migration {
                 Table::alter()
                     .table(DublinMetadataAr::Table)
                     .drop_column(DublinMetadataAr::Subject)
+                    .add_column_if_not_exists(
+                        ColumnDef::new(DublinMetadataAr::SubjectId).integer().null(),
+                    )
                     .to_owned(),
             )
             .await?;
         let foreign_key_en_subject = TableForeignKey::new()
             .name("dublin_metadata_subject_en")
             .from_tbl(DublinMetadataEn::Table)
-            .from_col(DublinMetadataEn::Id)
+            .from_col(DublinMetadataEn::SubjectId)
             .to_tbl(DublinMetadataSubjectEn::Table)
             .to_col(DublinMetadataSubjectEn::Id)
             .to_owned();
         let foreign_key_ar_subject = TableForeignKey::new()
             .name("dublin_metadata_subject_ar")
             .from_tbl(DublinMetadataAr::Table)
-            .from_col(DublinMetadataAr::Id)
+            .from_col(DublinMetadataAr::SubjectId)
             .to_tbl(DublinMetadataSubjectAr::Table)
             .to_col(DublinMetadataSubjectAr::Id)
             .to_owned();
@@ -88,13 +94,14 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(DublinMetadataEn::Table)
-                    .add_column_if_not_exists(
-                        ColumnDef::new(DublinMetadataEn::Subject).integer().null(),
-                    )
-                    .add_column_if_not_exists(
-                        ColumnDef::new(DublinMetadataAr::Subject).integer().null(),
-                    )
                     .add_foreign_key(&foreign_key_en_subject)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(DublinMetadataAr::Table)
                     .add_foreign_key(&foreign_key_ar_subject)
                     .to_owned(),
             )
@@ -130,7 +137,7 @@ impl MigrationTrait for Migration {
                 ) AS subjects_ar,
                 COALESCE((dme.id IS NOT NULL), FALSE) AS has_english_metadata,
                 COALESCE((dma.id IS NOT NULL), FALSE) AS has_arabic_metadata
-            FROM accessions a
+            FROM accession a
             LEFT JOIN dublin_metadata_en dme ON a.id = dme.id
             LEFT JOIN dublin_metadata_ar dma ON a.id = dma.id
         "#,
@@ -147,8 +154,8 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(DublinMetadataEn::Table)
-                    .drop_foreign_key(Alias::new("dublin_metadata_subject_ar"))
-                    .drop_column(DublinMetadataEn::Subject)
+                    .drop_foreign_key(Alias::new("dublin_metadata_subject_en"))
+                    .drop_column(DublinMetadataEn::SubjectId)
                     .to_owned(),
             )
             .await?;
@@ -157,8 +164,8 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(DublinMetadataAr::Table)
-                    .drop_foreign_key(Alias::new("dublin_metadata_ar_subject"))
-                    .drop_column(DublinMetadataAr::Subject)
+                    .drop_foreign_key(Alias::new("dublin_metadata_subject_ar"))
+                    .drop_column(DublinMetadataAr::SubjectId)
                     .to_owned(),
             )
             .await?;

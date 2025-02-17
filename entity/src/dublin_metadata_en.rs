@@ -10,21 +10,21 @@ pub struct Model {
     pub id: i32,
     pub title: String,
     pub description: Option<String>,
-    pub dublin_metadata_subject_en: Option<i32>,
+    pub subject_id: Option<i32>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_one = "super::accession::Entity")]
+    #[sea_orm(has_many = "super::accession::Entity")]
     Accession,
     #[sea_orm(
         belongs_to = "super::dublin_metadata_subject_en::Entity",
-        from = "Column::DublinMetadataSubjectEn",
+        from = "Column::SubjectId",
         to = "super::dublin_metadata_subject_en::Column::Id",
         on_update = "NoAction",
         on_delete = "NoAction"
     )]
-    DublinMetadataSubjectEn
+    DublinMetadataSubjectEn,
 }
 
 impl Related<super::accession::Entity> for Entity {
@@ -32,6 +32,7 @@ impl Related<super::accession::Entity> for Entity {
         Relation::Accession.def()
     }
 }
+
 impl Related<super::dublin_metadata_subject_en::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::DublinMetadataSubjectEn.def()

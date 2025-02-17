@@ -153,7 +153,7 @@ impl AccessionsService {
     ///
     /// # Arguments
     /// * `payload` - The creation request containing URL and metadata
-    pub async fn create_one(self, mut payload: CreateAccessionRequest) {
+    pub async fn create_one(self, payload: CreateAccessionRequest) {
         let create_crawl_request = CreateCrawlRequest {
             url: payload.url.clone(),
             browser_profile: payload.browser_profile.clone(),
