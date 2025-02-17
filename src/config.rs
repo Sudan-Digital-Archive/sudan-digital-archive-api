@@ -169,7 +169,10 @@ mod tests {
     #[test]
     fn test_crawl_config_new_different_urls() {
         let config1 = BrowsertrixCrawlConfig::new("https://example.com".to_string(), None);
-        let config2 = BrowsertrixCrawlConfig::new("https://different.com".to_string(), Some(BrowserProfile::Facebook));
+        let config2 = BrowsertrixCrawlConfig::new(
+            "https://different.com".to_string(),
+            Some(BrowserProfile::Facebook),
+        );
 
         assert_eq!(config1.config.seeds[0].url, "https://example.com");
         assert_eq!(config2.config.seeds[0].url, "https://different.com");
