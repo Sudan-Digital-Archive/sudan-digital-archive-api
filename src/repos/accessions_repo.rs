@@ -115,7 +115,9 @@ impl AccessionsRepo for DBAccessionsRepo {
         crawl_status: CrawlStatus,
     ) -> Result<(), DbErr> {
         let txn = self.db_session.begin().await?;
-        let (dublin_metadata_en_id, dublin_metadata_ar_id) = match create_accession_request.metadata_language {
+        let (dublin_metadata_en_id, dublin_metadata_ar_id) = match create_accession_request
+            .metadata_language
+        {
             MetadataLanguage::English => {
                 let metadata = DublinMetadataEnActiveModel {
                     id: Default::default(),

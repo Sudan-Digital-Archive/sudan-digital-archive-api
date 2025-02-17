@@ -54,16 +54,18 @@ pub fn build_filter_expression(
     date_from: Option<NaiveDateTime>,
     date_to: Option<NaiveDateTime>,
 ) -> Option<SimpleExpr> {
-    let (title, subject, description) = match metadata_language {
+    let (title, subject, description, lang_filter) = match metadata_language {
         MetadataLanguage::English => (
             Expr::col(dublin_metadata_en::Column::Title),
             Expr::col(dublin_metadata_en::Column::Subject),
             Expr::col(dublin_metadata_en::Column::Description),
+            accession::Column::DublinMetadataEn.is_not_null(),
         ),
         MetadataLanguage::Arabic => (
             Expr::col(dublin_metadata_ar::Column::Title),
             Expr::col(dublin_metadata_ar::Column::Subject),
             Expr::col(dublin_metadata_ar::Column::Description),
+            accession::Column::DublinMetadataAr.is_not_null(),
         ),
     };
 
@@ -76,7 +78,8 @@ pub fn build_filter_expression(
                     .or(Func::lower(subject).like(&query_string))
                     .or(Func::lower(description).like(&query_string))
                     .and(accession::Column::DublinMetadataDate.gte(from))
-                    .and(accession::Column::DublinMetadataDate.lte(to)),
+                    .and(accession::Column::DublinMetadataDate.lte(to))
+                    .and(lang_filter),
             )
         }
         (Some(term), Some(from), None) => {
@@ -86,7 +89,8 @@ pub fn build_filter_expression(
                     .like(&query_string)
                     .or(Func::lower(subject).like(&query_string))
                     .or(Func::lower(description).like(&query_string))
-                    .and(accession::Column::DublinMetadataDate.gte(from)),
+                    .and(accession::Column::DublinMetadataDate.gte(from))
+                    .and(lang_filter),
             )
         }
         (Some(term), None, Some(to)) => {
@@ -96,7 +100,8 @@ pub fn build_filter_expression(
                     .like(&query_string)
                     .or(Func::lower(subject).like(&query_string))
                     .or(Func::lower(description).like(&query_string))
-                    .and(accession::Column::DublinMetadataDate.lte(to)),
+                    .and(accession::Column::DublinMetadataDate.lte(to))
+                    .and(lang_filter),
             )
         }
         (Some(term), None, None) => {
@@ -105,17 +110,27 @@ pub fn build_filter_expression(
                 Func::lower(title)
                     .like(&query_string)
                     .or(Func::lower(subject).like(&query_string))
-                    .or(Func::lower(description).like(&query_string)),
+                    .or(Func::lower(description).like(&query_string))
+                    .and(lang_filter),
             )
         }
         (None, Some(from), Some(to)) => Some(
             accession::Column::DublinMetadataDate
                 .gte(from)
-                .and(accession::Column::DublinMetadataDate.lte(to)),
+                .and(accession::Column::DublinMetadataDate.lte(to))
+                .and(lang_filter),
         ),
-        (None, Some(from), None) => Some(accession::Column::DublinMetadataDate.gte(from)),
-        (None, None, Some(to)) => Some(accession::Column::DublinMetadataDate.lte(to)),
-        (None, None, None) => None,
+        (None, Some(from), None) => Some(
+            accession::Column::DublinMetadataDate
+                .gte(from)
+                .and(lang_filter),
+        ),
+        (None, None, Some(to)) => Some(
+            accession::Column::DublinMetadataDate
+                .lte(to)
+                .and(lang_filter),
+        ),
+        (None, None, None) => Some(lang_filter),
     }
 }
 
@@ -127,7 +142,7 @@ mod tests {
     #[test]
     fn test_build_filter_none_params() {
         let actual = build_filter_expression(MetadataLanguage::English, None, None, None);
-        assert_eq!(actual, None);
+        assert_eq!(actual, Some(accession::Column::DublinMetadataEn.is_not_null()));
     }
 
     #[test]
@@ -148,7 +163,8 @@ mod tests {
             Func::lower(title)
                 .like(&query_string)
                 .or(Func::lower(subject).like(&query_string))
-                .or(Func::lower(description).like(&query_string)),
+                .or(Func::lower(description).like(&query_string))
+                .and(accession::Column::DublinMetadataEn.is_not_null()),
         );
         assert_eq!(actual, expected);
     }
@@ -171,7 +187,8 @@ mod tests {
             Func::lower(title)
                 .like(&query_string)
                 .or(Func::lower(subject).like(&query_string))
-                .or(Func::lower(description).like(&query_string)),
+                .or(Func::lower(description).like(&query_string))
+                .and(accession::Column::DublinMetadataAr.is_not_null()),
         );
         assert_eq!(actual, expected);
     }
@@ -196,7 +213,8 @@ mod tests {
         let expected = Some(
             accession::Column::DublinMetadataDate
                 .gte(from_date)
-                .and(accession::Column::DublinMetadataDate.lte(to_date)),
+                .and(accession::Column::DublinMetadataDate.lte(to_date))
+                .and(accession::Column::DublinMetadataEn.is_not_null()),
         );
         assert_eq!(actual, expected);
     }
@@ -210,7 +228,11 @@ mod tests {
 
         let actual =
             build_filter_expression(MetadataLanguage::English, None, Some(from_date), None);
-        let expected = Some(accession::Column::DublinMetadataDate.gte(from_date));
+        let expected = Some(
+            accession::Column::DublinMetadataDate
+                .gte(from_date)
+                .and(accession::Column::DublinMetadataEn.is_not_null()),
+        );
         assert_eq!(actual, expected);
     }
 
@@ -222,7 +244,11 @@ mod tests {
             .unwrap();
 
         let actual = build_filter_expression(MetadataLanguage::English, None, None, Some(to_date));
-        let expected = Some(accession::Column::DublinMetadataDate.lte(to_date));
+        let expected = Some(
+            accession::Column::DublinMetadataDate
+                .lte(to_date)
+                .and(accession::Column::DublinMetadataEn.is_not_null()),
+        );
         assert_eq!(actual, expected);
     }
 
@@ -256,7 +282,8 @@ mod tests {
                 .or(Func::lower(subject).like(&query_string))
                 .or(Func::lower(description).like(&query_string))
                 .and(accession::Column::DublinMetadataDate.gte(from_date))
-                .and(accession::Column::DublinMetadataDate.lte(to_date)),
+                .and(accession::Column::DublinMetadataDate.lte(to_date))
+                .and(accession::Column::DublinMetadataEn.is_not_null()),
         );
         assert_eq!(actual, expected);
     }
@@ -286,7 +313,8 @@ mod tests {
             Func::lower(title)
                 .like(&query_string)
                 .or(Func::lower(subject).like(&query_string))
-                .or(Func::lower(description).like(&query_string)),
+                .or(Func::lower(description).like(&query_string))
+                .and(accession::Column::DublinMetadataEn.is_not_null()),
         );
 
         assert_eq!(actual_lower, expected);
