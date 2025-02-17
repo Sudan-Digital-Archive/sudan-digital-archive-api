@@ -43,11 +43,12 @@ async fn main() {
     };
     let app_state = AppState { accessions_service };
     let app = create_app(app_state, app_config.cors_urls, false);
-    
-    let addr: SocketAddr = app_config.listener_address
+
+    let addr: SocketAddr = app_config
+        .listener_address
         .parse()
         .expect("Should be in address format like 0.0.0.0:5000");
-    
+
     info!("listening on {}", addr);
     let listener = TcpListener::bind(addr).await.unwrap();
     axum::serve(

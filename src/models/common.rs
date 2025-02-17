@@ -9,3 +9,10 @@ pub enum MetadataLanguage {
     English,
     Arabic,
 }
+
+/// Supported browser profiles for hard to archive sites
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BrowserProfile {
+    Facebook,
+}

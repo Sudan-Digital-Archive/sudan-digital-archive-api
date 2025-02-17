@@ -1,7 +1,7 @@
 //! Filter builder module for dynamic query construction across multilingual metadata tables.
-//! 
+//!
 //! This module provides functionality to construct dynamic database filters for the digital archive search,
-//! supporting multiple languages and search criteria. It's designed to be extensible for future 
+//! supporting multiple languages and search criteria. It's designed to be extensible for future
 //! enhancements like full-text search using ts_vector indices and additional metadata fields.
 
 use crate::models::common::MetadataLanguage;

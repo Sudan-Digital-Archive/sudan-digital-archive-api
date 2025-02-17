@@ -1,9 +1,9 @@
 //! Request models for the API endpoints.
-//! 
+//!
 //! This module contains all the request structures used by the API endpoints,
 //! including validation rules for incoming data.
 
-use crate::models::common::MetadataLanguage;
+use crate::models::common::{BrowserProfile, MetadataLanguage};
 use chrono::NaiveDateTime;
 use serde::Deserialize;
 use validator::Validate;
@@ -21,6 +21,7 @@ pub struct CreateAccessionRequest {
     #[validate(length(min = 1, max = 2000))]
     pub metadata_description: Option<String>,
     pub metadata_time: NaiveDateTime,
+    pub browser_profile: Option<BrowserProfile>,
 }
 
 /// Request for initiating a new Browsertrix crawl.
@@ -28,6 +29,7 @@ pub struct CreateAccessionRequest {
 pub struct CreateCrawlRequest {
     #[validate(url)]
     pub url: String,
+    pub browser_profile: Option<BrowserProfile>,
 }
 
 /// Pagination and filtering parameters for listing accessions.

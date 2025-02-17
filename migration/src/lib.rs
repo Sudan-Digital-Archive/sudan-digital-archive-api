@@ -1,4 +1,3 @@
-
 pub use sea_orm_migration::prelude::*;
 mod m20241224_163000_accessions;
 mod m20250212_014525_optional_metadata_description;

@@ -1,6 +1,7 @@
 //! Configuration module for Browsertrix web archiving integration and application settings.
 //! Handles environment variables and configuration structures for the archiving service.
 
+use crate::models::common::BrowserProfile;
 use http::HeaderValue;
 use serde::Serialize;
 use std::env;
@@ -53,8 +54,7 @@ pub fn build_app_config() -> AppConfig {
                 .expect("CORS_URL env var should contain comma separated origins")
         })
         .collect();
-    let listener_address = env::var("LISTENER_ADDRESS")
-    .expect("Missing LISTENER_ADDRESS env var");
+    let listener_address = env::var("LISTENER_ADDRESS").expect("Missing LISTENER_ADDRESS env var");
 
     AppConfig {
         browsertrix,
@@ -114,7 +114,7 @@ pub struct BrowsertrixCrawlConfig {
 
 impl BrowsertrixCrawlConfig {
     /// Creates a new crawl configuration for a single URL with default settings
-    pub fn new(url: String) -> Self {
+    pub fn new(url: String, browser_profile: Option<BrowserProfile>) -> Self {
         let one_seed = OneSeed {
             url,
             scope_type: "page".to_string(),
@@ -135,12 +135,20 @@ impl BrowsertrixCrawlConfig {
             exclude: vec![],
             behaviors: "autoscroll,autoplay,autofetch,siteSpecific".to_string(),
         };
+        let mut profileid = "".to_string();
+        if let Some(browser_profile_name) = browser_profile {
+            // profile ids here are from Browsertrix API
+            // to get them you need to do list profiles
+            profileid = match browser_profile_name {
+                BrowserProfile::Facebook => "b1cd3192-a554-41e1-9509-0cbff3b3df16".to_string(),
+            };
+        }
         BrowsertrixCrawlConfig {
             job_type: "custom".to_string(),
             name: "".to_string(),
             description: None,
             scale: 1,
-            profileid: "".to_string(),
+            profileid,
             run_now: true,
             schedule: "".to_string(),
             crawl_timeout: 0,
@@ -160,8 +168,8 @@ mod tests {
 
     #[test]
     fn test_crawl_config_new_different_urls() {
-        let config1 = BrowsertrixCrawlConfig::new("https://example.com".to_string());
-        let config2 = BrowsertrixCrawlConfig::new("https://different.com".to_string());
+        let config1 = BrowsertrixCrawlConfig::new("https://example.com".to_string(), None);
+        let config2 = BrowsertrixCrawlConfig::new("https://different.com".to_string(), Some(BrowserProfile::Facebook));
 
         assert_eq!(config1.config.seeds[0].url, "https://example.com");
         assert_eq!(config2.config.seeds[0].url, "https://different.com");

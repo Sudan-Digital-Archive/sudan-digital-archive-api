@@ -1,5 +1,5 @@
 //! Repository module for managing accessions in the digital archive.
-//! 
+//!
 //! This module provides functionality for creating, retrieving, and listing
 //! accession records with their associated metadata in both Arabic and English.
 
@@ -32,13 +32,13 @@ pub struct DBAccessionsRepo {
 }
 
 /// Defines the interface for accession-related database operations.
-/// 
+///
 /// This trait provides methods for creating and retrieving accession records
 /// along with their associated metadata in both Arabic and English.
 #[async_trait]
 pub trait AccessionsRepo: Send + Sync {
     /// Creates a new accession record with associated metadata.
-    /// 
+    ///
     /// # Arguments
     /// * `create_accession_request` - The request containing accession and metadata details
     /// * `org_id` - The Browsertrix organization ID associated with the accession
@@ -55,7 +55,7 @@ pub trait AccessionsRepo: Send + Sync {
     ) -> Result<(), DbErr>;
 
     /// Retrieves an accession record by its ID along with associated metadata.
-    /// 
+    ///
     /// Returns a tuple containing the accession and its metadata in both languages.
     async fn get_one(
         &self,
@@ -70,7 +70,7 @@ pub trait AccessionsRepo: Send + Sync {
     >;
 
     /// Lists paginated accessions with Arabic metadata.
-    /// 
+    ///
     /// # Arguments
     /// * `page` - The page number to retrieve
     /// * `per_page` - Number of items per page
@@ -87,7 +87,7 @@ pub trait AccessionsRepo: Send + Sync {
     ) -> Result<(Vec<(AccessionModel, Option<DublinMetataArModel>)>, u64), DbErr>;
 
     /// Lists paginated accessions with English metadata.
-    /// 
+    ///
     /// # Arguments
     /// * `page` - The page number to retrieve
     /// * `per_page` - Number of items per page
