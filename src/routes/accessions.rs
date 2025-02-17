@@ -1,5 +1,5 @@
 //! Routes for managing archival records (accessions) in the digital archive.
-//! 
+//!
 //! This module provides HTTP endpoints for creating, retrieving, and listing accessions.
 //! It uses in-memory repositories for testing to avoid I/O operations.
 
@@ -99,6 +99,7 @@ mod tests {
                 metadata_subject: "".to_string(),
                 metadata_description: Some("".to_string()),
                 metadata_time: Default::default(),
+                browser_profile: None,
             })
             .await;
     }
@@ -114,6 +115,7 @@ mod tests {
                 metadata_subject: "".to_string(),
                 metadata_description: None,
                 metadata_time: Default::default(),
+                browser_profile: None,
             })
             .await;
     }
@@ -159,13 +161,15 @@ mod tests {
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(Body::from(
                         serde_json::to_vec(&json!({
-    "url": "https://www.theguardian.com/business/2025/jan/10/britain-energy-costs-labour-power-plants-uk-cold-weather?utm_source=firefox-newtab-en-gb",
-    "metadata_language": "english",
-    "metadata_title": "Guardian piece",
-    "metadata_subject": "UK energy costs",
-    "metadata_description": null,
-    "metadata_time": "2024-11-01T23:32:00"
-})).unwrap(),
+                            "url": "https://facebook.com/some/story",
+                            "metadata_language": "english",
+                            "metadata_title": "Guardian piece",
+                            "metadata_subject": "UK energy costs",
+                            "metadata_description": null,
+                            "metadata_time": "2024-11-01T23:32:00",
+                            "browser_profile": "facebook"
+                        }))
+                        .unwrap(),
                     ))
                     .unwrap(),
             )

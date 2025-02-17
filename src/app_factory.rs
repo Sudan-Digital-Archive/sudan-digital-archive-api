@@ -1,16 +1,16 @@
 //! Application factory module for configuring and building the API server.
-//! 
+//!
 //! This module handles the setup of:
 //! - Rate limiting (via tower-governor)
 //! - CORS configuration
 //! - Middleware stack (compression, timeout, tracing)
 //! - Route registration
-//! 
+//!
 //! # Rate Limiting
 //! The application uses tower-governor for rate limiting with default configuration:
 //! - 32 requests per minute per IP address
 //! - Regular cleanup of rate limiting storage every 60 seconds
-//! 
+//!
 //! Note: Rate limiting is disabled in test mode.
 
 use crate::routes::accessions::get_accessions_routes;

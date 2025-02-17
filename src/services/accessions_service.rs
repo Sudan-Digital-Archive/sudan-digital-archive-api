@@ -1,5 +1,5 @@
 //! Service layer for managing archival accessions (records).
-//! 
+//!
 //! This module handles the business logic for creating, retrieving, and listing
 //! archival records, including their associated web crawls and metadata in both
 //! Arabic and English.
@@ -156,6 +156,7 @@ impl AccessionsService {
     pub async fn create_one(self, payload: CreateAccessionRequest) {
         let create_crawl_request = CreateCrawlRequest {
             url: payload.url.clone(),
+            browser_profile: payload.browser_profile.clone(),
         };
         let resp = self
             .browsertrix_repo
@@ -181,6 +182,7 @@ impl AccessionsService {
                                 info!(%valid_crawl_resp, %count, "Crawl complete after {crawl_time_secs}s");
                                 let create_accessions_request = CreateAccessionRequest {
                                     url: payload.url,
+                                    browser_profile: payload.browser_profile,
                                     metadata_language: payload.metadata_language,
                                     metadata_title: payload.metadata_title,
                                     metadata_subject: payload.metadata_subject,

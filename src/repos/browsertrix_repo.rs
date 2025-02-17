@@ -108,7 +108,10 @@ impl BrowsertrixRepo for HTTPBrowsertrixRepo {
         &self,
         create_crawl_request: CreateCrawlRequest,
     ) -> Result<CreateCrawlResponse, Error> {
-        let json_payload = BrowsertrixCrawlConfig::new(create_crawl_request.url);
+        let json_payload = BrowsertrixCrawlConfig::new(
+            create_crawl_request.url,
+            create_crawl_request.browser_profile,
+        );
         let create_crawl_req = self
             .client
             .post(self.create_crawl_url.clone())

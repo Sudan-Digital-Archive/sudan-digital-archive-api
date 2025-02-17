@@ -1,5 +1,5 @@
 //! Response models for the API endpoints.
-//! 
+//!
 //! This module contains all the response structures used by the API endpoints,
 //! including authentication, crawl operations, and accession management.
 
@@ -55,10 +55,7 @@ pub struct GetOneAccessionResponse {
 /// Paginated response for Arabic accession listings.
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ListAccessionsArResponse {
-    pub items: Vec<(
-        AccessionModel,
-        Option<DublinMetataArModel>,
-    )>,
+    pub items: Vec<(AccessionModel, Option<DublinMetataArModel>)>,
     pub num_pages: u64,
     pub page: u64,
     pub per_page: u64,
@@ -67,10 +64,7 @@ pub struct ListAccessionsArResponse {
 /// Paginated response for English accession listings.
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ListAccessionsEnResponse {
-    pub items: Vec<(
-        AccessionModel,
-        Option<DublinMetadataEnModel>,
-    )>,
+    pub items: Vec<(AccessionModel, Option<DublinMetadataEnModel>)>,
     pub num_pages: u64,
     pub page: u64,
     pub per_page: u64,
