@@ -115,7 +115,7 @@ impl AccessionsRepo for DBAccessionsRepo {
         crawl_status: CrawlStatus,
     ) -> Result<(), DbErr> {
         let txn = self.db_session.begin().await?;
-        let metadata_id = match create_accession_request.metadata_language {
+        let (dublin_metadata_en_id, dublin_metadata_ar_id) = match create_accession_request.metadata_language {
             MetadataLanguage::English => {
                 let metadata = DublinMetadataEnActiveModel {
                     id: Default::default(),
@@ -124,7 +124,7 @@ impl AccessionsRepo for DBAccessionsRepo {
                     description: ActiveValue::Set(create_accession_request.metadata_description),
                 };
                 let inserted_metadata = metadata.save(&txn).await?;
-                inserted_metadata.try_into_model()?.id
+                (Some(inserted_metadata.try_into_model()?.id), None)
             }
             MetadataLanguage::Arabic => {
                 let metadata = DublinMetadataArActiveModel {
@@ -134,7 +134,7 @@ impl AccessionsRepo for DBAccessionsRepo {
                     description: ActiveValue::Set(create_accession_request.metadata_description),
                 };
                 let inserted_metadata = metadata.save(&txn).await?;
-                inserted_metadata.try_into_model()?.id
+                (None, Some(inserted_metadata.try_into_model()?.id))
             }
         };
 
@@ -142,8 +142,8 @@ impl AccessionsRepo for DBAccessionsRepo {
         let i_hate_timezones = utc_now.naive_utc();
         let accession = AccessionActiveModel {
             id: Default::default(),
-            dublin_metadata_en: ActiveValue::Set(Some(metadata_id)),
-            dublin_metadata_ar: ActiveValue::Set(None),
+            dublin_metadata_en: ActiveValue::Set(dublin_metadata_en_id),
+            dublin_metadata_ar: ActiveValue::Set(dublin_metadata_ar_id),
             dublin_metadata_date: ActiveValue::Set(create_accession_request.metadata_time),
             crawl_status: ActiveValue::Set(crawl_status),
             crawl_timestamp: ActiveValue::Set(i_hate_timezones),
