@@ -16,8 +16,6 @@ pub struct CreateAccessionRequest {
     pub metadata_language: MetadataLanguage,
     #[validate(length(min = 1, max = 200))]
     pub metadata_title: String,
-    #[validate(length(min = 1))]
-    pub metadata_subject: String,
     #[validate(length(min = 1, max = 2000))]
     pub metadata_description: Option<String>,
     pub metadata_time: NaiveDateTime,
@@ -43,4 +41,10 @@ pub struct Pagination {
     pub query_term: Option<String>,
     pub date_from: Option<NaiveDateTime>,
     pub date_to: Option<NaiveDateTime>,
+}
+
+#[derive(Debug, Validate, Deserialize)]
+pub struct CreateSubjectRequest {
+    #[validate(length(min = 1, max=100))]
+    pub metadata_subject: String,
 }

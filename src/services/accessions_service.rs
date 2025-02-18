@@ -190,7 +190,6 @@ impl AccessionsService {
                                     browser_profile: payload.browser_profile,
                                     metadata_language: payload.metadata_language,
                                     metadata_title: trimmed_title,
-                                    metadata_subject: payload.metadata_subject,
                                     metadata_description: trimmed_description,
                                     metadata_time: payload.metadata_time,
                                 };

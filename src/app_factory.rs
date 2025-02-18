@@ -33,11 +33,13 @@ use tower_http::{
 };
 use tracing::info_span;
 use tracing_subscriber::util::SubscriberInitExt;
+use crate::services::subjects_service::SubjectsService;
 
 /// Application state shared across routes
 #[derive(Clone)]
 pub struct AppState {
     pub accessions_service: AccessionsService,
+    pub subjects_service: SubjectsService,
 }
 
 /// Creates and configures the main application router with middleware and routes.
