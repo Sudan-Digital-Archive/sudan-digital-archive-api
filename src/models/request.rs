@@ -20,6 +20,8 @@ pub struct CreateAccessionRequest {
     pub metadata_description: Option<String>,
     pub metadata_time: NaiveDateTime,
     pub browser_profile: Option<BrowserProfile>,
+    #[validate(length(min = 1, max = 200))]
+    pub metadata_subjects: Vec<u64>,
 }
 
 /// Request for initiating a new Browsertrix crawl.
@@ -32,7 +34,7 @@ pub struct CreateCrawlRequest {
 
 /// Pagination and filtering parameters for listing accessions.
 #[derive(Debug, Validate, Deserialize)]
-pub struct Pagination {
+pub struct AccessionPagination {
     pub page: u64,
     #[validate(range(min = 1, max = 200))]
     pub per_page: u64,
@@ -45,6 +47,18 @@ pub struct Pagination {
 
 #[derive(Debug, Validate, Deserialize)]
 pub struct CreateSubjectRequest {
-    #[validate(length(min = 1, max=100))]
+    #[validate(length(min = 1, max = 100))]
     pub metadata_subject: String,
+    pub lang: MetadataLanguage,
+}
+
+/// Pagination and filtering parameters for listing subjects.
+#[derive(Debug, Validate, Deserialize)]
+pub struct SubjectPagination {
+    pub page: u64,
+    #[validate(range(min = 1, max = 200))]
+    pub per_page: u64,
+    pub lang: MetadataLanguage,
+    #[validate(length(min = 1, max = 500))]
+    pub query_term: Option<String>,
 }

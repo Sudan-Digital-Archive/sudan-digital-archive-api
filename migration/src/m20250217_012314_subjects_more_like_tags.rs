@@ -20,14 +20,28 @@ enum DublinMetadataSubjectAr {
 #[derive(DeriveIden)]
 enum DublinMetadataEn {
     Table,
+    Id,
     Subject,
-    SubjectId,
 }
 
 #[derive(DeriveIden)]
 enum DublinMetadataAr {
     Table,
+    Id,
     Subject,
+}
+
+#[derive(DeriveIden)]
+enum DublinMetadataEnSubjects {
+    Table,
+    MetadataId,
+    SubjectId,
+}
+
+#[derive(DeriveIden)]
+enum DublinMetadataArSubjects {
+    Table,
+    MetadataId,
     SubjectId,
 }
 
@@ -40,7 +54,7 @@ impl MigrationTrait for Migration {
                     .table(DublinMetadataSubjectEn::Table)
                     .if_not_exists()
                     .col(pk_auto(DublinMetadataSubjectEn::Id))
-                    .col(string(DublinMetadataSubjectEn::Subject))
+                    .col(string(DublinMetadataSubjectEn::Subject).unique_key())
                     .to_owned(),
             )
             .await?;
@@ -50,7 +64,7 @@ impl MigrationTrait for Migration {
                     .table(DublinMetadataSubjectAr::Table)
                     .if_not_exists()
                     .col(pk_auto(DublinMetadataSubjectAr::Id))
-                    .col(string(DublinMetadataSubjectAr::Subject))
+                    .col(string(DublinMetadataSubjectAr::Subject).unique_key())
                     .to_owned(),
             )
             .await?;
@@ -59,9 +73,6 @@ impl MigrationTrait for Migration {
                 Table::alter()
                     .table(DublinMetadataEn::Table)
                     .drop_column(DublinMetadataEn::Subject)
-                    .add_column_if_not_exists(
-                        ColumnDef::new(DublinMetadataEn::SubjectId).integer().null(),
-                    )
                     .to_owned(),
             )
             .await?;
@@ -70,39 +81,92 @@ impl MigrationTrait for Migration {
                 Table::alter()
                     .table(DublinMetadataAr::Table)
                     .drop_column(DublinMetadataAr::Subject)
-                    .add_column_if_not_exists(
-                        ColumnDef::new(DublinMetadataAr::SubjectId).integer().null(),
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(DublinMetadataEnSubjects::Table)
+                    .if_not_exists()
+                    .primary_key(
+                        Index::create()
+                            .name("link_subjects_en")
+                            .table(DublinMetadataEnSubjects::Table)
+                            .col(DublinMetadataEnSubjects::MetadataId)
+                            .col(DublinMetadataEnSubjects::SubjectId)
+                    )
+                    .col(
+                        ColumnDef::new(DublinMetadataEnSubjects::MetadataId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DublinMetadataEnSubjects::SubjectId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("dublin_metadata_id_en")
+                            .from(
+                                DublinMetadataEnSubjects::Table,
+                                DublinMetadataEnSubjects::MetadataId,
+                            )
+                            .to(DublinMetadataEn::Table, DublinMetadataEn::Id)
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("dublin_metadata_subject_en")
+                            .from(
+                                DublinMetadataEnSubjects::Table,
+                                DublinMetadataEnSubjects::SubjectId,
+                            )
+                            .to(DublinMetadataSubjectEn::Table, DublinMetadataSubjectEn::Id)
                     )
                     .to_owned(),
             )
             .await?;
-        let foreign_key_en_subject = TableForeignKey::new()
-            .name("dublin_metadata_subject_en")
-            .from_tbl(DublinMetadataEn::Table)
-            .from_col(DublinMetadataEn::SubjectId)
-            .to_tbl(DublinMetadataSubjectEn::Table)
-            .to_col(DublinMetadataSubjectEn::Id)
-            .to_owned();
-        let foreign_key_ar_subject = TableForeignKey::new()
-            .name("dublin_metadata_subject_ar")
-            .from_tbl(DublinMetadataAr::Table)
-            .from_col(DublinMetadataAr::SubjectId)
-            .to_tbl(DublinMetadataSubjectAr::Table)
-            .to_col(DublinMetadataSubjectAr::Id)
-            .to_owned();
         manager
-            .alter_table(
-                Table::alter()
-                    .table(DublinMetadataEn::Table)
-                    .add_foreign_key(&foreign_key_en_subject)
-                    .to_owned(),
-            )
-            .await?;
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(DublinMetadataAr::Table)
-                    .add_foreign_key(&foreign_key_ar_subject)
+            .create_table(
+                Table::create()
+                    .table(DublinMetadataArSubjects::Table)
+                    .if_not_exists()
+                    .primary_key(
+                        Index::create()
+                            .name("link_subjects_ar")
+                            .table(DublinMetadataArSubjects::Table)
+                            .col(DublinMetadataArSubjects::MetadataId)
+                            .col(DublinMetadataArSubjects::SubjectId)
+                    )
+                    .col(
+                        ColumnDef::new(DublinMetadataArSubjects::MetadataId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DublinMetadataArSubjects::SubjectId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("dublin_metadata_id_ar")
+                            .from(
+                                DublinMetadataArSubjects::Table,
+                                DublinMetadataArSubjects::MetadataId,
+                            )
+                            .to(DublinMetadataAr::Table, DublinMetadataAr::Id),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("dublin_metadata_subject_ar")
+                            .from(
+                                DublinMetadataArSubjects::Table,
+                                DublinMetadataArSubjects::SubjectId,
+                            )
+                            .to(DublinMetadataSubjectAr::Table, DublinMetadataSubjectAr::Id),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -154,8 +218,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(DublinMetadataEn::Table)
-                    .drop_foreign_key(Alias::new("dublin_metadata_subject_en"))
-                    .drop_column(DublinMetadataEn::SubjectId)
+                    .add_column_if_not_exists(
+                        ColumnDef::new(DublinMetadataEn::Subject)
+                            .string()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -164,8 +231,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(DublinMetadataAr::Table)
-                    .drop_foreign_key(Alias::new("dublin_metadata_subject_ar"))
-                    .drop_column(DublinMetadataAr::SubjectId)
+                    .add_column_if_not_exists(
+                        ColumnDef::new(DublinMetadataAr::Subject)
+                            .string()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -185,33 +255,20 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-
         manager
-            .alter_table(
-                Table::alter()
-                    .table(DublinMetadataEn::Table)
-                    .add_column(
-                        ColumnDef::new(DublinMetadataEn::Subject)
-                            .string()
-                            .not_null(),
-                    )
+            .drop_table(
+                Table::drop()
+                    .table(DublinMetadataEnSubjects::Table)
                     .to_owned(),
             )
             .await?;
-
         manager
-            .alter_table(
-                Table::alter()
-                    .table(DublinMetadataAr::Table)
-                    .add_column(
-                        ColumnDef::new(DublinMetadataAr::Subject)
-                            .string()
-                            .not_null(),
-                    )
+            .drop_table(
+                Table::drop()
+                    .table(DublinMetadataArSubjects::Table)
                     .to_owned(),
             )
             .await?;
-
         Ok(())
     }
 }

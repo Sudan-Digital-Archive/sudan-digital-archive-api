@@ -6,6 +6,8 @@
 use ::entity::accession::Model as AccessionModel;
 use ::entity::dublin_metadata_ar::Model as DublinMetataArModel;
 use ::entity::dublin_metadata_en::Model as DublinMetadataEnModel;
+use ::entity::dublin_metadata_subject_ar::Model as DublinMetadataSubjectArModel;
+use ::entity::dublin_metadata_subject_en::Model as DublinMetadataSubjectEnModel;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -65,6 +67,27 @@ pub struct ListAccessionsArResponse {
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ListAccessionsEnResponse {
     pub items: Vec<(AccessionModel, Option<DublinMetadataEnModel>)>,
+    pub num_pages: u64,
+    pub page: u64,
+    pub per_page: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SubjectResponse {
+    pub id: i32,
+    pub subject: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ListSubjectsArResponse {
+    pub items: Vec<DublinMetadataSubjectArModel>,
+    pub num_pages: u64,
+    pub page: u64,
+    pub per_page: u64,
+}
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ListSubjectsEnResponse {
+    pub items: Vec<DublinMetadataSubjectEnModel>,
     pub num_pages: u64,
     pub page: u64,
     pub per_page: u64,

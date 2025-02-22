@@ -121,10 +121,9 @@ impl AccessionsRepo for DBAccessionsRepo {
             MetadataLanguage::English => {
                 let metadata = DublinMetadataEnActiveModel {
                     id: Default::default(),
-                    // TODO: This should write an actual subject id
-                    subject_id: ActiveValue::Set(None),
                     title: ActiveValue::Set(create_accession_request.metadata_title),
                     description: ActiveValue::Set(create_accession_request.metadata_description),
+                    dublin_metadata_subject_en:
                 };
                 let inserted_metadata = metadata.save(&txn).await?;
                 (Some(inserted_metadata.try_into_model()?.id), None)

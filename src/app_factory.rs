@@ -16,6 +16,7 @@
 use crate::routes::accessions::get_accessions_routes;
 use crate::routes::health::healthcheck;
 use crate::services::accessions_service::AccessionsService;
+use crate::services::subjects_service::SubjectsService;
 use axum::extract::MatchedPath;
 use axum::http::Request;
 use axum::routing::get;
@@ -33,7 +34,6 @@ use tower_http::{
 };
 use tracing::info_span;
 use tracing_subscriber::util::SubscriberInitExt;
-use crate::services::subjects_service::SubjectsService;
 
 /// Application state shared across routes
 #[derive(Clone)]

@@ -11,7 +11,7 @@ use crate::app_factory::{create_app, AppState};
 use crate::config::build_app_config;
 use crate::repos::accessions_repo::DBAccessionsRepo;
 use crate::repos::browsertrix_repo::{BrowsertrixRepo, HTTPBrowsertrixRepo};
-use crate::repos::subjects_repo::{ DBSubjectsRepo};
+use crate::repos::subjects_repo::DBSubjectsRepo;
 use crate::services::accessions_service::AccessionsService;
 use crate::services::subjects_service::SubjectsService;
 use sea_orm::Database;
@@ -28,7 +28,9 @@ async fn main() {
         .await
         .expect("Could not connect to db");
     // TODO: Double check in docs this is fine to clone
-    let accessions_repo = DBAccessionsRepo { db_session: db_session.clone()};
+    let accessions_repo = DBAccessionsRepo {
+        db_session: db_session.clone(),
+    };
     let subjects_repo = DBSubjectsRepo { db_session };
     let mut http_btrix_repo = HTTPBrowsertrixRepo {
         client: reqwest::Client::new(),
@@ -45,8 +47,13 @@ async fn main() {
         accessions_repo: Arc::new(accessions_repo),
         browsertrix_repo: Arc::new(http_btrix_repo),
     };
-    let subjects_service = SubjectsService {subjects_repo: Arc::new(subjects_repo) };
-    let app_state = AppState { accessions_service, subjects_service };
+    let subjects_service = SubjectsService {
+        subjects_repo: Arc::new(subjects_repo),
+    };
+    let app_state = AppState {
+        accessions_service,
+        subjects_service,
+    };
     let app = create_app(app_state, app_config.cors_urls, false);
 
     let addr: SocketAddr = app_config

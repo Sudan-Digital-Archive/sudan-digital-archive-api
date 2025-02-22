@@ -51,7 +51,7 @@ impl AccessionsService {
         date_from: Option<NaiveDateTime>,
         date_to: Option<NaiveDateTime>,
     ) -> Response {
-        info!("Getting page {page} of accessions with per page {per_page}...");
+        info!("Getting page {page} of {metadata_language} accessions with per page {per_page}...");
         match metadata_language {
             MetadataLanguage::Arabic => {
                 let rows = match self
@@ -192,6 +192,7 @@ impl AccessionsService {
                                     metadata_title: trimmed_title,
                                     metadata_description: trimmed_description,
                                     metadata_time: payload.metadata_time,
+                                    metadata_subjects: payload.metadata_subjects,
                                 };
                                 let write_result = self
                                     .accessions_repo

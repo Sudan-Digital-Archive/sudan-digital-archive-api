@@ -4,7 +4,7 @@
 //! It uses in-memory repositories for testing to avoid I/O operations.
 
 use crate::app_factory::AppState;
-use crate::models::request::{CreateAccessionRequest, Pagination};
+use crate::models::request::{AccessionPagination, CreateAccessionRequest};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -52,7 +52,10 @@ async fn get_one_accession(State(state): State<AppState>, Path(id): Path<i32>) -
 ///
 /// Supports filtering by language, date range, and search terms.
 /// Returns 400 BAD REQUEST if pagination parameters are invalid.
-async fn list_accessions(State(state): State<AppState>, pagination: Query<Pagination>) -> Response {
+async fn list_accessions(
+    State(state): State<AppState>,
+    pagination: Query<AccessionPagination>,
+) -> Response {
     if let Err(err) = pagination.0.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }
