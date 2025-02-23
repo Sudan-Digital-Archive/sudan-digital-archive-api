@@ -1,10 +1,8 @@
 # TODOs
 
-- Change create accession to write to new subject table; limit to max 200 subject ids lol.
-- Verify view entity works in simple test new endpoint - just write a new one that runs
-  appropriate sql and see if it's OK.
-- If that works, change read + list accessions to hit the view
+- Change read + list accessions to hit the view
 - Write tests for all the new shiz
+- Write ticket to do open api schema
 
 # Overview
 

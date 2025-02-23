@@ -33,7 +33,19 @@ async fn create_accession(
     if let Err(err) = payload.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }
-
+    let cloned_payload = payload.clone();
+    let subjects_exist = state.subjects_service.clone().verify_subjects_exist(cloned_payload.metadata_subjects,
+                                                                   cloned_payload.metadata_language).await;
+    match subjects_exist {
+        Err(err) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response();
+        },
+        Ok(flag) => {
+            if !flag {
+                return (StatusCode::BAD_REQUEST, "Subjects do not exist").into_response();
+            }
+        }
+    };
     let cloned_state = state.clone();
     tokio::spawn(async move {
         cloned_state.accessions_service.create_one(payload).await;

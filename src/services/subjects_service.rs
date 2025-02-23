@@ -4,11 +4,10 @@ use crate::models::response::{ListSubjectsArResponse, ListSubjectsEnResponse};
 use crate::repos::subjects_repo::SubjectsRepo;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use chrono::NaiveDateTime;
 use http::StatusCode;
 use std::sync::Arc;
-use tracing::{error, info};
-
+use sea_orm::DbErr;
+use tracing::{error, info, warn};
 #[derive(Clone)]
 pub struct SubjectsService {
     pub subjects_repo: Arc<dyn SubjectsRepo>,
@@ -20,9 +19,22 @@ impl SubjectsService {
             "Creating new {} subject {}...",
             payload.lang, payload.metadata_subject
         );
-        let write_result = self.subjects_repo.write_one(payload).await;
+        let write_result = self.subjects_repo.write_one(payload.clone()).await;
         match write_result {
             Err(write_error) => {
+                if write_error
+                    .to_string()
+                    .contains("duplicate key value violates unique constraint")
+                {
+                    warn!(%write_error,
+                        "Can't write {} subject since subject {} already exists",
+                        payload.lang, payload.metadata_subject);
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        format!("Subject {} already exists", payload.metadata_subject),
+                    )
+                        .into_response();
+                }
                 error!(%write_error, "Error occurred writing subject");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
             }
@@ -83,6 +95,14 @@ impl SubjectsService {
                     }
                 }
             }
-        };
+        }
+    }
+
+    pub async fn verify_subjects_exist(
+        self,
+        metadata_subjects: Vec<i32>,
+        metadata_language: MetadataLanguage,
+    ) -> Result<bool, DbErr>{
+        Ok(self.subjects_repo.verify_subjects_exist(metadata_subjects, metadata_language).await?)
     }
 }

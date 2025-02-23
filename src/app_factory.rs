@@ -14,6 +14,8 @@
 //! Note: Rate limiting is disabled in test mode.
 
 use crate::routes::accessions::get_accessions_routes;
+use crate::routes::subjects::get_subjects_routes;
+
 use crate::routes::health::healthcheck;
 use crate::services::accessions_service::AccessionsService;
 use crate::services::subjects_service::SubjectsService;
@@ -118,8 +120,10 @@ fn build_routes() -> Router<AppState> {
         .layer(CompressionLayer::new())
         .layer(ValidateRequestHeaderLayer::accept("application/json"));
     let accessions_routes = get_accessions_routes();
+    let subjects_routes = get_subjects_routes();
     Router::new()
         .nest("/api/v1", accessions_routes)
+        .nest("/api/v1", subjects_routes)
         .nest("/health", Router::new().route("/", get(healthcheck)))
         .layer(middleware)
 }

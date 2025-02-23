@@ -113,34 +113,34 @@ impl AccessionsService {
                 error!(%query_result, "Error occurred retrieving accession");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
             }
-            Ok(query_result) => match query_result.0 {
-                Some(accession_record) => {
-                    match self
-                        .browsertrix_repo
-                        .get_wacz_url(&accession_record.job_run_id)
-                        .await
-                    {
-                        Ok(wacz_url) => {
-                            let resp = GetOneAccessionResponse {
-                                accession: accession_record,
-                                metadata_ar: query_result.1,
-                                metadata_en: query_result.2,
-                                wacz_url,
-                            };
-                            Json(resp).into_response()
-                        }
-                        Err(err) => {
-                            error!(%err, "Error occurred retrieiving wacz url");
-                            (
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                "Error retrieving wacz url",
-                            )
-                                .into_response()
-                        }
-                    }
-                }
-                None => (StatusCode::NOT_FOUND, "No such record").into_response(),
-            },
+            Ok(query_result) => Json(query_result).into_response(), // Ok(query_result) => match query_result.0 {
+                                                                    //     Some(accession_record) => {
+                                                                    //         match self
+                                                                    //             .browsertrix_repo
+                                                                    //             .get_wacz_url(&accession_record.job_run_id)
+                                                                    //             .await
+                                                                    //         {
+                                                                    //             Ok(wacz_url) => {
+                                                                    //                 let resp = GetOneAccessionResponse {
+                                                                    //                     accession: accession_record,
+                                                                    //                     metadata_ar: query_result.1,
+                                                                    //                     metadata_en: query_result.2,
+                                                                    //                     wacz_url,
+                                                                    //                 };
+                                                                    //                 Json(resp).into_response()
+                                                                    //             }
+                                                                    //             Err(err) => {
+                                                                    //                 error!(%err, "Error occurred retrieiving wacz url");
+                                                                    //                 (
+                                                                    //                     StatusCode::INTERNAL_SERVER_ERROR,
+                                                                    //                     "Error retrieving wacz url",
+                                                                    //                 )
+                                                                    //                     .into_response()
+                                                                    //             }
+                                                                    //         }
+                                                                    //     }
+                                                                    //     None => (StatusCode::NOT_FOUND, "No such record").into_response(),
+                                                                    // },
         }
     }
 
@@ -154,6 +154,7 @@ impl AccessionsService {
     /// # Arguments
     /// * `payload` - The creation request containing URL and metadata
     pub async fn create_one(self, payload: CreateAccessionRequest) {
+        // TODO: Validate that subject exists
         let create_crawl_request = CreateCrawlRequest {
             url: payload.url.clone(),
             browser_profile: payload.browser_profile.clone(),

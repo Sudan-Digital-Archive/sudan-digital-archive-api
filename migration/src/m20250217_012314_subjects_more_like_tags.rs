@@ -92,9 +92,8 @@ impl MigrationTrait for Migration {
                     .primary_key(
                         Index::create()
                             .name("link_subjects_en")
-                            .table(DublinMetadataEnSubjects::Table)
                             .col(DublinMetadataEnSubjects::MetadataId)
-                            .col(DublinMetadataEnSubjects::SubjectId)
+                            .col(DublinMetadataEnSubjects::SubjectId),
                     )
                     .col(
                         ColumnDef::new(DublinMetadataEnSubjects::MetadataId)
@@ -113,7 +112,7 @@ impl MigrationTrait for Migration {
                                 DublinMetadataEnSubjects::Table,
                                 DublinMetadataEnSubjects::MetadataId,
                             )
-                            .to(DublinMetadataEn::Table, DublinMetadataEn::Id)
+                            .to(DublinMetadataEn::Table, DublinMetadataEn::Id),
                     )
                     .foreign_key(
                         ForeignKey::create()
@@ -122,7 +121,7 @@ impl MigrationTrait for Migration {
                                 DublinMetadataEnSubjects::Table,
                                 DublinMetadataEnSubjects::SubjectId,
                             )
-                            .to(DublinMetadataSubjectEn::Table, DublinMetadataSubjectEn::Id)
+                            .to(DublinMetadataSubjectEn::Table, DublinMetadataSubjectEn::Id),
                     )
                     .to_owned(),
             )
@@ -135,9 +134,8 @@ impl MigrationTrait for Migration {
                     .primary_key(
                         Index::create()
                             .name("link_subjects_ar")
-                            .table(DublinMetadataArSubjects::Table)
                             .col(DublinMetadataArSubjects::MetadataId)
-                            .col(DublinMetadataArSubjects::SubjectId)
+                            .col(DublinMetadataArSubjects::SubjectId),
                     )
                     .col(
                         ColumnDef::new(DublinMetadataArSubjects::MetadataId)
@@ -186,17 +184,21 @@ impl MigrationTrait for Migration {
                 dme.title AS title_en,
                 dme.description AS description_en,
                 (
-                    SELECT array_agg(dmse.subject)
-                    FROM dublin_metadata_subject_en dmse
-                    WHERE dme.id = dmse.id
-                    LIMIT 200
+                SELECT array_agg(dmse.subject)
+                FROM dublin_metadata_subject_en dmse
+                JOIN dublin_metadata_en_subjects dmes ON dmse.id = dmes.subject_id
+                WHERE dmes.metadata_id = dme.id
+                -- api validation limits 200 max subjects
+                LIMIT 200
                 ) AS subjects_en,
                 dma.title AS title_ar,
                 dma.description AS description_ar,
                 (
                     SELECT array_agg(dmsa.subject)
                     FROM dublin_metadata_subject_ar dmsa
-                    WHERE dma.id = dmsa.id
+                    JOIN dublin_metadata_ar_subjects dmas ON dmsa.id = dmas.subject_id
+                    WHERE dmas.metadata_id = dma.id
+                    -- api validation limits 200 max subjects
                     LIMIT 200
                 ) AS subjects_ar,
                 COALESCE((dme.id IS NOT NULL), FALSE) AS has_english_metadata,
@@ -243,6 +245,20 @@ impl MigrationTrait for Migration {
         manager
             .drop_table(
                 Table::drop()
+                    .table(DublinMetadataEnSubjects::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(DublinMetadataArSubjects::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
                     .table(DublinMetadataSubjectEn::Table)
                     .to_owned(),
             )
@@ -252,20 +268,6 @@ impl MigrationTrait for Migration {
             .drop_table(
                 Table::drop()
                     .table(DublinMetadataSubjectAr::Table)
-                    .to_owned(),
-            )
-            .await?;
-        manager
-            .drop_table(
-                Table::drop()
-                    .table(DublinMetadataEnSubjects::Table)
-                    .to_owned(),
-            )
-            .await?;
-        manager
-            .drop_table(
-                Table::drop()
-                    .table(DublinMetadataArSubjects::Table)
                     .to_owned(),
             )
             .await?;

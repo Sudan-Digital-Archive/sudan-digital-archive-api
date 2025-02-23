@@ -9,7 +9,7 @@ use serde::Deserialize;
 use validator::Validate;
 
 /// Request for creating a new accession with metadata.
-#[derive(Debug, Validate, Deserialize)]
+#[derive(Debug, Clone, Validate, Deserialize)]
 pub struct CreateAccessionRequest {
     #[validate(url)]
     pub url: String,
@@ -21,7 +21,7 @@ pub struct CreateAccessionRequest {
     pub metadata_time: NaiveDateTime,
     pub browser_profile: Option<BrowserProfile>,
     #[validate(length(min = 1, max = 200))]
-    pub metadata_subjects: Vec<u64>,
+    pub metadata_subjects: Vec<i32>,
 }
 
 /// Request for initiating a new Browsertrix crawl.
@@ -45,7 +45,7 @@ pub struct AccessionPagination {
     pub date_to: Option<NaiveDateTime>,
 }
 
-#[derive(Debug, Validate, Deserialize)]
+#[derive(Debug, Clone, Validate, Deserialize)]
 pub struct CreateSubjectRequest {
     #[validate(length(min = 1, max = 100))]
     pub metadata_subject: String,

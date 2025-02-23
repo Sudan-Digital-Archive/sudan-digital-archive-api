@@ -2,28 +2,22 @@
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Deserialize, Serialize)]
 #[sea_orm(table_name = "dublin_metadata_ar")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub title: String,
     pub description: Option<String>,
-    pub subject_id: Option<i32>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(has_one = "super::accession::Entity")]
     Accession,
-    #[sea_orm(
-        belongs_to = "super::dublin_metadata_subject_ar::Entity",
-        from = "Column::SubjectId",
-        to = "super::dublin_metadata_subject_ar::Column::Id",
-        on_update = "NoAction",
-        on_delete = "NoAction"
-    )]
-    DublinMetadataSubjectAr,
+    #[sea_orm(has_many = "super::dublin_metadata_ar_subjects::Entity")]
+    DublinMetadataArSubjects,
 }
 
 impl Related<super::accession::Entity> for Entity {
@@ -32,9 +26,22 @@ impl Related<super::accession::Entity> for Entity {
     }
 }
 
+impl Related<super::dublin_metadata_ar_subjects::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::DublinMetadataArSubjects.def()
+    }
+}
+
 impl Related<super::dublin_metadata_subject_ar::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::DublinMetadataSubjectAr.def()
+        super::dublin_metadata_ar_subjects::Relation::DublinMetadataSubjectAr.def()
+    }
+    fn via() -> Option<RelationDef> {
+        Some(
+            super::dublin_metadata_ar_subjects::Relation::DublinMetadataAr
+                .def()
+                .rev(),
+        )
     }
 }
 

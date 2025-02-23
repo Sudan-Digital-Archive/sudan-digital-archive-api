@@ -14,11 +14,11 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use validator::Validate;
 
-pub fn get_accessions_routes() -> Router<AppState> {
+pub fn get_subjects_routes() -> Router<AppState> {
     Router::new().nest(
-        "/subjects",
+        "/metadata-subjects",
         Router::new()
-            .route("/{query}", get(list_subjects))
+            .route("/", get(list_subjects))
             .route("/", post(create_subject)),
     )
 }

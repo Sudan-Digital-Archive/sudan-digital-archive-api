@@ -27,7 +27,6 @@ async fn main() {
     let db_session = Database::connect(app_config.postgres_url)
         .await
         .expect("Could not connect to db");
-    // TODO: Double check in docs this is fine to clone
     let accessions_repo = DBAccessionsRepo {
         db_session: db_session.clone(),
     };
@@ -46,6 +45,7 @@ async fn main() {
     let accessions_service = AccessionsService {
         accessions_repo: Arc::new(accessions_repo),
         browsertrix_repo: Arc::new(http_btrix_repo),
+
     };
     let subjects_service = SubjectsService {
         subjects_repo: Arc::new(subjects_repo),

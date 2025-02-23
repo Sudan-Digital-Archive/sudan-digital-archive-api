@@ -9,10 +9,11 @@ use ::entity::dublin_metadata_subject_en::Entity as DublinMetadataSubjectEn;
 use ::entity::dublin_metadata_subject_en::Model as DublinMetadataSubjectEnModel;
 use async_trait::async_trait;
 use entity::{dublin_metadata_subject_ar, dublin_metadata_subject_en};
+use sea_orm::prelude::Expr;
 use sea_orm::sea_query::{ExprTrait, Func};
+use sea_orm::{ColumnTrait, QueryFilter};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, DatabaseConnection, DbErr, EntityTrait, TransactionTrait,
-    TryIntoModel,
+    ActiveModelTrait, ActiveValue, DatabaseConnection, DbErr, EntityTrait, PaginatorTrait,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -40,6 +41,12 @@ pub trait SubjectsRepo: Send + Sync {
         per_page: u64,
         query_term: Option<String>,
     ) -> Result<(Vec<DublinMetadataSubjectEnModel>, u64), DbErr>;
+
+    async fn verify_subjects_exist(
+        &self,
+        subject_ids: Vec<i32>,
+        metadata_language: MetadataLanguage
+    ) -> Result<bool, DbErr>;
 }
 
 #[async_trait]
@@ -81,12 +88,17 @@ impl SubjectsRepo for DBSubjectsRepo {
         per_page: u64,
         query_term: Option<String>,
     ) -> Result<(Vec<DublinMetadataSubjectArModel>, u64), DbErr> {
-        let query_filter =
-            Func::lower(dublin_metadata_subject_ar::Column::Subject).like(&query_term);
-        let subject_pages = DublinMetadataSubjectAr::find()
-            .filter(query_filter)
-            .paginate(&self.db_session, per_page);
-
+        let subject_pages;
+        if let Some(term) = query_term {
+            let query_string = format!("%{}%", term.to_lowercase());
+            let query_filter = Func::lower(Expr::col(dublin_metadata_subject_ar::Column::Subject))
+                .like(&query_string);
+            subject_pages = DublinMetadataSubjectAr::find()
+                .filter(query_filter)
+                .paginate(&self.db_session, per_page);
+        } else {
+            subject_pages = DublinMetadataSubjectAr::find().paginate(&self.db_session, per_page);
+        }
         let num_pages = subject_pages.num_pages().await?;
         Ok((subject_pages.fetch_page(page).await?, num_pages))
     }
@@ -97,12 +109,36 @@ impl SubjectsRepo for DBSubjectsRepo {
         per_page: u64,
         query_term: Option<String>,
     ) -> Result<(Vec<DublinMetadataSubjectEnModel>, u64), DbErr> {
-        let query_filter =
-            Func::lower(dublin_metadata_subject_en::Column::Subject).like(&query_term);
-        let subject_pages = DublinMetadataSubjectEn::find()
-            .filter(query_filter)
-            .paginate(&self.db_session, per_page);
+        let subject_pages;
+        if let Some(term) = query_term {
+            let query_string = format!("%{}%", term.to_lowercase());
+            let query_filter = Func::lower(Expr::col(dublin_metadata_subject_en::Column::Subject))
+                .like(&query_string);
+            subject_pages = DublinMetadataSubjectEn::find()
+                .filter(query_filter)
+                .paginate(&self.db_session, per_page);
+        } else {
+            subject_pages = DublinMetadataSubjectEn::find().paginate(&self.db_session, per_page);
+        }
         let num_pages = subject_pages.num_pages().await?;
         Ok((subject_pages.fetch_page(page).await?, num_pages))
+    }
+
+    async fn verify_subjects_exist(&self, subject_ids: Vec<i32>, metadata_language: MetadataLanguage) -> Result<bool, DbErr> {
+        let flag = match metadata_language {
+            MetadataLanguage::English => {
+                let rows = DublinMetadataSubjectEn::find().filter(
+                    dublin_metadata_subject_en::Column::Id.is_in(subject_ids)
+                ).all(&self.db_session).await?;
+                rows.len() > 0
+            },
+            MetadataLanguage::Arabic => {
+                let rows = DublinMetadataSubjectAr::find().filter(
+                    dublin_metadata_subject_ar::Column::Id.is_in(subject_ids)
+                ).all(&self.db_session).await?;
+                rows.len() > 0
+            },
+        };
+        Ok(flag)
     }
 }
