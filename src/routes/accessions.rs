@@ -34,12 +34,18 @@ async fn create_accession(
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }
     let cloned_payload = payload.clone();
-    let subjects_exist = state.subjects_service.clone().verify_subjects_exist(cloned_payload.metadata_subjects,
-                                                                   cloned_payload.metadata_language).await;
+    let subjects_exist = state
+        .subjects_service
+        .clone()
+        .verify_subjects_exist(
+            cloned_payload.metadata_subjects,
+            cloned_payload.metadata_language,
+        )
+        .await;
     match subjects_exist {
         Err(err) => {
             return (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response();
-        },
+        }
         Ok(flag) => {
             if !flag {
                 return (StatusCode::BAD_REQUEST, "Subjects do not exist").into_response();
@@ -77,6 +83,7 @@ async fn list_accessions(
             pagination.0.page,
             pagination.0.per_page,
             pagination.0.lang,
+            pagination.0.metadata_subjects,
             pagination.0.query_term,
             pagination.0.date_from,
             pagination.0.date_to,
@@ -88,9 +95,7 @@ async fn list_accessions(
 mod tests {
     use crate::models::common::MetadataLanguage;
     use crate::models::request::CreateAccessionRequest;
-    use crate::models::response::{
-        GetOneAccessionResponse, ListAccessionsArResponse, ListAccessionsEnResponse,
-    };
+    use crate::models::response::GetOneAccessionResponse;
     use crate::test_tools::{
         build_test_accessions_service, build_test_app, mock_get_one, mock_paginated_ar,
         mock_paginated_en,
@@ -103,6 +108,9 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use tower::ServiceExt;
+    use crate::models::response::ListAccessionsResponse as ListAccessionsEnResponse;
+    use crate::models::response::ListAccessionsResponse as ListAccessionsArResponse;
+    use crate::repos::accessions_repo::AccessionsRepo;
 
     #[tokio::test]
     async fn run_one_crawl() {
@@ -111,12 +119,13 @@ mod tests {
             .create_one(CreateAccessionRequest {
                 url: "".to_string(),
                 metadata_language: MetadataLanguage::English,
+                metadata_subjects: vec![1, 2, 3],
                 metadata_title: "".to_string(),
                 metadata_description: Some("".to_string()),
                 metadata_time: Default::default(),
                 browser_profile: None,
             })
-            .await;
+            .await.expect("TODO: panic message");
     }
 
     #[tokio::test]
@@ -126,12 +135,13 @@ mod tests {
             .create_one(CreateAccessionRequest {
                 url: "".to_string(),
                 metadata_language: MetadataLanguage::English,
+                metadata_subjects: vec![1, 2, 3],
                 metadata_title: "".to_string(),
                 metadata_description: None,
                 metadata_time: Default::default(),
                 browser_profile: None,
             })
-            .await;
+            .await.expect("TODO: panic message");
     }
     #[tokio::test]
     async fn create_one_accession() {
@@ -149,7 +159,8 @@ mod tests {
     "metadata_title": "Guardian piece",
     "metadata_subject": "UK energy costs",
     "metadata_description": "Blah de blah",
-    "metadata_time": "2024-11-01T23:32:00"
+    "metadata_time": "2024-11-01T23:32:00",
+    "metadata_subjects": [1,2,3]
 })).unwrap(),
                     ))
                     .unwrap(),
@@ -175,15 +186,15 @@ mod tests {
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(Body::from(
                         serde_json::to_vec(&json!({
-                            "url": "https://facebook.com/some/story",
-                            "metadata_language": "english",
-                            "metadata_title": "Guardian piece",
-                            "metadata_subject": "UK energy costs",
-                            "metadata_description": null,
-                            "metadata_time": "2024-11-01T23:32:00",
-                            "browser_profile": "facebook"
-                        }))
-                        .unwrap(),
+    "url": "https://www.theguardian.com/business/2025/jan/10/britain-energy-costs-labour-power-plants-uk-cold-weather?utm_source=firefox-newtab-en-gb",
+    "metadata_language": "english",
+    "metadata_title": "Guardian piece",
+    "metadata_subject": "UK energy costs",
+    "metadata_description": null,
+    "browser_profile": "facebook"
+    "metadata_time": "2024-11-01T23:32:00",
+    "metadata_subjects": [1,2,3]
+})).unwrap(),
                     ))
                     .unwrap(),
             )
@@ -215,8 +226,6 @@ mod tests {
         let mocked_resp = mock_get_one();
         let expected = GetOneAccessionResponse {
             accession: mocked_resp.0.unwrap(),
-            metadata_ar: mocked_resp.1,
-            metadata_en: mocked_resp.2,
             wacz_url: "my url".to_owned(),
         };
         assert_eq!(actual, expected)

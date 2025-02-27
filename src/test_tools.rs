@@ -16,9 +16,14 @@ use reqwest::{Error, RequestBuilder, Response};
 use sea_orm::DbErr;
 use std::sync::Arc;
 use uuid::Uuid;
+use crate::models::common::MetadataLanguage;
+use crate::routes::accessions::get_accessions_routes;
+use entity::accessions_with_metadata::Model as AccessionsWithMetadataModel;
+use crate::repos::subjects_repo::SubjectsRepo;
 
+#[derive(Clone, Debug, Default)]
 pub struct InMemoryAccessionsRepo {}
-pub struct InMemoryBrowsertrixRepo {}
+
 #[async_trait]
 impl AccessionsRepo for InMemoryAccessionsRepo {
     async fn write_one(
@@ -35,15 +40,25 @@ impl AccessionsRepo for InMemoryAccessionsRepo {
     async fn get_one(
         &self,
         _id: i32,
-    ) -> Result<
-        (
-            Option<AccessionModel>,
-            Option<DublinMetataArModel>,
-            Option<DublinMetadataEnModel>,
-        ),
-        DbErr,
-    > {
-        Ok(mock_get_one())
+    ) -> Result<Option<AccessionsWithMetadataModel>, DbErr> {
+        Ok(Some(one_accession_with_metadata()))
+    }
+
+    async fn create_one(&self, _create_accession_request: crate::models::request::CreateAccessionRequest) -> Result<(), DbErr> {
+        Ok(())
+    }
+
+    async fn list_paginated(
+        &self,
+        _page: u64,
+        _per_page: u64,
+        _metadata_language: MetadataLanguage,
+        _metadata_subjects: Option<Vec<i32>>,
+        _query_term: Option<String>,
+        _date_from: Option<chrono::NaiveDateTime>,
+        _date_to: Option<chrono::NaiveDateTime>,
+    ) -> Result<(Vec<AccessionsWithMetadataModel>, u64), DbErr> {
+        Ok(mock_paginated_en())
     }
 
     async fn list_paginated_ar(
@@ -66,6 +81,48 @@ impl AccessionsRepo for InMemoryAccessionsRepo {
         _date_to: Option<NaiveDateTime>,
     ) -> Result<(Vec<(AccessionModel, Option<DublinMetadataEnModel>)>, u64), DbErr> {
         Ok(mock_paginated_en())
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct InMemorySubjectsRepo {}
+
+#[async_trait]
+impl SubjectsRepo for InMemorySubjectsRepo {
+    async fn write_one(
+        &self,
+        _create_subject_request: crate::models::request::CreateSubjectRequest,
+    ) -> Result<crate::models::response::SubjectResponse, DbErr> {
+        Ok(crate::models::response::SubjectResponse {
+            id: 1,
+            subject: "some cool archive".to_string(),
+        })
+    }
+
+    async fn list_paginated_ar(
+        &self,
+        _page: u64,
+        _per_page: u64,
+        _query_term: Option<String>,
+    ) -> Result<(Vec<entity::dublin_metadata_subject_ar::Model>, u64), DbErr> {
+        Ok((vec![], 10))
+    }
+
+    async fn list_paginated_en(
+        &self,
+        _page: u64,
+        _per_page: u64,
+        _query_term: Option<String>,
+    ) -> Result<(Vec<entity::dublin_metadata_subject_en::Model>, u64), DbErr> {
+        Ok((vec![], 10))
+    }
+
+    async fn verify_subjects_exist(
+        &self,
+        _subject_ids: Vec<i32>,
+        _metadata_language: MetadataLanguage,
+    ) -> Result<bool, DbErr> {
+        Ok(true)
     }
 }
 
@@ -112,26 +169,20 @@ impl BrowsertrixRepo for InMemoryBrowsertrixRepo {
     }
 }
 
-pub fn build_test_accessions_service() -> AccessionsService {
-    let accessions_repo = InMemoryAccessionsRepo {};
-    let browsertrix_repo = InMemoryBrowsertrixRepo {};
-    AccessionsService {
-        accessions_repo: Arc::new(accessions_repo),
-        browsertrix_repo: Arc::new(browsertrix_repo),
-    }
+pub fn build_test_accessions_service() -> InMemoryAccessionsRepo {
+    InMemoryAccessionsRepo::default()
 }
-pub fn build_test_app() -> Router {
+
+pub fn build_test_subjects_service() -> InMemorySubjectsRepo {
+    InMemorySubjectsRepo::default()
+}
+
+pub fn build_test_app() -> Router<AppState> {
     let accessions_service = build_test_accessions_service();
-    let app_state = AppState { accessions_service };
-    let cors_origins = "http://localhost"
-        .to_string()
-        .split(",")
-        .map(|s| {
-            HeaderValue::from_str(s)
-                .expect("CORS_URL env var should contain comma separated origins")
-        })
-        .collect();
-    create_app(app_state, cors_origins, true)
+    let subjects_service = build_test_subjects_service();
+    let app_state = AppState { accessions_service, subjects_service };
+    let app = get_accessions_routes().with_state(app_state);
+    app
 }
 
 fn one_accession() -> AccessionModel {
@@ -174,9 +225,24 @@ pub fn mock_get_one() -> (
 ) {
     (Some(one_accession()), None, None)
 }
-pub fn mock_paginated_en() -> (Vec<(AccessionModel, Option<DublinMetadataEnModel>)>, u64) {
-    (vec![(one_accession(), Some(one_dublin_metadata_en()))], 10)
+pub fn mock_paginated_en() -> (Vec<AccessionsWithMetadataModel>, u64) {
+    (vec![one_accession_with_metadata()], 10)
 }
-pub fn mock_paginated_ar() -> (Vec<(AccessionModel, Option<DublinMetataArModel>)>, u64) {
-    (vec![(one_accession(), Some(one_dublin_metadata_ar()))], 10)
+pub fn mock_paginated_ar() -> (Vec<AccessionsWithMetadataModel>, u64) {
+    (vec![one_accession_with_metadata()], 10)
+}
+pub fn one_accession_with_metadata() -> AccessionsWithMetadataModel {
+    AccessionsWithMetadataModel {
+        id: 1,
+        url: "some cool archive".to_string(),
+        dublin_metadata_date: Default::default(),
+        has_arabic_metadata: false,
+        has_english_metadata: false,
+        title_en: Some("".to_string()),
+        description_en: Some("".to_string()),
+        title_ar: Some("".to_string()),
+        description_ar: Some("".to_string()),
+        subjects_en: Some(vec![1,2,3]),
+        subjects_ar: Some(vec![1,2,3]),
+    }
 }

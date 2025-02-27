@@ -6,9 +6,7 @@
 
 use crate::models::common::MetadataLanguage;
 use crate::models::request::{CreateAccessionRequest, CreateCrawlRequest};
-use crate::models::response::{
-    GetOneAccessionResponse, ListAccessionsArResponse, ListAccessionsEnResponse,
-};
+use crate::models::response::GetOneAccessionResponse;
 use crate::repos::accessions_repo::AccessionsRepo;
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
 use axum::http::StatusCode;
@@ -47,54 +45,30 @@ impl AccessionsService {
         page: u64,
         per_page: u64,
         metadata_language: MetadataLanguage,
+        metadata_subjects: Option<Vec<i32>>,
         query_term: Option<String>,
         date_from: Option<NaiveDateTime>,
         date_to: Option<NaiveDateTime>,
     ) -> Response {
         info!("Getting page {page} of {metadata_language} accessions with per page {per_page}...");
-        match metadata_language {
-            MetadataLanguage::Arabic => {
-                let rows = match self
-                    .accessions_repo
-                    .list_paginated_ar(page, per_page, query_term, date_from, date_to)
-                    .await
-                {
-                    Ok(rows) => rows,
-                    Err(err) => {
-                        error!(%err, "Error occurred paginating accessions in Arabic");
-                        return (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error")
-                            .into_response();
-                    }
-                };
-                let rows = ListAccessionsArResponse {
-                    items: rows.0,
-                    num_pages: rows.1,
-                    page,
-                    per_page,
-                };
-                Json(rows).into_response()
+        let rows = self
+            .accessions_repo
+            .list_paginated(
+                page,
+                per_page,
+                metadata_language,
+                metadata_subjects,
+                query_term,
+                date_from,
+                date_to,
+            )
+            .await;
+        match rows {
+            Err(err) => {
+                error!(%err, "Error occurred paginating accessions in Arabic");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
             }
-            MetadataLanguage::English => {
-                let rows = match self
-                    .accessions_repo
-                    .list_paginated_en(page, per_page, query_term, date_from, date_to)
-                    .await
-                {
-                    Ok(rows) => rows,
-                    Err(err) => {
-                        error!(%err, "Error occurred paginating accessions in English");
-                        return (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error")
-                            .into_response();
-                    }
-                };
-                let rows = ListAccessionsEnResponse {
-                    items: rows.0,
-                    num_pages: rows.1,
-                    page,
-                    per_page,
-                };
-                Json(rows).into_response()
-            }
+            Ok(rows) => Json(rows).into_response(),
         }
     }
 
@@ -104,7 +78,7 @@ impl AccessionsService {
     /// * `id` - The unique identifier of the accession
     ///
     /// # Returns
-    /// Returns a JSON response containing the accession details or an error response
+    /// JSON response containing the accession details or an error response
     pub async fn get_one(self, id: i32) -> Response {
         info!("Getting accession with id {id}");
         let query_result = self.accessions_repo.get_one(id).await;
@@ -113,34 +87,32 @@ impl AccessionsService {
                 error!(%query_result, "Error occurred retrieving accession");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
             }
-            Ok(query_result) => Json(query_result).into_response(), // Ok(query_result) => match query_result.0 {
-                                                                    //     Some(accession_record) => {
-                                                                    //         match self
-                                                                    //             .browsertrix_repo
-                                                                    //             .get_wacz_url(&accession_record.job_run_id)
-                                                                    //             .await
-                                                                    //         {
-                                                                    //             Ok(wacz_url) => {
-                                                                    //                 let resp = GetOneAccessionResponse {
-                                                                    //                     accession: accession_record,
-                                                                    //                     metadata_ar: query_result.1,
-                                                                    //                     metadata_en: query_result.2,
-                                                                    //                     wacz_url,
-                                                                    //                 };
-                                                                    //                 Json(resp).into_response()
-                                                                    //             }
-                                                                    //             Err(err) => {
-                                                                    //                 error!(%err, "Error occurred retrieiving wacz url");
-                                                                    //                 (
-                                                                    //                     StatusCode::INTERNAL_SERVER_ERROR,
-                                                                    //                     "Error retrieving wacz url",
-                                                                    //                 )
-                                                                    //                     .into_response()
-                                                                    //             }
-                                                                    //         }
-                                                                    //     }
-                                                                    //     None => (StatusCode::NOT_FOUND, "No such record").into_response(),
-                                                                    // },
+            Ok(query_result) => match query_result {
+                Some(accession) => {
+                    match self
+                        .browsertrix_repo
+                        .get_wacz_url(&accession.job_run_id)
+                        .await
+                    {
+                        Ok(wacz_url) => {
+                            let resp = GetOneAccessionResponse {
+                                accession: accession,
+                                wacz_url,
+                            };
+                            Json(resp).into_response()
+                        }
+                        Err(err) => {
+                            error!(%err, "Error occurred retrieving wacz url");
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                "Error retrieving wacz url",
+                            )
+                                .into_response()
+                        }
+                    }
+                }
+                None => (StatusCode::NOT_FOUND, "No such record").into_response(),
+            },
         }
     }
 
@@ -151,10 +123,13 @@ impl AccessionsService {
     /// 2. Polls the crawl status for up to 30 minutes
     /// 3. Creates an accession record once the crawl is complete
     ///
+    /// You should validate that `metadata_subjects` exist in the
+    /// payload before calling this method - it will error out
+    /// if they don't.
+    ///
     /// # Arguments
     /// * `payload` - The creation request containing URL and metadata
     pub async fn create_one(self, payload: CreateAccessionRequest) {
-        // TODO: Validate that subject exists
         let create_crawl_request = CreateCrawlRequest {
             url: payload.url.clone(),
             browser_profile: payload.browser_profile.clone(),

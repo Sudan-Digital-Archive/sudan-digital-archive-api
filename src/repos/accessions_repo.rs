@@ -6,22 +6,16 @@
 use crate::models::common::MetadataLanguage;
 use crate::models::request::CreateAccessionRequest;
 use ::entity::accession::ActiveModel as AccessionActiveModel;
-use ::entity::accession::Entity as Accession;
 use ::entity::dublin_metadata_ar::ActiveModel as DublinMetadataArActiveModel;
-use ::entity::dublin_metadata_ar::Entity as DublinMetadataAr;
 use ::entity::dublin_metadata_ar_subjects::ActiveModel as DublinMetadataSubjectsArActiveModel;
 use ::entity::dublin_metadata_ar_subjects::Entity as DublinMetadataSubjectsAr;
 use ::entity::dublin_metadata_en::ActiveModel as DublinMetadataEnActiveModel;
-use ::entity::dublin_metadata_en::Entity as DublinMetadataEn;
 use ::entity::dublin_metadata_en_subjects::ActiveModel as DublinMetadataSubjectsEnActiveModel;
 use ::entity::dublin_metadata_en_subjects::Entity as DublinMetadataSubjectsEn;
 
 use crate::repos::filter_builder::build_filter_expression;
-use ::entity::accession::Model as AccessionModel;
 use ::entity::accessions_with_metadata::Entity as AccessionWithMetadata;
 use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
-use ::entity::dublin_metadata_ar::Model as DublinMetataArModel;
-use ::entity::dublin_metadata_en::Model as DublinMetadataEnModel;
 use async_trait::async_trait;
 use chrono::{NaiveDateTime, Utc};
 use entity::sea_orm_active_enums::CrawlStatus;
@@ -75,39 +69,16 @@ pub trait AccessionsRepo: Send + Sync {
     // >;
     async fn get_one(&self, id: i32) -> Result<Option<AccessionWithMetadataModel>, DbErr>;
 
-    /// Lists paginated accessions with Arabic metadata.
-    ///
-    /// # Arguments
-    /// * `page` - The page number to retrieve
-    /// * `per_page` - Number of items per page
-    /// * `query_term` - Optional search term for filtering results
-    /// * `date_from` - Optional start date for filtering
-    /// * `date_to` - Optional end date for filtering
-    async fn list_paginated_ar(
+    async fn list_paginated(
         &self,
         page: u64,
         per_page: u64,
+        metadata_language: MetadataLanguage,
+        metadata_ids: Option<Vec<i32>>,
         query_term: Option<String>,
         date_from: Option<NaiveDateTime>,
         date_to: Option<NaiveDateTime>,
-    ) -> Result<(Vec<(AccessionModel, Option<DublinMetataArModel>)>, u64), DbErr>;
-
-    /// Lists paginated accessions with English metadata.
-    ///
-    /// # Arguments
-    /// * `page` - The page number to retrieve
-    /// * `per_page` - Number of items per page
-    /// * `query_term` - Optional search term for filtering results
-    /// * `date_from` - Optional start date for filtering
-    /// * `date_to` - Optional end date for filtering
-    async fn list_paginated_en(
-        &self,
-        page: u64,
-        per_page: u64,
-        query_term: Option<String>,
-        date_from: Option<NaiveDateTime>,
-        date_to: Option<NaiveDateTime>,
-    ) -> Result<(Vec<(AccessionModel, Option<DublinMetadataEnModel>)>, u64), DbErr>;
+    ) -> Result<(Vec<AccessionWithMetadataModel>, u64), DbErr>;
 }
 
 #[async_trait]
@@ -186,33 +157,6 @@ impl AccessionsRepo for DBAccessionsRepo {
         Ok(())
     }
 
-    // async fn get_one(
-    //     &self,
-    //     id: i32,
-    // ) -> Result<
-    //     (
-    //         Option<AccessionModel>,
-    //         Option<DublinMetataArModel>,
-    //         Option<DublinMetadataEnModel>,
-    //     ),
-    //     DbErr,
-    // > {
-    //     let accession = Accession::find_by_id(id).one(&self.db_session).await?;
-    //     if let Some(accession) = accession {
-    //         let metadata_en = accession
-    //             .find_related(DublinMetadataEn)
-    //             .one(&self.db_session)
-    //             .await?;
-    //         let metadata_ar = accession
-    //             .find_related(DublinMetadataAr)
-    //             .one(&self.db_session)
-    //             .await?;
-    //         Ok((Some(accession), metadata_ar, metadata_en))
-    //     } else {
-    //         Ok((None, None, None))
-    //     }
-    // }
-
     async fn get_one(&self, id: i32) -> Result<Option<AccessionWithMetadataModel>, DbErr> {
         let accession = AccessionWithMetadata::find_by_id(id)
             .one(&self.db_session)
@@ -220,51 +164,30 @@ impl AccessionsRepo for DBAccessionsRepo {
         Ok(accession)
     }
 
-    async fn list_paginated_ar(
+    async fn list_paginated(
         &self,
         page: u64,
         per_page: u64,
+        metadata_language: MetadataLanguage,
+        metadata_subjects: Option<Vec<i32>>,
         query_term: Option<String>,
         date_from: Option<NaiveDateTime>,
         date_to: Option<NaiveDateTime>,
-    ) -> Result<(Vec<(AccessionModel, Option<DublinMetataArModel>)>, u64), DbErr> {
-        let filter_expression =
-            build_filter_expression(MetadataLanguage::Arabic, query_term, date_from, date_to);
+    ) -> Result<(Vec<AccessionWithMetadataModel>, u64), DbErr> {
+        let filter_expression = build_filter_expression(
+            metadata_language,
+            metadata_subjects,
+            query_term,
+            date_from,
+            date_to,
+        );
         let accession_pages;
         if let Some(query_filter) = filter_expression {
-            accession_pages = Accession::find()
-                .find_also_related(DublinMetadataAr)
+            accession_pages = AccessionWithMetadata::find()
                 .filter(query_filter)
                 .paginate(&self.db_session, per_page);
         } else {
-            accession_pages = Accession::find()
-                .find_also_related(DublinMetadataAr)
-                .paginate(&self.db_session, per_page);
-        }
-        let num_pages = accession_pages.num_pages().await?;
-        Ok((accession_pages.fetch_page(page).await?, num_pages))
-    }
-
-    async fn list_paginated_en(
-        &self,
-        page: u64,
-        per_page: u64,
-        query_term: Option<String>,
-        date_from: Option<NaiveDateTime>,
-        date_to: Option<NaiveDateTime>,
-    ) -> Result<(Vec<(AccessionModel, Option<DublinMetadataEnModel>)>, u64), DbErr> {
-        let filter_expression =
-            build_filter_expression(MetadataLanguage::English, query_term, date_from, date_to);
-        let accession_pages;
-        if let Some(query_filter) = filter_expression {
-            accession_pages = Accession::find()
-                .find_also_related(DublinMetadataEn)
-                .filter(query_filter)
-                .paginate(&self.db_session, per_page);
-        } else {
-            accession_pages = Accession::find()
-                .find_also_related(DublinMetadataEn)
-                .paginate(&self.db_session, per_page);
+            accession_pages = AccessionWithMetadata::find().paginate(&self.db_session, per_page);
         }
         let num_pages = accession_pages.num_pages().await?;
         Ok((accession_pages.fetch_page(page).await?, num_pages))

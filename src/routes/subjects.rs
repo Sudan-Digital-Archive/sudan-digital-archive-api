@@ -6,7 +6,7 @@
 //! It uses in-memory repositories for testing to avoid I/O operations.
 
 use crate::app_factory::AppState;
-use crate::models::request::{AccessionPagination, CreateSubjectRequest, SubjectPagination};
+use crate::models::request::{CreateSubjectRequest, SubjectPagination};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};

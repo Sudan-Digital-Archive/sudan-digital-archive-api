@@ -39,6 +39,7 @@ pub struct AccessionPagination {
     #[validate(range(min = 1, max = 200))]
     pub per_page: u64,
     pub lang: MetadataLanguage,
+    pub metadata_subjects: Option<Vec<i32>>,
     #[validate(length(min = 1, max = 500))]
     pub query_term: Option<String>,
     pub date_from: Option<NaiveDateTime>,

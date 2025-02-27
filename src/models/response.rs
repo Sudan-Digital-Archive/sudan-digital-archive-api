@@ -3,9 +3,7 @@
 //! This module contains all the response structures used by the API endpoints,
 //! including authentication, crawl operations, and accession management.
 
-use ::entity::accession::Model as AccessionModel;
-use ::entity::dublin_metadata_ar::Model as DublinMetataArModel;
-use ::entity::dublin_metadata_en::Model as DublinMetadataEnModel;
+use ::entity::accessions_with_metadata::Model as AccessionsWithMetadataModel;
 use ::entity::dublin_metadata_subject_ar::Model as DublinMetadataSubjectArModel;
 use ::entity::dublin_metadata_subject_en::Model as DublinMetadataSubjectEnModel;
 use serde::{Deserialize, Serialize};
@@ -48,25 +46,14 @@ pub struct WaczItem {
 /// Response for retrieving a single accession with its metadata.
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct GetOneAccessionResponse {
-    pub accession: AccessionModel,
-    pub metadata_ar: Option<DublinMetataArModel>,
-    pub metadata_en: Option<DublinMetadataEnModel>,
+    pub accession: AccessionsWithMetadataModel,
     pub wacz_url: String,
 }
 
-/// Paginated response for Arabic accession listings.
+/// Paginated response for accession listings.
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct ListAccessionsArResponse {
-    pub items: Vec<(AccessionModel, Option<DublinMetataArModel>)>,
-    pub num_pages: u64,
-    pub page: u64,
-    pub per_page: u64,
-}
-
-/// Paginated response for English accession listings.
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct ListAccessionsEnResponse {
-    pub items: Vec<(AccessionModel, Option<DublinMetadataEnModel>)>,
+pub struct ListAccessionsResponse {
+    pub items: Vec<AccessionsWithMetadataModel>,
     pub num_pages: u64,
     pub page: u64,
     pub per_page: u64,

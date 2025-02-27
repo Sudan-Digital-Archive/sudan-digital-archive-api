@@ -45,7 +45,6 @@ async fn main() {
     let accessions_service = AccessionsService {
         accessions_repo: Arc::new(accessions_repo),
         browsertrix_repo: Arc::new(http_btrix_repo),
-
     };
     let subjects_service = SubjectsService {
         subjects_repo: Arc::new(subjects_repo),

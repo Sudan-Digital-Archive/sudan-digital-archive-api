@@ -5,8 +5,8 @@ use crate::repos::subjects_repo::SubjectsRepo;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use http::StatusCode;
-use std::sync::Arc;
 use sea_orm::DbErr;
+use std::sync::Arc;
 use tracing::{error, info, warn};
 #[derive(Clone)]
 pub struct SubjectsService {
@@ -102,7 +102,10 @@ impl SubjectsService {
         self,
         metadata_subjects: Vec<i32>,
         metadata_language: MetadataLanguage,
-    ) -> Result<bool, DbErr>{
-        Ok(self.subjects_repo.verify_subjects_exist(metadata_subjects, metadata_language).await?)
+    ) -> Result<bool, DbErr> {
+        Ok(self
+            .subjects_repo
+            .verify_subjects_exist(metadata_subjects, metadata_language)
+            .await?)
     }
 }
