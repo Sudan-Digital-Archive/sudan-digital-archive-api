@@ -97,8 +97,8 @@ mod tests {
     use crate::models::request::CreateAccessionRequest;
     use crate::models::response::GetOneAccessionResponse;
     use crate::test_tools::{
-        build_test_accessions_service, build_test_app, mock_paginated_ar,
-        mock_paginated_en, mock_one_accession_with_metadata
+        build_test_accessions_service, build_test_app, mock_one_accession_with_metadata,
+        mock_paginated_ar, mock_paginated_en,
     };
     use axum::{
         body::Body,
@@ -246,7 +246,8 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let actual: ([AccessionsWithMetadataModel; 1], u64) = serde_json::from_slice(&body).unwrap();
+        let actual: ([AccessionsWithMetadataModel; 1], u64) =
+            serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_paginated_en();
         let expected = mocked_resp;
         assert_eq!(actual.1, expected.1);
@@ -268,7 +269,8 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let actual: ([AccessionsWithMetadataModel; 1], u64) = serde_json::from_slice(&body).unwrap();
+        let actual: ([AccessionsWithMetadataModel; 1], u64) =
+            serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_paginated_ar();
         let expected = mocked_resp;
         assert_eq!(actual.1, expected.1);

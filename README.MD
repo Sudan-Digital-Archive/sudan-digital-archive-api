@@ -1,9 +1,3 @@
-# TODOs
-
-- Change read + list accessions to hit the view
-- Write tests for all the new shiz
-- Write ticket to do open api schema
-
 # Overview
 
 This is the API for the Sudan Digital Archive.

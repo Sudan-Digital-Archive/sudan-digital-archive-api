@@ -50,8 +50,6 @@ pub struct GetOneAccessionResponse {
     pub wacz_url: String,
 }
 
-
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SubjectResponse {
     pub id: i32,

@@ -54,19 +54,6 @@ pub trait AccessionsRepo: Send + Sync {
     ) -> Result<(), DbErr>;
 
     /// Retrieves an accession record by its ID along with associated metadata.
-    ///
-    /// Returns a tuple containing the accession and its metadata in both languages.
-    // async fn get_one(
-    //     &self,
-    //     id: i32,
-    // ) -> Result<
-    //     (
-    //         Option<AccessionModel>,
-    //         Option<DublinMetataArModel>,
-    //         Option<DublinMetadataEnModel>,
-    //     ),
-    //     DbErr,
-    // >;
     async fn get_one(&self, id: i32) -> Result<Option<AccessionWithMetadataModel>, DbErr>;
 
     async fn list_paginated(
