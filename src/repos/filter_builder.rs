@@ -196,7 +196,6 @@ pub fn build_filter_expression(
                 .and(lang_filter),
         ),
         (None, None, None, None) => None,
->>>>>>> 0693eef (feat: built with new pass)
     }
 }
 
@@ -383,5 +382,53 @@ mod tests {
 
         assert_eq!(actual_lower, expected);
         assert_eq!(actual_upper, expected);
+    }
+
+    #[test]
+    fn test_build_filter_metadata_subjects_only() {
+        let subjects = vec![1, 2, 3];
+        let actual = build_filter_expression(
+            MetadataLanguage::English,
+            Some(subjects.clone()),
+            None,
+            None,
+            None,
+        );
+
+        let subjects_column = Expr::col(accessions_with_metadata::Column::SubjectsEn);
+        let expected = Some(
+            Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).is(true)
+                .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+        );
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_build_filter_query_term_and_metadata_subjects() {
+        let subjects = vec![1, 2, 3];
+        let actual = build_filter_expression(
+            MetadataLanguage::English,
+            Some(subjects.clone()),
+            Some("test".to_string()),
+            None,
+            None,
+        );
+
+        let (title, description) = (
+            Expr::col(accessions_with_metadata::Column::TitleEn),
+            Expr::col(accessions_with_metadata::Column::DescriptionEn),
+        );
+        let query_string = format!("%test%");
+        let subjects_column = Expr::col(accessions_with_metadata::Column::SubjectsEn);
+        let expected = Some(
+            Func::lower(title)
+                .like(&query_string)
+                .or(Func::lower(description).like(&query_string))
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).is(true))
+                .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+        );
+
+        assert_eq!(actual, expected);
     }
 }

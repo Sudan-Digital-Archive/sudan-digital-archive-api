@@ -114,7 +114,7 @@ impl AccessionsRepo for DBAccessionsRepo {
                 DublinMetadataSubjectsEn::insert_many(subject_links)
                     .exec(&txn)
                     .await?;
-                metadata_id
+                (Some(metadata_id), None)
             }
             MetadataLanguage::Arabic => {
                 let metadata = DublinMetadataArActiveModel {
@@ -135,7 +135,8 @@ impl AccessionsRepo for DBAccessionsRepo {
                 DublinMetadataSubjectsAr::insert_many(subject_links)
                     .exec(&txn)
                     .await?;
-                metadata_id }
+                (None, Some(metadata_id))
+            }
         };
 
         let utc_now = Utc::now();

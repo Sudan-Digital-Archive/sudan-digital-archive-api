@@ -108,9 +108,6 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use tower::ServiceExt;
-    use crate::models::response::ListAccessionsResponse as ListAccessionsEnResponse;
-    use crate::models::response::ListAccessionsResponse as ListAccessionsArResponse;
-    use crate::repos::accessions_repo::AccessionsRepo;
 
     #[tokio::test]
     async fn run_one_crawl() {
@@ -119,13 +116,13 @@ mod tests {
             .create_one(CreateAccessionRequest {
                 url: "".to_string(),
                 metadata_language: MetadataLanguage::English,
-                metadata_subjects: vec![1, 2, 3],
                 metadata_title: "".to_string(),
                 metadata_description: Some("".to_string()),
                 metadata_time: Default::default(),
                 browser_profile: None,
+                metadata_subjects: vec![1,2,3],
             })
-            .await.expect("TODO: panic message");
+            .await;
     }
 
     #[tokio::test]
@@ -135,13 +132,13 @@ mod tests {
             .create_one(CreateAccessionRequest {
                 url: "".to_string(),
                 metadata_language: MetadataLanguage::English,
-                metadata_subjects: vec![1, 2, 3],
                 metadata_title: "".to_string(),
+                metadata_subject: "".to_string(),
                 metadata_description: None,
                 metadata_time: Default::default(),
                 browser_profile: None,
             })
-            .await.expect("TODO: panic message");
+            .await;
     }
     #[tokio::test]
     async fn create_one_accession() {
@@ -159,8 +156,7 @@ mod tests {
     "metadata_title": "Guardian piece",
     "metadata_subject": "UK energy costs",
     "metadata_description": "Blah de blah",
-    "metadata_time": "2024-11-01T23:32:00",
-    "metadata_subjects": [1,2,3]
+    "metadata_time": "2024-11-01T23:32:00"
 })).unwrap(),
                     ))
                     .unwrap(),
@@ -186,15 +182,16 @@ mod tests {
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(Body::from(
                         serde_json::to_vec(&json!({
-    "url": "https://www.theguardian.com/business/2025/jan/10/britain-energy-costs-labour-power-plants-uk-cold-weather?utm_source=firefox-newtab-en-gb",
-    "metadata_language": "english",
-    "metadata_title": "Guardian piece",
-    "metadata_subject": "UK energy costs",
-    "metadata_description": null,
-    "browser_profile": "facebook"
-    "metadata_time": "2024-11-01T23:32:00",
-    "metadata_subjects": [1,2,3]
-})).unwrap(),
+                            "url": "https://facebook.com/some/story",
+                            "metadata_language": "english",
+                            "metadata_title": "Guardian piece",
+                            "metadata_subject": "UK energy costs",
+                                "browser_profile": "facebook"
+                            "metadata_description": null,
+                            "metadata_time": "2024-11-01T23:32:00",
+                            "browser_profile": "facebook"
+                        }))
+                            .unwrap(),
                     ))
                     .unwrap(),
             )
@@ -226,6 +223,8 @@ mod tests {
         let mocked_resp = mock_get_one();
         let expected = GetOneAccessionResponse {
             accession: mocked_resp.0.unwrap(),
+            metadata_ar: mocked_resp.1,
+            metadata_en: mocked_resp.2,
             wacz_url: "my url".to_owned(),
         };
         assert_eq!(actual, expected)

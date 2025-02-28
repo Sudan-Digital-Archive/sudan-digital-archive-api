@@ -20,6 +20,7 @@ use crate::models::common::MetadataLanguage;
 use crate::routes::accessions::get_accessions_routes;
 use entity::accessions_with_metadata::Model as AccessionsWithMetadataModel;
 use crate::repos::subjects_repo::SubjectsRepo;
+use crate::services::subjects_service::SubjectsService;
 
 #[derive(Clone, Debug, Default)]
 pub struct InMemoryAccessionsRepo {}
@@ -58,28 +59,6 @@ impl AccessionsRepo for InMemoryAccessionsRepo {
         _date_from: Option<chrono::NaiveDateTime>,
         _date_to: Option<chrono::NaiveDateTime>,
     ) -> Result<(Vec<AccessionsWithMetadataModel>, u64), DbErr> {
-        Ok(mock_paginated_en())
-    }
-
-    async fn list_paginated_ar(
-        &self,
-        _page: u64,
-        _per_page: u64,
-        _query_term: Option<String>,
-        _date_from: Option<NaiveDateTime>,
-        _date_to: Option<NaiveDateTime>,
-    ) -> Result<(Vec<(AccessionModel, Option<DublinMetataArModel>)>, u64), DbErr> {
-        Ok((vec![(one_accession(), Some(one_dublin_metadata_ar()))], 10))
-    }
-
-    async fn list_paginated_en(
-        &self,
-        _page: u64,
-        _per_page: u64,
-        _query_term: Option<String>,
-        _date_from: Option<NaiveDateTime>,
-        _date_to: Option<NaiveDateTime>,
-    ) -> Result<(Vec<(AccessionModel, Option<DublinMetadataEnModel>)>, u64), DbErr> {
         Ok(mock_paginated_en())
     }
 }
@@ -126,6 +105,7 @@ impl SubjectsRepo for InMemorySubjectsRepo {
     }
 }
 
+pub struct InMemoryBrowsertrixRepo{}
 #[async_trait]
 impl BrowsertrixRepo for InMemoryBrowsertrixRepo {
     fn get_org_id(&self) -> Uuid {
@@ -169,12 +149,15 @@ impl BrowsertrixRepo for InMemoryBrowsertrixRepo {
     }
 }
 
-pub fn build_test_accessions_service() -> InMemoryAccessionsRepo {
-    InMemoryAccessionsRepo::default()
+pub fn build_test_accessions_service() -> AccessionsService {
+    let accessions_repo = Arc::new(InMemoryAccessionsRepo::default());
+    let browsertrix_repo = Arc::new(InMemoryBrowsertrixRepo{});
+    AccessionsService {accessions_repo, browsertrix_repo}
 }
 
-pub fn build_test_subjects_service() -> InMemorySubjectsRepo {
-    InMemorySubjectsRepo::default()
+pub fn build_test_subjects_service() -> SubjectsService {
+    let subjects_repo = Arc::new(InMemorySubjectsRepo::default());
+    SubjectsService {subjects_repo}
 }
 
 pub fn build_test_app() -> Router<AppState> {
