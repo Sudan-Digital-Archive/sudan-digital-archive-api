@@ -15,7 +15,7 @@ pub enum MetadataLanguage {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum BrowserProfile {
-    Facebook
+    Facebook,
 }
 impl fmt::Display for MetadataLanguage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

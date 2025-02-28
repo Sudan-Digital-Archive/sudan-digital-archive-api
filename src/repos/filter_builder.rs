@@ -68,7 +68,6 @@ pub fn build_filter_expression(
             Expr::col(accessions_with_metadata::Column::DescriptionAr),
             Expr::col(accessions_with_metadata::Column::HasArabicMetadata).is(true),
             Expr::col(accessions_with_metadata::Column::SubjectsAr),
-
         ),
     };
 
@@ -136,9 +135,9 @@ pub fn build_filter_expression(
                 .and(lang_filter)
                 .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
         ),
-        (None, None, None, Some(subjects)) => Some(
-            lang_filter.and(subjects_column.binary(PgBinOper::Overlap, subjects))
-        ),
+        (None, None, None, Some(subjects)) => {
+            Some(lang_filter.and(subjects_column.binary(PgBinOper::Overlap, subjects)))
+        }
         (Some(term), Some(from), Some(to), None) => {
             let query_string = format!("%{}%", term.to_lowercase());
             Some(
@@ -307,7 +306,8 @@ mod tests {
             .and_hms_opt(23, 59, 59)
             .unwrap();
 
-        let actual = build_filter_expression(MetadataLanguage::English, None, None, None, Some(to_date));
+        let actual =
+            build_filter_expression(MetadataLanguage::English, None, None, None, Some(to_date));
         let expected = Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .lte(to_date)
@@ -397,7 +397,8 @@ mod tests {
 
         let subjects_column = Expr::col(accessions_with_metadata::Column::SubjectsEn);
         let expected = Some(
-            Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).is(true)
+            Expr::col(accessions_with_metadata::Column::HasEnglishMetadata)
+                .is(true)
                 .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
         );
 

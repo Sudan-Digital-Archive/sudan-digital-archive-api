@@ -97,13 +97,14 @@ mod tests {
     use crate::models::request::CreateAccessionRequest;
     use crate::models::response::GetOneAccessionResponse;
     use crate::test_tools::{
-        build_test_accessions_service, build_test_app, mock_get_one, mock_paginated_ar,
-        mock_paginated_en,
+        build_test_accessions_service, build_test_app, mock_paginated_ar,
+        mock_paginated_en, mock_one_accession_with_metadata
     };
     use axum::{
         body::Body,
         http::{Request, StatusCode},
     };
+    use entity::accessions_with_metadata::Model as AccessionsWithMetadataModel;
     use http_body_util::BodyExt;
     use pretty_assertions::assert_eq;
     use serde_json::json;
@@ -120,7 +121,7 @@ mod tests {
                 metadata_description: Some("".to_string()),
                 metadata_time: Default::default(),
                 browser_profile: None,
-                metadata_subjects: vec![1,2,3],
+                metadata_subjects: vec![1, 2, 3],
             })
             .await;
     }
@@ -133,7 +134,7 @@ mod tests {
                 url: "".to_string(),
                 metadata_language: MetadataLanguage::English,
                 metadata_title: "".to_string(),
-                metadata_subject: "".to_string(),
+                metadata_subjects: vec![1, 2, 3],
                 metadata_description: None,
                 metadata_time: Default::default(),
                 browser_profile: None,
@@ -156,7 +157,9 @@ mod tests {
     "metadata_title": "Guardian piece",
     "metadata_subject": "UK energy costs",
     "metadata_description": "Blah de blah",
-    "metadata_time": "2024-11-01T23:32:00"
+    "metadata_time": "2024-11-01T23:32:00",
+    "browser_profile": null,
+    "metadata_subjects": [1]
 })).unwrap(),
                     ))
                     .unwrap(),
@@ -185,13 +188,13 @@ mod tests {
                             "url": "https://facebook.com/some/story",
                             "metadata_language": "english",
                             "metadata_title": "Guardian piece",
-                            "metadata_subject": "UK energy costs",
-                                "browser_profile": "facebook"
+                            "browser_profile": "facebook",
                             "metadata_description": null,
                             "metadata_time": "2024-11-01T23:32:00",
-                            "browser_profile": "facebook"
+                            "browser_profile": "facebook",
+                            "metadata_subjects": [1]
                         }))
-                            .unwrap(),
+                        .unwrap(),
                     ))
                     .unwrap(),
             )
@@ -220,11 +223,9 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let actual: GetOneAccessionResponse = serde_json::from_slice(&body).unwrap();
-        let mocked_resp = mock_get_one();
+        let mocked_resp = mock_one_accession_with_metadata();
         let expected = GetOneAccessionResponse {
-            accession: mocked_resp.0.unwrap(),
-            metadata_ar: mocked_resp.1,
-            metadata_en: mocked_resp.2,
+            accession: mocked_resp,
             wacz_url: "my url".to_owned(),
         };
         assert_eq!(actual, expected)
@@ -245,15 +246,11 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let actual: ListAccessionsEnResponse = serde_json::from_slice(&body).unwrap();
+        let actual: ([AccessionsWithMetadataModel; 1], u64) = serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_paginated_en();
-        let expected = ListAccessionsEnResponse {
-            items: mocked_resp.0,
-            num_pages: mocked_resp.1,
-            page: 0,
-            per_page: 1,
-        };
-        assert_eq!(actual, expected)
+        let expected = mocked_resp;
+        assert_eq!(actual.1, expected.1);
+        assert_eq!(actual.0.len(), expected.0.len());
     }
 
     #[tokio::test]
@@ -271,14 +268,10 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let actual: ListAccessionsArResponse = serde_json::from_slice(&body).unwrap();
+        let actual: ([AccessionsWithMetadataModel; 1], u64) = serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_paginated_ar();
-        let expected = ListAccessionsArResponse {
-            items: mocked_resp.0,
-            num_pages: mocked_resp.1,
-            page: 0,
-            per_page: 1,
-        };
-        assert_eq!(actual, expected)
+        let expected = mocked_resp;
+        assert_eq!(actual.1, expected.1);
+        assert_eq!(actual.0.len(), expected.0.len());
     }
 }

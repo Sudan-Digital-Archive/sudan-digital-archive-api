@@ -11,10 +11,10 @@ use async_trait::async_trait;
 use entity::{dublin_metadata_subject_ar, dublin_metadata_subject_en};
 use sea_orm::prelude::Expr;
 use sea_orm::sea_query::{ExprTrait, Func};
-use sea_orm::{ColumnTrait, QueryFilter};
 use sea_orm::{
     ActiveModelTrait, ActiveValue, DatabaseConnection, DbErr, EntityTrait, PaginatorTrait,
 };
+use sea_orm::{ColumnTrait, QueryFilter};
 
 #[derive(Debug, Clone, Default)]
 pub struct DBSubjectsRepo {
@@ -45,7 +45,7 @@ pub trait SubjectsRepo: Send + Sync {
     async fn verify_subjects_exist(
         &self,
         subject_ids: Vec<i32>,
-        metadata_language: MetadataLanguage
+        metadata_language: MetadataLanguage,
     ) -> Result<bool, DbErr>;
 }
 
@@ -124,20 +124,26 @@ impl SubjectsRepo for DBSubjectsRepo {
         Ok((subject_pages.fetch_page(page).await?, num_pages))
     }
 
-    async fn verify_subjects_exist(&self, subject_ids: Vec<i32>, metadata_language: MetadataLanguage) -> Result<bool, DbErr> {
+    async fn verify_subjects_exist(
+        &self,
+        subject_ids: Vec<i32>,
+        metadata_language: MetadataLanguage,
+    ) -> Result<bool, DbErr> {
         let flag = match metadata_language {
             MetadataLanguage::English => {
-                let rows = DublinMetadataSubjectEn::find().filter(
-                    dublin_metadata_subject_en::Column::Id.is_in(subject_ids)
-                ).all(&self.db_session).await?;
+                let rows = DublinMetadataSubjectEn::find()
+                    .filter(dublin_metadata_subject_en::Column::Id.is_in(subject_ids))
+                    .all(&self.db_session)
+                    .await?;
                 rows.len() > 0
-            },
+            }
             MetadataLanguage::Arabic => {
-                let rows = DublinMetadataSubjectAr::find().filter(
-                    dublin_metadata_subject_ar::Column::Id.is_in(subject_ids)
-                ).all(&self.db_session).await?;
+                let rows = DublinMetadataSubjectAr::find()
+                    .filter(dublin_metadata_subject_ar::Column::Id.is_in(subject_ids))
+                    .all(&self.db_session)
+                    .await?;
                 rows.len() > 0
-            },
+            }
         };
         Ok(flag)
     }

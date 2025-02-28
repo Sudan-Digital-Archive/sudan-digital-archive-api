@@ -16,10 +16,10 @@ pub struct Model {
     pub dublin_metadata_date: DateTime,
     pub title_en: Option<String>,
     pub description_en: Option<String>,
-    pub subjects_en: Option<Vec<String>>,
+    pub subjects_en: Option<Vec<i32>>,
     pub title_ar: Option<String>,
     pub description_ar: Option<String>,
-    pub subjects_ar: Option<Vec<String>>,
+    pub subjects_ar: Option<Vec<i32>>,
     pub has_english_metadata: bool,
     pub has_arabic_metadata: bool,
 }

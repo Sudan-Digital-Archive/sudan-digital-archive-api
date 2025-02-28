@@ -50,14 +50,7 @@ pub struct GetOneAccessionResponse {
     pub wacz_url: String,
 }
 
-/// Paginated response for accession listings.
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct ListAccessionsResponse {
-    pub items: Vec<AccessionsWithMetadataModel>,
-    pub num_pages: u64,
-    pub page: u64,
-    pub per_page: u64,
-}
+
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SubjectResponse {
