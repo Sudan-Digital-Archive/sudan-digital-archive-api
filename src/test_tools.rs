@@ -10,6 +10,8 @@ use crate::services::subjects_service::SubjectsService;
 use async_trait::async_trait;
 use axum::Router;
 use entity::accessions_with_metadata::Model as AccessionsWithMetadataModel;
+use entity::dublin_metadata_subject_ar::Model as DublinMetadataSubjectArModel;
+use entity::dublin_metadata_subject_en::Model as DublinMetadataSubjectEnModel;
 use entity::sea_orm_active_enums::CrawlStatus;
 use reqwest::{Error, RequestBuilder, Response};
 use sea_orm::DbErr;
@@ -70,8 +72,8 @@ impl SubjectsRepo for InMemorySubjectsRepo {
         _page: u64,
         _per_page: u64,
         _query_term: Option<String>,
-    ) -> Result<(Vec<entity::dublin_metadata_subject_ar::Model>, u64), DbErr> {
-        Ok((vec![], 10))
+    ) -> Result<(Vec<DublinMetadataSubjectArModel>, u64), DbErr> {
+        Ok(mock_paginated_subjects_ar())
     }
 
     async fn list_paginated_en(
@@ -79,8 +81,8 @@ impl SubjectsRepo for InMemorySubjectsRepo {
         _page: u64,
         _per_page: u64,
         _query_term: Option<String>,
-    ) -> Result<(Vec<entity::dublin_metadata_subject_en::Model>, u64), DbErr> {
-        Ok((vec![], 10))
+    ) -> Result<(Vec<DublinMetadataSubjectEnModel>, u64), DbErr> {
+        Ok(mock_paginated_subjects_en())
     }
 
     async fn verify_subjects_exist(
@@ -185,4 +187,24 @@ pub fn mock_one_accession_with_metadata() -> AccessionsWithMetadataModel {
         subjects_ar: Some(vec![1, 2, 3]),
         seed_url: "".to_string(),
     }
+}
+
+pub fn mock_paginated_subjects_en() -> (Vec<DublinMetadataSubjectEnModel>, u64) {
+    (
+        vec![DublinMetadataSubjectEnModel {
+            id: 1,
+            subject: "English Subject".to_string(),
+        }],
+        10,
+    )
+}
+
+pub fn mock_paginated_subjects_ar() -> (Vec<DublinMetadataSubjectArModel>, u64) {
+    (
+        vec![DublinMetadataSubjectArModel {
+            id: 1,
+            subject: "Arabic Subject".to_string(),
+        }],
+        10,
+    )
 }
