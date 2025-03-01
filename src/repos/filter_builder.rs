@@ -60,14 +60,14 @@ pub fn build_filter_expression(
         MetadataLanguage::English => (
             Expr::col(accessions_with_metadata::Column::TitleEn),
             Expr::col(accessions_with_metadata::Column::DescriptionEn),
-            Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).is(true),
-            Expr::col(accessions_with_metadata::Column::SubjectsEn),
+            Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true),
+            Expr::col(accessions_with_metadata::Column::SubjectsEnIds),
         ),
         MetadataLanguage::Arabic => (
             Expr::col(accessions_with_metadata::Column::TitleAr),
             Expr::col(accessions_with_metadata::Column::DescriptionAr),
-            Expr::col(accessions_with_metadata::Column::HasArabicMetadata).is(true),
-            Expr::col(accessions_with_metadata::Column::SubjectsAr),
+            Expr::col(accessions_with_metadata::Column::HasArabicMetadata).eq(true),
+            Expr::col(accessions_with_metadata::Column::SubjectsArIds),
         ),
     };
 

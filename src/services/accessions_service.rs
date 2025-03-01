@@ -65,7 +65,7 @@ impl AccessionsService {
             .await;
         match rows {
             Err(err) => {
-                error!(%err, "Error occurred paginating accessions in Arabic");
+                error!(%err, "Error occurred paginating accessions");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
             }
             Ok(rows) => Json(rows).into_response(),

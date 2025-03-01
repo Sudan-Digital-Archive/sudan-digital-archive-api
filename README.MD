@@ -1,3 +1,7 @@
+# TODOs
+
+- Rewrite tests
+- Add array filtering for subjects in list endpoint
 # Overview
 
 This is the API for the Sudan Digital Archive.

@@ -132,17 +132,17 @@ impl SubjectsRepo for DBSubjectsRepo {
         let flag = match metadata_language {
             MetadataLanguage::English => {
                 let rows = DublinMetadataSubjectEn::find()
-                    .filter(dublin_metadata_subject_en::Column::Id.is_in(subject_ids))
+                    .filter(dublin_metadata_subject_en::Column::Id.is_in(subject_ids.clone()))
                     .all(&self.db_session)
                     .await?;
-                rows.len() > 0
+                rows.len() == subject_ids.len()
             }
             MetadataLanguage::Arabic => {
                 let rows = DublinMetadataSubjectAr::find()
-                    .filter(dublin_metadata_subject_ar::Column::Id.is_in(subject_ids))
+                    .filter(dublin_metadata_subject_ar::Column::Id.is_in(subject_ids.clone()))
                     .all(&self.db_session)
                     .await?;
-                rows.len() > 0
+                rows.len() == subject_ids.len()
             }
         };
         Ok(flag)

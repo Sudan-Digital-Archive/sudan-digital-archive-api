@@ -83,7 +83,7 @@ async fn list_accessions(
             pagination.0.page,
             pagination.0.per_page,
             pagination.0.lang,
-            pagination.0.metadata_subjects,
+            Some(vec![3,4,5,2]),
             pagination.0.query_term,
             pagination.0.date_from,
             pagination.0.date_to,
