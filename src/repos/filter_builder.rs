@@ -227,7 +227,7 @@ mod tests {
             Func::lower(title)
                 .like(&query_string)
                 .or(Func::lower(description).like(&query_string))
-                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).is(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true)),
         );
         assert_eq!(actual, expected);
     }
@@ -250,7 +250,7 @@ mod tests {
             Func::lower(title)
                 .like(&query_string)
                 .or(Func::lower(description).like(&query_string))
-                .and(Expr::col(accessions_with_metadata::Column::HasArabicMetadata).is(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasArabicMetadata).eq(true)),
         );
         assert_eq!(actual, expected);
     }
@@ -277,7 +277,7 @@ mod tests {
             accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from_date)
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to_date))
-                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).is(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true)),
         );
         assert_eq!(actual, expected);
     }
@@ -294,7 +294,7 @@ mod tests {
         let expected = Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from_date)
-                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).is(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true)),
         );
         assert_eq!(actual, expected);
     }
@@ -311,7 +311,7 @@ mod tests {
         let expected = Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .lte(to_date)
-                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).is(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true)),
         );
         assert_eq!(actual, expected);
     }
@@ -346,7 +346,7 @@ mod tests {
                 .or(Func::lower(description).like(&query_string))
                 .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from_date))
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to_date))
-                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).is(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true)),
         );
         assert_eq!(actual, expected);
     }
@@ -377,7 +377,7 @@ mod tests {
             Func::lower(title)
                 .like(&query_string)
                 .or(Func::lower(description).like(&query_string))
-                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).is(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true)),
         );
 
         assert_eq!(actual_lower, expected);
@@ -395,10 +395,10 @@ mod tests {
             None,
         );
 
-        let subjects_column = Expr::col(accessions_with_metadata::Column::SubjectsEn);
+        let subjects_column = Expr::col(accessions_with_metadata::Column::SubjectsEnIds);
         let expected = Some(
             Expr::col(accessions_with_metadata::Column::HasEnglishMetadata)
-                .is(true)
+                .eq(true)
                 .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
         );
 
@@ -421,12 +421,12 @@ mod tests {
             Expr::col(accessions_with_metadata::Column::DescriptionEn),
         );
         let query_string = format!("%test%");
-        let subjects_column = Expr::col(accessions_with_metadata::Column::SubjectsEn);
+        let subjects_column = Expr::col(accessions_with_metadata::Column::SubjectsEnIds);
         let expected = Some(
             Func::lower(title)
                 .like(&query_string)
                 .or(Func::lower(description).like(&query_string))
-                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).is(true))
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
                 .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
         );
 

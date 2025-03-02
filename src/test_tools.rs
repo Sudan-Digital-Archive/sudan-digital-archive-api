@@ -186,6 +186,8 @@ pub fn mock_one_accession_with_metadata() -> AccessionsWithMetadataModel {
         subjects_en: Some(vec!["archive".to_string()]),
         subjects_ar: Some(vec!["mrhaba archive".to_string()]),
         seed_url: "".to_string(),
+        subjects_en_ids: Some(vec![1]),
+        subjects_ar_ids: Some(vec![3]),
     }
 }
 
