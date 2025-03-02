@@ -50,12 +50,14 @@ pub struct GetOneAccessionResponse {
     pub wacz_url: String,
 }
 
+/// Response containing a single subject with its identifier.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SubjectResponse {
     pub id: i32,
     pub subject: String,
 }
 
+/// Response for listing Arabic language subjects with pagination.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ListSubjectsArResponse {
     pub items: Vec<DublinMetadataSubjectArModel>,
@@ -63,6 +65,8 @@ pub struct ListSubjectsArResponse {
     pub page: u64,
     pub per_page: u64,
 }
+
+/// Response for listing English language subjects with pagination.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ListSubjectsEnResponse {
     pub items: Vec<DublinMetadataSubjectEnModel>,

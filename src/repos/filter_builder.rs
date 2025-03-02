@@ -11,44 +11,23 @@ use sea_orm::prelude::Expr;
 use sea_orm::sea_query::{ExprTrait, Func, SimpleExpr};
 use sea_orm::{sea_query, ColumnTrait};
 use sea_query::extension::postgres::PgBinOper;
-//TODO: Redo this docstring
-/// Builds a dynamic filter expression for searching across metadata tables based on provided criteria.
-///
-/// This function creates SQL filter conditions that can be applied to queries, supporting:
-/// - Multilingual search across English and Arabic metadata
-/// - Case-insensitive text search in titles, subjects, and descriptions
-/// - Date range filtering
-/// - Combination of text and date filters
+
+/// Builds a dynamic filter expression for searching metadata across the archive.
 ///
 /// # Arguments
 ///
-/// * `metadata_language` - Language selection (English/Arabic) determining which metadata table to search
-/// * `query_term` - Optional search term for text-based filtering
-/// * `date_from` - Optional start date for date range filtering
-/// * `date_to` - Optional end date for date range filtering
+/// * `metadata_language` - Language to search in (English or Arabic)
+/// * `metadata_subjects` - Optional array of subject IDs to filter by
+/// * `query_term` - Optional text to search in title and description fields
+/// * `date_from` - Optional start date for filtering
+/// * `date_to` - Optional end date for filtering
 ///
 /// # Returns
 ///
-/// * `Option<SimpleExpr>` - A SeaORM expression that can be used in a WHERE clause, or None if no filters applied
+/// * `Option<SimpleExpr>` - SQL expression for filtering, or None if no filters provided
 ///
-/// # Examples
-///
-/// ```
-/// let filter = build_filter_expression(
-///     MetadataLanguage::English,
-///     Some("heritage".to_string()),
-///     Some(start_date),
-///     Some(end_date)
-/// );
-/// ```
-///
-/// # Future Enhancements
-///
-/// This function is designed to be extended with:
-/// - Full-text search using PostgreSQL ts_vector indices
-/// - Additional metadata fields for filtering
-/// - More complex search patterns and combinations
-/// - Support for additional languages and metadata schemas
+/// The function combines these parameters to create appropriate SQL conditions based on
+/// which parameters are provided, with proper language-specific handling for metadata fields.
 pub fn build_filter_expression(
     metadata_language: MetadataLanguage,
     metadata_subjects: Option<Vec<i32>>,

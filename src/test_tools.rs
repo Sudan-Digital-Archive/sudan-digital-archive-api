@@ -1,6 +1,10 @@
+//! Test utilities for creating mock implementations and test fixtures.
+//! This module provides in-memory implementations of repositories and services
+//! to facilitate testing without requiring actual database or external API connections.
+
 use crate::app_factory::{create_app, AppState};
 use crate::models::common::MetadataLanguage;
-use crate::models::request::{CreateAccessionRequest, CreateCrawlRequest};
+use crate::models::request::{AccessionPagination, CreateAccessionRequest, CreateCrawlRequest};
 use crate::models::response::CreateCrawlResponse;
 use crate::repos::accessions_repo::AccessionsRepo;
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
@@ -18,11 +22,14 @@ use sea_orm::DbErr;
 use std::sync::Arc;
 use uuid::Uuid;
 
+/// In-memory implementation of AccessionsRepo for testing.
+/// Returns predefined mock data instead of interacting with a database.
 #[derive(Clone, Debug, Default)]
 pub struct InMemoryAccessionsRepo {}
 
 #[async_trait]
 impl AccessionsRepo for InMemoryAccessionsRepo {
+    /// Mock implementation that always succeeds without storing data.
     async fn write_one(
         &self,
         _create_accession_request: CreateAccessionRequest,
@@ -34,29 +41,28 @@ impl AccessionsRepo for InMemoryAccessionsRepo {
         Ok(())
     }
 
+    /// Returns a predefined mock accession.
     async fn get_one(&self, _id: i32) -> Result<Option<AccessionsWithMetadataModel>, DbErr> {
         Ok(Some(mock_one_accession_with_metadata()))
     }
 
+    /// Returns predefined mock paginated accessions.
     async fn list_paginated(
         &self,
-        _page: u64,
-        _per_page: u64,
-        _metadata_language: MetadataLanguage,
-        _metadata_subjects: Option<Vec<i32>>,
-        _query_term: Option<String>,
-        _date_from: Option<chrono::NaiveDateTime>,
-        _date_to: Option<chrono::NaiveDateTime>,
+        _params: AccessionPagination,
     ) -> Result<(Vec<AccessionsWithMetadataModel>, u64), DbErr> {
         Ok(mock_paginated_en())
     }
 }
 
+/// In-memory implementation of SubjectsRepo for testing.
+/// Provides mock data for subject-related operations.
 #[derive(Clone, Debug, Default)]
 pub struct InMemorySubjectsRepo {}
 
 #[async_trait]
 impl SubjectsRepo for InMemorySubjectsRepo {
+    /// Returns a predefined subject response without storing data.
     async fn write_one(
         &self,
         _create_subject_request: crate::models::request::CreateSubjectRequest,
@@ -67,6 +73,7 @@ impl SubjectsRepo for InMemorySubjectsRepo {
         })
     }
 
+    /// Returns predefined mock Arabic subjects.
     async fn list_paginated_ar(
         &self,
         _page: u64,
@@ -76,6 +83,7 @@ impl SubjectsRepo for InMemorySubjectsRepo {
         Ok(mock_paginated_subjects_ar())
     }
 
+    /// Returns predefined mock English subjects.
     async fn list_paginated_en(
         &self,
         _page: u64,
@@ -85,6 +93,7 @@ impl SubjectsRepo for InMemorySubjectsRepo {
         Ok(mock_paginated_subjects_en())
     }
 
+    /// Always returns true for subject verification in tests.
     async fn verify_subjects_exist(
         &self,
         _subject_ids: Vec<i32>,
@@ -94,35 +103,45 @@ impl SubjectsRepo for InMemorySubjectsRepo {
     }
 }
 
+/// In-memory implementation of BrowsertrixRepo for testing.
+/// Mocks interactions with the Browsertrix API.
 pub struct InMemoryBrowsertrixRepo {}
+
 #[async_trait]
 impl BrowsertrixRepo for InMemoryBrowsertrixRepo {
+    /// Returns a random UUID as organization ID.
     fn get_org_id(&self) -> Uuid {
         Uuid::new_v4()
     }
 
+    /// Mock refresh authentication that does nothing.
     async fn refresh_auth(&self) {
         // No-op for tests
     }
 
+    /// Returns a fixed mock URL for WACZ files.
     async fn get_wacz_url(&self, _job_run_id: &str) -> Result<String, Error> {
         Ok("my url".to_owned())
     }
 
+    /// Returns a mock response for any request.
     async fn make_request(&self, _req: RequestBuilder) -> Result<Response, Error> {
         Ok(reqwest::Response::from(http::Response::new(
             "mock test data",
         )))
     }
 
+    /// Returns a fixed authentication token.
     async fn authenticate(&self) -> Result<String, Error> {
         Ok("test_token".to_string())
     }
 
+    /// Mock initialization that does nothing.
     async fn initialize(&mut self) {
         // No-op for tests
     }
 
+    /// Returns a mock crawl response with random UUID and fixed job ID.
     async fn create_crawl(
         &self,
         _create_crawl_request: CreateCrawlRequest,
@@ -133,11 +152,14 @@ impl BrowsertrixRepo for InMemoryBrowsertrixRepo {
         })
     }
 
+    /// Returns a fixed "complete" status for any crawl.
     async fn get_crawl_status(&self, _crawl_id: Uuid) -> Result<String, Error> {
         Ok("complete".to_owned())
     }
 }
 
+/// Builds a test accessions service with in-memory repositories.
+/// Useful for unit testing service functionality without database connections.
 pub fn build_test_accessions_service() -> AccessionsService {
     let accessions_repo = Arc::new(InMemoryAccessionsRepo::default());
     let browsertrix_repo = Arc::new(InMemoryBrowsertrixRepo {});
@@ -147,11 +169,14 @@ pub fn build_test_accessions_service() -> AccessionsService {
     }
 }
 
+/// Builds a test subjects service with in-memory repository.
 pub fn build_test_subjects_service() -> SubjectsService {
     let subjects_repo = Arc::new(InMemorySubjectsRepo::default());
     SubjectsService { subjects_repo }
 }
 
+/// Creates a test application instance with in-memory services.
+/// The returned Router can be used with axum test utilities.
 pub fn build_test_app() -> Router {
     let accessions_service = build_test_accessions_service();
     let subjects_service = build_test_subjects_service();
@@ -162,12 +187,17 @@ pub fn build_test_app() -> Router {
     create_app(app_state, vec![], true)
 }
 
+/// Creates a mock paginated collection of English accessions.
 pub fn mock_paginated_en() -> (Vec<AccessionsWithMetadataModel>, u64) {
     (vec![mock_one_accession_with_metadata()], 10)
 }
+
+/// Creates a mock paginated collection of Arabic accessions.
 pub fn mock_paginated_ar() -> (Vec<AccessionsWithMetadataModel>, u64) {
     (vec![mock_one_accession_with_metadata()], 10)
 }
+
+/// Creates a single mock accession with metadata for testing.
 pub fn mock_one_accession_with_metadata() -> AccessionsWithMetadataModel {
     AccessionsWithMetadataModel {
         id: 1,
@@ -191,6 +221,7 @@ pub fn mock_one_accession_with_metadata() -> AccessionsWithMetadataModel {
     }
 }
 
+/// Creates a collection of mock English subjects for testing.
 pub fn mock_paginated_subjects_en() -> (Vec<DublinMetadataSubjectEnModel>, u64) {
     (
         vec![DublinMetadataSubjectEnModel {
@@ -201,6 +232,7 @@ pub fn mock_paginated_subjects_en() -> (Vec<DublinMetadataSubjectEnModel>, u64) 
     )
 }
 
+/// Creates a collection of mock Arabic subjects for testing.
 pub fn mock_paginated_subjects_ar() -> (Vec<DublinMetadataSubjectArModel>, u64) {
     (
         vec![DublinMetadataSubjectArModel {

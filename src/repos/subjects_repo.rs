@@ -1,3 +1,8 @@
+//! Repository module for managing subject metadata in the digital archive.
+//!
+//! This module provides functionality for creating and listing subject terms
+//! that can be used to categorize archived content in both Arabic and English.
+
 use crate::models::common::MetadataLanguage;
 use crate::models::request::CreateSubjectRequest;
 use crate::models::response::SubjectResponse;
@@ -16,18 +21,33 @@ use sea_orm::{
 };
 use sea_orm::{ColumnTrait, QueryFilter};
 
+/// Repository implementation for database operations on subjects.
 #[derive(Debug, Clone, Default)]
 pub struct DBSubjectsRepo {
     pub db_session: DatabaseConnection,
 }
 
+/// Defines the interface for subject-related database operations.
+///
+/// This trait provides methods for creating and retrieving subject terms
+/// that can be used to categorize archived content in both Arabic and English.
 #[async_trait]
 pub trait SubjectsRepo: Send + Sync {
+    /// Creates a new subject term in the specified language.
+    ///
+    /// # Arguments
+    /// * `create_subject_request` - The request containing subject details and language
     async fn write_one(
         &self,
         create_subject_request: CreateSubjectRequest,
     ) -> Result<SubjectResponse, DbErr>;
 
+    /// Lists Arabic subject terms with pagination and optional text search.
+    ///
+    /// # Arguments
+    /// * `page` - The page number to retrieve
+    /// * `per_page` - Number of records per page
+    /// * `query_term` - Optional text search term
     async fn list_paginated_ar(
         &self,
         page: u64,
@@ -35,6 +55,12 @@ pub trait SubjectsRepo: Send + Sync {
         query_term: Option<String>,
     ) -> Result<(Vec<DublinMetadataSubjectArModel>, u64), DbErr>;
 
+    /// Lists English subject terms with pagination and optional text search.
+    ///
+    /// # Arguments
+    /// * `page` - The page number to retrieve
+    /// * `per_page` - Number of records per page
+    /// * `query_term` - Optional text search term
     async fn list_paginated_en(
         &self,
         page: u64,
@@ -42,6 +68,11 @@ pub trait SubjectsRepo: Send + Sync {
         query_term: Option<String>,
     ) -> Result<(Vec<DublinMetadataSubjectEnModel>, u64), DbErr>;
 
+    /// Verifies that all provided subject IDs exist in the database.
+    ///
+    /// # Arguments
+    /// * `subject_ids` - List of subject IDs to verify
+    /// * `metadata_language` - Language of the subjects to check
     async fn verify_subjects_exist(
         &self,
         subject_ids: Vec<i32>,

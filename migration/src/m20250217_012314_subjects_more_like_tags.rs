@@ -241,9 +241,7 @@ impl MigrationTrait for Migration {
                 Table::alter()
                     .table(DublinMetadataEn::Table)
                     .add_column_if_not_exists(
-                        ColumnDef::new(DublinMetadataEn::Subject)
-                            .string()
-                            .null(),
+                        ColumnDef::new(DublinMetadataEn::Subject).string().null(),
                     )
                     .to_owned(),
             )
@@ -254,9 +252,7 @@ impl MigrationTrait for Migration {
                 Table::alter()
                     .table(DublinMetadataAr::Table)
                     .add_column_if_not_exists(
-                        ColumnDef::new(DublinMetadataAr::Subject)
-                            .string()
-                            .null(),
+                        ColumnDef::new(DublinMetadataAr::Subject).string().null(),
                     )
                     .to_owned(),
             )

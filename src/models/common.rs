@@ -17,6 +17,9 @@ pub enum MetadataLanguage {
 pub enum BrowserProfile {
     Facebook,
 }
+
+/// Display implementation for MetadataLanguage. Mostly exists
+/// for logging and debugging purposes.
 impl fmt::Display for MetadataLanguage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

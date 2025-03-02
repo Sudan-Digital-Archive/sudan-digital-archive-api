@@ -6,11 +6,11 @@
 use crate::app_factory::AppState;
 use crate::models::request::{AccessionPagination, CreateAccessionRequest};
 use axum::extract::{Path, State};
-use axum_extra::extract::Query;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use axum_extra::extract::Query;
 use validator::Validate;
 
 /// Creates routes for accession-related endpoints under `/accessions`.
@@ -78,18 +78,8 @@ async fn list_accessions(
     if let Err(err) = pagination.0.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }
-    state
-        .accessions_service
-        .list(
-            pagination.0.page,
-            pagination.0.per_page,
-            pagination.0.lang,
-            pagination.0.metadata_subjects,
-            pagination.0.query_term,
-            pagination.0.date_from,
-            pagination.0.date_to,
-        )
-        .await
+
+    state.accessions_service.list(pagination.0).await
 }
 
 #[cfg(test)]

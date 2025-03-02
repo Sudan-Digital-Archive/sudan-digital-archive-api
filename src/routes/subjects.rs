@@ -14,6 +14,7 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use validator::Validate;
 
+/// Creates routes for subject-related endpoints under `/metadata-subjects`.
 pub fn get_subjects_routes() -> Router<AppState> {
     Router::new().nest(
         "/metadata-subjects",
@@ -22,6 +23,10 @@ pub fn get_subjects_routes() -> Router<AppState> {
             .route("/", post(create_subject)),
     )
 }
+
+/// Creates a new metadata subject.
+///
+/// Returns a 201 CREATED status on success, or 400 BAD REQUEST if validation fails.
 async fn create_subject(
     State(state): State<AppState>,
     Json(payload): Json<CreateSubjectRequest>,
@@ -32,6 +37,10 @@ async fn create_subject(
     state.subjects_service.create_one(payload).await
 }
 
+/// Lists metadata subjects with pagination and filtering support.
+///
+/// Supports filtering by language and search query.
+/// Returns 400 BAD REQUEST if pagination parameters are invalid.
 async fn list_subjects(
     State(state): State<AppState>,
     pagination: Query<SubjectPagination>,
@@ -53,8 +62,12 @@ async fn list_subjects(
 #[cfg(test)]
 mod tests {
 
-    use crate::models::response::{ListSubjectsArResponse, ListSubjectsEnResponse, SubjectResponse};
-    use crate::test_tools::{build_test_app, mock_paginated_subjects_ar, mock_paginated_subjects_en};
+    use crate::models::response::{
+        ListSubjectsArResponse, ListSubjectsEnResponse, SubjectResponse,
+    };
+    use crate::test_tools::{
+        build_test_app, mock_paginated_subjects_ar, mock_paginated_subjects_en,
+    };
     use axum::{
         body::Body,
         http::{Request, StatusCode},

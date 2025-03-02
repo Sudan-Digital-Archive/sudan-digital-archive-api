@@ -4,7 +4,7 @@
 //! archival records, including their associated web crawls and metadata in both
 //! Arabic and English.
 
-use crate::models::common::MetadataLanguage;
+use crate::models::request::AccessionPagination;
 use crate::models::request::{CreateAccessionRequest, CreateCrawlRequest};
 use crate::models::response::GetOneAccessionResponse;
 use crate::repos::accessions_repo::AccessionsRepo;
@@ -12,7 +12,6 @@ use crate::repos::browsertrix_repo::BrowsertrixRepo;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use chrono::NaiveDateTime;
 use entity::sea_orm_active_enums::CrawlStatus;
 use std::sync::Arc;
 use std::time::Duration;
@@ -31,38 +30,18 @@ impl AccessionsService {
     /// Lists paginated accessions with optional filtering.
     ///
     /// # Arguments
-    /// * `page` - Page number to retrieve
-    /// * `per_page` - Number of items per page
-    /// * `metadata_language` - Language of the metadata (Arabic or English)
-    /// * `query_term` - Optional search term to filter results
-    /// * `date_from` - Optional start date for filtering
-    /// * `date_to` - Optional end date for filtering
+    /// * `params` - Struct containing all pagination and filtering parameters
     ///
     /// # Returns
     /// Returns a JSON response containing paginated accessions or an error response
-    pub async fn list(
-        self,
-        page: u64,
-        per_page: u64,
-        metadata_language: MetadataLanguage,
-        metadata_subjects: Option<Vec<i32>>,
-        query_term: Option<String>,
-        date_from: Option<NaiveDateTime>,
-        date_to: Option<NaiveDateTime>,
-    ) -> Response {
-        info!("Getting page {page} of {metadata_language} accessions with per page {per_page}...");
-        let rows = self
-            .accessions_repo
-            .list_paginated(
-                page,
-                per_page,
-                metadata_language,
-                metadata_subjects,
-                query_term,
-                date_from,
-                date_to,
-            )
-            .await;
+    pub async fn list(self, params: AccessionPagination) -> Response {
+        info!(
+            "Getting page {} of {} accessions with per page {}...",
+            params.page, params.lang, params.per_page
+        );
+
+        let rows = self.accessions_repo.list_paginated(params).await;
+
         match rows {
             Err(err) => {
                 error!(%err, "Error occurred paginating accessions");
@@ -96,7 +75,7 @@ impl AccessionsService {
                     {
                         Ok(wacz_url) => {
                             let resp = GetOneAccessionResponse {
-                                accession: accession,
+                                accession,
                                 wacz_url,
                             };
                             Json(resp).into_response()
@@ -157,10 +136,9 @@ impl AccessionsService {
                                 let crawl_time_secs = (time_to_sleep * count).as_secs();
                                 info!(%valid_crawl_resp, %count, "Crawl complete after {crawl_time_secs}s");
                                 let trimmed_title = payload.metadata_title.trim().to_string();
-                                let trimmed_description = match payload.metadata_description {
-                                    Some(description) => Some(description.trim().to_string()),
-                                    None => None,
-                                };
+                                let trimmed_description = payload
+                                    .metadata_description
+                                    .map(|description| description.trim().to_string());
                                 let create_accessions_request = CreateAccessionRequest {
                                     url: payload.url,
                                     browser_profile: payload.browser_profile,

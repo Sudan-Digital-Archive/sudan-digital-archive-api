@@ -4,7 +4,7 @@
 //! accession records with their associated metadata in both Arabic and English.
 
 use crate::models::common::MetadataLanguage;
-use crate::models::request::CreateAccessionRequest;
+use crate::models::request::{AccessionPagination, CreateAccessionRequest};
 use ::entity::accession::ActiveModel as AccessionActiveModel;
 use ::entity::dublin_metadata_ar::ActiveModel as DublinMetadataArActiveModel;
 use ::entity::dublin_metadata_ar_subjects::ActiveModel as DublinMetadataSubjectsArActiveModel;
@@ -17,13 +17,14 @@ use crate::repos::filter_builder::build_filter_expression;
 use ::entity::accessions_with_metadata::Entity as AccessionWithMetadata;
 use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
 use async_trait::async_trait;
-use chrono::{NaiveDateTime, Utc};
+use chrono::Utc;
 use entity::sea_orm_active_enums::CrawlStatus;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, DatabaseConnection, DbErr, EntityTrait, PaginatorTrait,
     QueryFilter, TransactionTrait, TryIntoModel,
 };
 use uuid::Uuid;
+
 /// Repository implementation for database operations on accessions.
 #[derive(Debug, Clone, Default)]
 pub struct DBAccessionsRepo {
@@ -56,15 +57,13 @@ pub trait AccessionsRepo: Send + Sync {
     /// Retrieves an accession record by its ID along with associated metadata.
     async fn get_one(&self, id: i32) -> Result<Option<AccessionWithMetadataModel>, DbErr>;
 
+    /// Lists accessions with pagination and filtering options.
+    ///
+    /// # Arguments
+    /// * `params` - Parameters for filtering and pagination
     async fn list_paginated(
         &self,
-        page: u64,
-        per_page: u64,
-        metadata_language: MetadataLanguage,
-        metadata_ids: Option<Vec<i32>>,
-        query_term: Option<String>,
-        date_from: Option<NaiveDateTime>,
-        date_to: Option<NaiveDateTime>,
+        params: AccessionPagination,
     ) -> Result<(Vec<AccessionWithMetadataModel>, u64), DbErr>;
 }
 
@@ -154,30 +153,25 @@ impl AccessionsRepo for DBAccessionsRepo {
 
     async fn list_paginated(
         &self,
-        page: u64,
-        per_page: u64,
-        metadata_language: MetadataLanguage,
-        metadata_subjects: Option<Vec<i32>>,
-        query_term: Option<String>,
-        date_from: Option<NaiveDateTime>,
-        date_to: Option<NaiveDateTime>,
+        params: AccessionPagination,
     ) -> Result<(Vec<AccessionWithMetadataModel>, u64), DbErr> {
         let filter_expression = build_filter_expression(
-            metadata_language,
-            metadata_subjects,
-            query_term,
-            date_from,
-            date_to,
+            params.lang,
+            params.metadata_subjects,
+            params.query_term,
+            params.date_from,
+            params.date_to,
         );
         let accession_pages;
         if let Some(query_filter) = filter_expression {
             accession_pages = AccessionWithMetadata::find()
                 .filter(query_filter)
-                .paginate(&self.db_session, per_page);
+                .paginate(&self.db_session, params.per_page);
         } else {
-            accession_pages = AccessionWithMetadata::find().paginate(&self.db_session, per_page);
+            accession_pages =
+                AccessionWithMetadata::find().paginate(&self.db_session, params.per_page);
         }
         let num_pages = accession_pages.num_pages().await?;
-        Ok((accession_pages.fetch_page(page).await?, num_pages))
+        Ok((accession_pages.fetch_page(params.page).await?, num_pages))
     }
 }

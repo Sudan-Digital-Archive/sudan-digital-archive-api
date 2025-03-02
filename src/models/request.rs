@@ -46,6 +46,7 @@ pub struct AccessionPagination {
     pub date_to: Option<NaiveDateTime>,
 }
 
+/// Request for creating a new subject category.
 #[derive(Debug, Clone, Validate, Deserialize)]
 pub struct CreateSubjectRequest {
     #[validate(length(min = 1, max = 100))]

@@ -1,3 +1,8 @@
+//! Service layer for managing archive metadata subjects.
+//!
+//! This module handles the business logic for creating and listing subject tags
+//! that are used to categorize archival records in both Arabic and English.
+
 use crate::models::common::MetadataLanguage;
 use crate::models::request::CreateSubjectRequest;
 use crate::models::response::{ListSubjectsArResponse, ListSubjectsEnResponse};
@@ -8,12 +13,22 @@ use http::StatusCode;
 use sea_orm::DbErr;
 use std::sync::Arc;
 use tracing::{error, info, warn};
+
+/// Service for managing metadata subjects in multiple languages.
+/// Uses dynamic traits for dependency injection
 #[derive(Clone)]
 pub struct SubjectsService {
     pub subjects_repo: Arc<dyn SubjectsRepo>,
 }
 
 impl SubjectsService {
+    /// Creates a new metadata subject.
+    ///
+    /// # Arguments
+    /// * `payload` - The creation request containing subject text and language
+    ///
+    /// # Returns
+    /// Returns a JSON response with the created subject or an error response
     pub async fn create_one(self, payload: CreateSubjectRequest) -> Response {
         info!(
             "Creating new {} subject {}...",
@@ -42,6 +57,16 @@ impl SubjectsService {
         }
     }
 
+    /// Lists paginated subjects with optional search filtering.
+    ///
+    /// # Arguments
+    /// * `page` - The page number to retrieve
+    /// * `per_page` - Number of items per page
+    /// * `metadata_language` - Language of subjects to retrieve (Arabic or English)
+    /// * `query_term` - Optional search term to filter subjects
+    ///
+    /// # Returns
+    /// Returns a JSON response containing paginated subjects or an error response
     pub async fn list(
         self,
         page: u64,
@@ -98,14 +123,21 @@ impl SubjectsService {
         }
     }
 
+    /// Verifies that all subject IDs in the provided list exist in the database.
+    ///
+    /// # Arguments
+    /// * `metadata_subjects` - List of subject IDs to verify
+    /// * `metadata_language` - Language of the subjects to check
+    ///
+    /// # Returns
+    /// Returns true if all subjects exist, false otherwise, or a database error
     pub async fn verify_subjects_exist(
         self,
         metadata_subjects: Vec<i32>,
         metadata_language: MetadataLanguage,
     ) -> Result<bool, DbErr> {
-        Ok(self
-            .subjects_repo
+        self.subjects_repo
             .verify_subjects_exist(metadata_subjects, metadata_language)
-            .await?)
+            .await
     }
 }
