@@ -6,7 +6,7 @@
 
 use crate::models::request::AccessionPagination;
 use crate::models::request::{CreateAccessionRequest, CreateCrawlRequest};
-use crate::models::response::GetOneAccessionResponse;
+use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use crate::repos::accessions_repo::AccessionsRepo;
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
 use axum::http::StatusCode;
@@ -33,21 +33,29 @@ impl AccessionsService {
     /// * `params` - Struct containing all pagination and filtering parameters
     ///
     /// # Returns
-    /// Returns a JSON response containing paginated accessions or an error response
+    /// JSON response containing paginated accessions or an error response
     pub async fn list(self, params: AccessionPagination) -> Response {
         info!(
             "Getting page {} of {} accessions with per page {}...",
             params.page, params.lang, params.per_page
         );
 
-        let rows = self.accessions_repo.list_paginated(params).await;
+        let rows = self.accessions_repo.list_paginated(params.clone()).await;
 
         match rows {
             Err(err) => {
                 error!(%err, "Error occurred paginating accessions");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
             }
-            Ok(rows) => Json(rows).into_response(),
+            Ok(rows) => {
+                let resp = ListAccessionsResponse {
+                    items: rows.0,
+                    num_pages: rows.1,
+                    page: params.page,
+                    per_page: params.per_page,
+                };
+                Json(resp).into_response()
+            }
         }
     }
 

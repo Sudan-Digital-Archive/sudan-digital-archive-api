@@ -86,7 +86,7 @@ async fn list_accessions(
 mod tests {
     use crate::models::common::MetadataLanguage;
     use crate::models::request::CreateAccessionRequest;
-    use crate::models::response::GetOneAccessionResponse;
+    use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
     use crate::test_tools::{
         build_test_accessions_service, build_test_app, mock_one_accession_with_metadata,
         mock_paginated_ar, mock_paginated_en,
@@ -95,7 +95,6 @@ mod tests {
         body::Body,
         http::{Request, StatusCode},
     };
-    use entity::accessions_with_metadata::Model as AccessionsWithMetadataModel;
     use http_body_util::BodyExt;
     use pretty_assertions::assert_eq;
     use serde_json::json;
@@ -237,12 +236,11 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let actual: ([AccessionsWithMetadataModel; 1], u64) =
-            serde_json::from_slice(&body).unwrap();
+        let actual: ListAccessionsResponse = serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_paginated_en();
         let expected = mocked_resp;
-        assert_eq!(actual.1, expected.1);
-        assert_eq!(actual.0.len(), expected.0.len());
+        assert_eq!(actual.num_pages, expected.1);
+        assert_eq!(actual.items.len(), expected.0.len());
     }
 
     #[tokio::test]
@@ -260,11 +258,10 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let actual: ([AccessionsWithMetadataModel; 1], u64) =
-            serde_json::from_slice(&body).unwrap();
+        let actual: ListAccessionsResponse = serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_paginated_ar();
         let expected = mocked_resp;
-        assert_eq!(actual.1, expected.1);
-        assert_eq!(actual.0.len(), expected.0.len());
+        assert_eq!(actual.num_pages, expected.1);
+        assert_eq!(actual.items.len(), expected.0.len());
     }
 }

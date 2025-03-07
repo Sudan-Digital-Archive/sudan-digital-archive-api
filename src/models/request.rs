@@ -33,7 +33,7 @@ pub struct CreateCrawlRequest {
 }
 
 /// Pagination and filtering parameters for listing accessions.
-#[derive(Debug, Validate, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Validate)]
 pub struct AccessionPagination {
     pub page: u64,
     #[validate(range(min = 1, max = 200))]
