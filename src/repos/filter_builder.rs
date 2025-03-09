@@ -39,13 +39,13 @@ pub fn build_filter_expression(
         MetadataLanguage::English => (
             Expr::col(accessions_with_metadata::Column::TitleEn),
             Expr::col(accessions_with_metadata::Column::DescriptionEn),
-            Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true),
+            Expr::col(accessions_with_metadata::Column::HasEnglishMetadata),
             Expr::col(accessions_with_metadata::Column::SubjectsEnIds),
         ),
         MetadataLanguage::Arabic => (
             Expr::col(accessions_with_metadata::Column::TitleAr),
             Expr::col(accessions_with_metadata::Column::DescriptionAr),
-            Expr::col(accessions_with_metadata::Column::HasArabicMetadata).eq(true),
+            Expr::col(accessions_with_metadata::Column::HasArabicMetadata),
             Expr::col(accessions_with_metadata::Column::SubjectsArIds),
         ),
     };
@@ -59,7 +59,7 @@ pub fn build_filter_expression(
                     .or(Func::lower(description).like(&query_string))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
-                    .and(lang_filter)
+                    .and(lang_filter.eq(true))
                     .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
             )
         }
@@ -70,7 +70,7 @@ pub fn build_filter_expression(
                     .like(&query_string)
                     .or(Func::lower(description).like(&query_string))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
-                    .and(lang_filter)
+                    .and(lang_filter.eq(true))
                     .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
             )
         }
@@ -81,7 +81,7 @@ pub fn build_filter_expression(
                     .like(&query_string)
                     .or(Func::lower(description).like(&query_string))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
-                    .and(lang_filter)
+                    .and(lang_filter.eq(true))
                     .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
             )
         }
@@ -91,7 +91,7 @@ pub fn build_filter_expression(
                 Func::lower(title)
                     .like(&query_string)
                     .or(Func::lower(description).like(&query_string))
-                    .and(lang_filter)
+                    .and(lang_filter.eq(true))
                     .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
             )
         }
@@ -99,24 +99,26 @@ pub fn build_filter_expression(
             accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from)
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
-                .and(lang_filter)
+                .and(lang_filter.eq(true))
                 .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
         ),
         (None, Some(from), None, Some(subjects)) => Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from)
-                .and(lang_filter)
+                .and(lang_filter.eq(true))
                 .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
         ),
         (None, None, Some(to), Some(subjects)) => Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .lte(to)
-                .and(lang_filter)
+                .and(lang_filter.eq(true))
                 .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
         ),
-        (None, None, None, Some(subjects)) => {
-            Some(lang_filter.and(subjects_column.binary(PgBinOper::Overlap, subjects)))
-        }
+        (None, None, None, Some(subjects)) => Some(
+            lang_filter
+                .eq(true)
+                .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+        ),
         (Some(term), Some(from), Some(to), None) => {
             let query_string = format!("%{}%", term.to_lowercase());
             Some(
@@ -125,7 +127,7 @@ pub fn build_filter_expression(
                     .or(Func::lower(description).like(&query_string))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
-                    .and(lang_filter),
+                    .and(lang_filter.eq(true)),
             )
         }
         (Some(term), Some(from), None, None) => {
@@ -135,7 +137,7 @@ pub fn build_filter_expression(
                     .like(&query_string)
                     .or(Func::lower(description).like(&query_string))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
-                    .and(lang_filter),
+                    .and(lang_filter.eq(true)),
             )
         }
         (Some(term), None, Some(to), None) => {
@@ -145,7 +147,7 @@ pub fn build_filter_expression(
                     .like(&query_string)
                     .or(Func::lower(description).like(&query_string))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
-                    .and(lang_filter),
+                    .and(lang_filter.eq(true)),
             )
         }
         (Some(term), None, None, None) => {
@@ -154,26 +156,26 @@ pub fn build_filter_expression(
                 Func::lower(title)
                     .like(&query_string)
                     .or(Func::lower(description).like(&query_string))
-                    .and(lang_filter),
+                    .and(lang_filter.eq(true)),
             )
         }
         (None, Some(from), Some(to), None) => Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from)
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
-                .and(lang_filter),
+                .and(lang_filter.eq(true)),
         ),
         (None, Some(from), None, None) => Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from)
-                .and(lang_filter),
+                .and(lang_filter.eq(true)),
         ),
         (None, None, Some(to), None) => Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .lte(to)
-                .and(lang_filter),
+                .and(lang_filter.eq(true)),
         ),
-        (None, None, None, None) => None,
+        (None, None, None, None) => Some(lang_filter.eq(true)),
     }
 }
 
@@ -185,7 +187,13 @@ mod tests {
     #[test]
     fn test_build_filter_none_params() {
         let actual = build_filter_expression(MetadataLanguage::English, None, None, None, None);
-        assert_eq!(actual, None);
+        let expected =
+            Some(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true));
+        assert_eq!(actual, expected);
+        let actual = build_filter_expression(MetadataLanguage::Arabic, None, None, None, None);
+        let expected =
+            Some(Expr::col(accessions_with_metadata::Column::HasArabicMetadata).eq(true));
+        assert_eq!(actual, expected);
     }
 
     #[test]
