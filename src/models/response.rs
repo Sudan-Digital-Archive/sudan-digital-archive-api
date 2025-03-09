@@ -3,9 +3,9 @@
 //! This module contains all the response structures used by the API endpoints,
 //! including authentication, crawl operations, and accession management.
 
-use ::entity::accession::Model as AccessionModel;
-use ::entity::dublin_metadata_ar::Model as DublinMetataArModel;
-use ::entity::dublin_metadata_en::Model as DublinMetadataEnModel;
+use ::entity::accessions_with_metadata::Model as AccessionsWithMetadataModel;
+use ::entity::dublin_metadata_subject_ar::Model as DublinMetadataSubjectArModel;
+use ::entity::dublin_metadata_subject_en::Model as DublinMetadataSubjectEnModel;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -46,25 +46,39 @@ pub struct WaczItem {
 /// Response for retrieving a single accession with its metadata.
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct GetOneAccessionResponse {
-    pub accession: AccessionModel,
-    pub metadata_ar: Option<DublinMetataArModel>,
-    pub metadata_en: Option<DublinMetadataEnModel>,
+    pub accession: AccessionsWithMetadataModel,
     pub wacz_url: String,
 }
 
-/// Paginated response for Arabic accession listings.
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct ListAccessionsArResponse {
-    pub items: Vec<(AccessionModel, Option<DublinMetataArModel>)>,
+/// Response for listing accessions with pagination.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ListAccessionsResponse {
+    pub items: Vec<AccessionsWithMetadataModel>,
     pub num_pages: u64,
     pub page: u64,
     pub per_page: u64,
 }
 
-/// Paginated response for English accession listings.
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct ListAccessionsEnResponse {
-    pub items: Vec<(AccessionModel, Option<DublinMetadataEnModel>)>,
+/// Response containing a single subject with its identifier.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SubjectResponse {
+    pub id: i32,
+    pub subject: String,
+}
+
+/// Response for listing Arabic language subjects with pagination.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ListSubjectsArResponse {
+    pub items: Vec<DublinMetadataSubjectArModel>,
+    pub num_pages: u64,
+    pub page: u64,
+    pub per_page: u64,
+}
+
+/// Response for listing English language subjects with pagination.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ListSubjectsEnResponse {
+    pub items: Vec<DublinMetadataSubjectEnModel>,
     pub num_pages: u64,
     pub page: u64,
     pub per_page: u64,

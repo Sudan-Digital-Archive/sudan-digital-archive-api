@@ -25,6 +25,7 @@ uuid = { version="1.11.0", features=["v4"] }
 chrono = "0.4.39"
 http = "1.2.0"
 tower_governor = { version = "0.6.0", features = ["axum"] }
+axum-extra = { version = "0.10.0", features = ["query"] }
 
 [dev-dependencies]
 mime = "0.3.17"

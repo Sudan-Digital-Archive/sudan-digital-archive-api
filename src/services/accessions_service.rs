@@ -4,17 +4,14 @@
 //! archival records, including their associated web crawls and metadata in both
 //! Arabic and English.
 
-use crate::models::common::MetadataLanguage;
+use crate::models::request::AccessionPagination;
 use crate::models::request::{CreateAccessionRequest, CreateCrawlRequest};
-use crate::models::response::{
-    GetOneAccessionResponse, ListAccessionsArResponse, ListAccessionsEnResponse,
-};
+use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use crate::repos::accessions_repo::AccessionsRepo;
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use chrono::NaiveDateTime;
 use entity::sea_orm_active_enums::CrawlStatus;
 use std::sync::Arc;
 use std::time::Duration;
@@ -33,67 +30,31 @@ impl AccessionsService {
     /// Lists paginated accessions with optional filtering.
     ///
     /// # Arguments
-    /// * `page` - Page number to retrieve
-    /// * `per_page` - Number of items per page
-    /// * `metadata_language` - Language of the metadata (Arabic or English)
-    /// * `query_term` - Optional search term to filter results
-    /// * `date_from` - Optional start date for filtering
-    /// * `date_to` - Optional end date for filtering
+    /// * `params` - Struct containing all pagination and filtering parameters
     ///
     /// # Returns
-    /// Returns a JSON response containing paginated accessions or an error response
-    pub async fn list(
-        self,
-        page: u64,
-        per_page: u64,
-        metadata_language: MetadataLanguage,
-        query_term: Option<String>,
-        date_from: Option<NaiveDateTime>,
-        date_to: Option<NaiveDateTime>,
-    ) -> Response {
-        info!("Getting page {page} of accessions with per page {per_page}...");
-        match metadata_language {
-            MetadataLanguage::Arabic => {
-                let rows = match self
-                    .accessions_repo
-                    .list_paginated_ar(page, per_page, query_term, date_from, date_to)
-                    .await
-                {
-                    Ok(rows) => rows,
-                    Err(err) => {
-                        error!(%err, "Error occurred paginating accessions in Arabic");
-                        return (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error")
-                            .into_response();
-                    }
-                };
-                let rows = ListAccessionsArResponse {
-                    items: rows.0,
-                    num_pages: rows.1,
-                    page,
-                    per_page,
-                };
-                Json(rows).into_response()
+    /// JSON response containing paginated accessions or an error response
+    pub async fn list(self, params: AccessionPagination) -> Response {
+        info!(
+            "Getting page {} of {} accessions with per page {}...",
+            params.page, params.lang, params.per_page
+        );
+
+        let rows = self.accessions_repo.list_paginated(params.clone()).await;
+
+        match rows {
+            Err(err) => {
+                error!(%err, "Error occurred paginating accessions");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
             }
-            MetadataLanguage::English => {
-                let rows = match self
-                    .accessions_repo
-                    .list_paginated_en(page, per_page, query_term, date_from, date_to)
-                    .await
-                {
-                    Ok(rows) => rows,
-                    Err(err) => {
-                        error!(%err, "Error occurred paginating accessions in English");
-                        return (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error")
-                            .into_response();
-                    }
-                };
-                let rows = ListAccessionsEnResponse {
+            Ok(rows) => {
+                let resp = ListAccessionsResponse {
                     items: rows.0,
                     num_pages: rows.1,
-                    page,
-                    per_page,
+                    page: params.page,
+                    per_page: params.per_page,
                 };
-                Json(rows).into_response()
+                Json(resp).into_response()
             }
         }
     }
@@ -104,7 +65,7 @@ impl AccessionsService {
     /// * `id` - The unique identifier of the accession
     ///
     /// # Returns
-    /// Returns a JSON response containing the accession details or an error response
+    /// JSON response containing the accession details or an error response
     pub async fn get_one(self, id: i32) -> Response {
         info!("Getting accession with id {id}");
         let query_result = self.accessions_repo.get_one(id).await;
@@ -113,24 +74,22 @@ impl AccessionsService {
                 error!(%query_result, "Error occurred retrieving accession");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
             }
-            Ok(query_result) => match query_result.0 {
-                Some(accession_record) => {
+            Ok(query_result) => match query_result {
+                Some(accession) => {
                     match self
                         .browsertrix_repo
-                        .get_wacz_url(&accession_record.job_run_id)
+                        .get_wacz_url(&accession.job_run_id)
                         .await
                     {
                         Ok(wacz_url) => {
                             let resp = GetOneAccessionResponse {
-                                accession: accession_record,
-                                metadata_ar: query_result.1,
-                                metadata_en: query_result.2,
+                                accession,
                                 wacz_url,
                             };
                             Json(resp).into_response()
                         }
                         Err(err) => {
-                            error!(%err, "Error occurred retrieiving wacz url");
+                            error!(%err, "Error occurred retrieving wacz url");
                             (
                                 StatusCode::INTERNAL_SERVER_ERROR,
                                 "Error retrieving wacz url",
@@ -150,6 +109,10 @@ impl AccessionsService {
     /// 1. Launches a web crawl for the specified URL
     /// 2. Polls the crawl status for up to 30 minutes
     /// 3. Creates an accession record once the crawl is complete
+    ///
+    /// You should validate that `metadata_subjects` exist in the
+    /// payload before calling this method - it will error out
+    /// if they don't.
     ///
     /// # Arguments
     /// * `payload` - The creation request containing URL and metadata
@@ -180,14 +143,18 @@ impl AccessionsService {
                             if valid_crawl_resp == "complete" {
                                 let crawl_time_secs = (time_to_sleep * count).as_secs();
                                 info!(%valid_crawl_resp, %count, "Crawl complete after {crawl_time_secs}s");
+                                let trimmed_title = payload.metadata_title.trim().to_string();
+                                let trimmed_description = payload
+                                    .metadata_description
+                                    .map(|description| description.trim().to_string());
                                 let create_accessions_request = CreateAccessionRequest {
                                     url: payload.url,
                                     browser_profile: payload.browser_profile,
                                     metadata_language: payload.metadata_language,
-                                    metadata_title: payload.metadata_title,
-                                    metadata_subject: payload.metadata_subject,
-                                    metadata_description: payload.metadata_description,
+                                    metadata_title: trimmed_title,
+                                    metadata_description: trimmed_description,
                                     metadata_time: payload.metadata_time,
+                                    metadata_subjects: payload.metadata_subjects,
                                 };
                                 let write_result = self
                                     .accessions_repo

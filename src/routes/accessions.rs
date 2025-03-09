@@ -4,12 +4,13 @@
 //! It uses in-memory repositories for testing to avoid I/O operations.
 
 use crate::app_factory::AppState;
-use crate::models::request::{CreateAccessionRequest, Pagination};
-use axum::extract::{Path, Query, State};
+use crate::models::request::{AccessionPagination, CreateAccessionRequest};
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use axum_extra::extract::Query;
 use validator::Validate;
 
 /// Creates routes for accession-related endpoints under `/accessions`.
@@ -33,6 +34,25 @@ async fn create_accession(
     if let Err(err) = payload.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }
+    let cloned_payload = payload.clone();
+    let subjects_exist = state
+        .subjects_service
+        .clone()
+        .verify_subjects_exist(
+            cloned_payload.metadata_subjects,
+            cloned_payload.metadata_language,
+        )
+        .await;
+    match subjects_exist {
+        Err(err) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response();
+        }
+        Ok(flag) => {
+            if !flag {
+                return (StatusCode::BAD_REQUEST, "Subjects do not exist").into_response();
+            }
+        }
+    };
     let cloned_state = state.clone();
     tokio::spawn(async move {
         cloned_state.accessions_service.create_one(payload).await;
@@ -51,33 +71,25 @@ async fn get_one_accession(State(state): State<AppState>, Path(id): Path<i32>) -
 ///
 /// Supports filtering by language, date range, and search terms.
 /// Returns 400 BAD REQUEST if pagination parameters are invalid.
-async fn list_accessions(State(state): State<AppState>, pagination: Query<Pagination>) -> Response {
+async fn list_accessions(
+    State(state): State<AppState>,
+    pagination: Query<AccessionPagination>,
+) -> Response {
     if let Err(err) = pagination.0.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }
-    state
-        .accessions_service
-        .list(
-            pagination.0.page,
-            pagination.0.per_page,
-            pagination.0.lang,
-            pagination.0.query_term,
-            pagination.0.date_from,
-            pagination.0.date_to,
-        )
-        .await
+
+    state.accessions_service.list(pagination.0).await
 }
 
 #[cfg(test)]
 mod tests {
     use crate::models::common::MetadataLanguage;
     use crate::models::request::CreateAccessionRequest;
-    use crate::models::response::{
-        GetOneAccessionResponse, ListAccessionsArResponse, ListAccessionsEnResponse,
-    };
+    use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
     use crate::test_tools::{
-        build_test_accessions_service, build_test_app, mock_get_one, mock_paginated_ar,
-        mock_paginated_en,
+        build_test_accessions_service, build_test_app, mock_one_accession_with_metadata,
+        mock_paginated_ar, mock_paginated_en,
     };
     use axum::{
         body::Body,
@@ -96,10 +108,10 @@ mod tests {
                 url: "".to_string(),
                 metadata_language: MetadataLanguage::English,
                 metadata_title: "".to_string(),
-                metadata_subject: "".to_string(),
                 metadata_description: Some("".to_string()),
                 metadata_time: Default::default(),
                 browser_profile: None,
+                metadata_subjects: vec![1, 2, 3],
             })
             .await;
     }
@@ -112,7 +124,7 @@ mod tests {
                 url: "".to_string(),
                 metadata_language: MetadataLanguage::English,
                 metadata_title: "".to_string(),
-                metadata_subject: "".to_string(),
+                metadata_subjects: vec![1, 2, 3],
                 metadata_description: None,
                 metadata_time: Default::default(),
                 browser_profile: None,
@@ -135,7 +147,9 @@ mod tests {
     "metadata_title": "Guardian piece",
     "metadata_subject": "UK energy costs",
     "metadata_description": "Blah de blah",
-    "metadata_time": "2024-11-01T23:32:00"
+    "metadata_time": "2024-11-01T23:32:00",
+    "browser_profile": null,
+    "metadata_subjects": [1]
 })).unwrap(),
                     ))
                     .unwrap(),
@@ -164,10 +178,11 @@ mod tests {
                             "url": "https://facebook.com/some/story",
                             "metadata_language": "english",
                             "metadata_title": "Guardian piece",
-                            "metadata_subject": "UK energy costs",
+                            "browser_profile": "facebook",
                             "metadata_description": null,
                             "metadata_time": "2024-11-01T23:32:00",
-                            "browser_profile": "facebook"
+                            "browser_profile": "facebook",
+                            "metadata_subjects": [1]
                         }))
                         .unwrap(),
                     ))
@@ -198,11 +213,9 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let actual: GetOneAccessionResponse = serde_json::from_slice(&body).unwrap();
-        let mocked_resp = mock_get_one();
+        let mocked_resp = mock_one_accession_with_metadata();
         let expected = GetOneAccessionResponse {
-            accession: mocked_resp.0.unwrap(),
-            metadata_ar: mocked_resp.1,
-            metadata_en: mocked_resp.2,
+            accession: mocked_resp,
             wacz_url: "my url".to_owned(),
         };
         assert_eq!(actual, expected)
@@ -223,15 +236,11 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let actual: ListAccessionsEnResponse = serde_json::from_slice(&body).unwrap();
+        let actual: ListAccessionsResponse = serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_paginated_en();
-        let expected = ListAccessionsEnResponse {
-            items: mocked_resp.0,
-            num_pages: mocked_resp.1,
-            page: 0,
-            per_page: 1,
-        };
-        assert_eq!(actual, expected)
+        let expected = mocked_resp;
+        assert_eq!(actual.num_pages, expected.1);
+        assert_eq!(actual.items.len(), expected.0.len());
     }
 
     #[tokio::test]
@@ -249,14 +258,10 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let actual: ListAccessionsArResponse = serde_json::from_slice(&body).unwrap();
+        let actual: ListAccessionsResponse = serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_paginated_ar();
-        let expected = ListAccessionsArResponse {
-            items: mocked_resp.0,
-            num_pages: mocked_resp.1,
-            page: 0,
-            per_page: 1,
-        };
-        assert_eq!(actual, expected)
+        let expected = mocked_resp;
+        assert_eq!(actual.num_pages, expected.1);
+        assert_eq!(actual.items.len(), expected.0.len());
     }
 }

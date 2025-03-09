@@ -14,8 +14,11 @@
 //! Note: Rate limiting is disabled in test mode.
 
 use crate::routes::accessions::get_accessions_routes;
+use crate::routes::subjects::get_subjects_routes;
+
 use crate::routes::health::healthcheck;
 use crate::services::accessions_service::AccessionsService;
+use crate::services::subjects_service::SubjectsService;
 use axum::extract::MatchedPath;
 use axum::http::Request;
 use axum::routing::get;
@@ -38,6 +41,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 #[derive(Clone)]
 pub struct AppState {
     pub accessions_service: AccessionsService,
+    pub subjects_service: SubjectsService,
 }
 
 /// Creates and configures the main application router with middleware and routes.
@@ -73,7 +77,7 @@ pub fn create_app(app_state: AppState, cors_origins: Vec<HeaderValue>, test: boo
         .allow_methods([Method::GET, Method::POST])
         .allow_origin(cors_origins)
         .allow_headers([CONTENT_TYPE]);
-    let all_routes = build_routes();
+    let all_routes: Router<AppState> = build_routes();
     let base_routes = all_routes.layer(cors);
     // rate limiting breaks tests *sigh* #security #pita
     if test {
@@ -116,8 +120,10 @@ fn build_routes() -> Router<AppState> {
         .layer(CompressionLayer::new())
         .layer(ValidateRequestHeaderLayer::accept("application/json"));
     let accessions_routes = get_accessions_routes();
+    let subjects_routes = get_subjects_routes();
     Router::new()
         .nest("/api/v1", accessions_routes)
+        .nest("/api/v1", subjects_routes)
         .nest("/health", Router::new().route("/", get(healthcheck)))
         .layer(middleware)
 }

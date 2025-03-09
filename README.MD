@@ -14,18 +14,19 @@ export DATABASE_URL="postgresql://<your connection string>"
 sea-orm-cli migrate up
 ```
 
-To then generate entities:
+## Database
+
+It's pretty useful to generate entities with sea orm. That way you
+get a rust model for exactly what is in your database. After running
+migrations, to generate entities:
 ```shell
 sea-orm-cli generate entity -u $DATABASE_URL -o entity/src
 ```
 
-The code generation is buggy so don't rely on it. 
-However, it provides a good starting point. I would recommend saving the
-existing entity files before you do this so that you can see what a working version 
-looks like.
+The code generation typically doesn't work with the layout of the app - it writes
+stuff into `mod.rs` not `lib.rs` so I would focus instead on using it just for 
+modelling what's in the database, where it is perfect.
 
-You then need to set a lot of environment variables - take a look in the app config
-struct for more info. After that's done, it's just `cargo run`.
 
 ## Dockerfile
 
@@ -37,6 +38,11 @@ To test the Dockerfile, install docker, add the required environment variables t
 
 Just run `cargo test`. Note that clippy and tests run in CI on pull and merge
 to main. So, both need to pass before releasing code.
+
+Note that at the time of writing, there are no integration tests - only unit. 
+You therefore should manually test anything that involves I/O to
+external resources e.g. database since none of that functionality
+will run itests.
 
 ## Deployment
 

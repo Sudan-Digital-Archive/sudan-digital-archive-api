@@ -1,3 +1,9 @@
+//! Repository module for interacting with the Browsertrix crawling service.
+//!
+//! This module provides functionality for authenticating with Browsertrix,
+//! creating and managing web crawls, and retrieving WACZ (Web Archive Collection Zipped)
+//! files from completed crawl operations.
+
 use crate::config::BrowsertrixCrawlConfig;
 use crate::models::request::CreateCrawlRequest;
 use crate::models::response::{
@@ -11,6 +17,10 @@ use tokio::sync::RwLock;
 use tracing::info;
 use uuid::Uuid;
 
+/// HTTP-based implementation of the BrowsertrixRepo trait.
+///
+/// Provides methods for authenticating with and interacting with the Browsertrix
+/// web crawling service through its REST API.
 #[derive(Debug, Clone, Default)]
 pub struct HTTPBrowsertrixRepo {
     pub username: String,
@@ -23,19 +33,51 @@ pub struct HTTPBrowsertrixRepo {
     pub access_token: Arc<RwLock<String>>,
 }
 
+/// Defines the interface for interacting with the Browsertrix web crawling service.
+///
+/// This trait provides methods for creating crawls, checking their status,
+/// and retrieving archived content from completed crawls.
 #[async_trait]
 pub trait BrowsertrixRepo: Send + Sync {
+    /// Retrieves the organization ID for Browsertrix operations.
     fn get_org_id(&self) -> Uuid;
+
+    /// Refreshes the authentication token used for Browsertrix API calls.
     async fn refresh_auth(&self);
 
+    /// Retrieves the URL for a WACZ file from a completed crawl.
+    ///
+    /// # Arguments
+    /// * `job_run_id` - The ID of the completed crawl job
     async fn get_wacz_url(&self, job_run_id: &str) -> Result<String, Error>;
+
+    /// Makes an authenticated request to the Browsertrix API.
+    ///
+    /// Handles re-authentication if the current token has expired.
+    ///
+    /// # Arguments
+    /// * `req` - The request builder with the prepared request
     async fn make_request(&self, req: RequestBuilder) -> Result<Response, Error>;
+
+    /// Authenticates with the Browsertrix API and returns an access token.
     async fn authenticate(&self) -> Result<String, Error>;
+
+    /// Initializes the repository by obtaining and storing an access token.
     async fn initialize(&mut self);
+
+    /// Creates a new web crawl in Browsertrix.
+    ///
+    /// # Arguments
+    /// * `create_crawl_request` - The request containing crawl details
     async fn create_crawl(
         &self,
         create_crawl_request: CreateCrawlRequest,
     ) -> Result<CreateCrawlResponse, Error>;
+
+    /// Retrieves the status of a crawl operation.
+    ///
+    /// # Arguments
+    /// * `crawl_id` - The ID of the crawl to check
     async fn get_crawl_status(&self, crawl_id: Uuid) -> Result<String, Error>;
 }
 
