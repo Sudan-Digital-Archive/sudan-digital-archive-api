@@ -114,9 +114,11 @@ pub fn build_filter_expression(
                 .and(lang_filter.eq(true))
                 .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
         ),
-        (None, None, None, Some(subjects)) => {
-            Some(lang_filter.eq(true).and(subjects_column.binary(PgBinOper::Overlap, subjects)))
-        }
+        (None, None, None, Some(subjects)) => Some(
+            lang_filter
+                .eq(true)
+                .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+        ),
         (Some(term), Some(from), Some(to), None) => {
             let query_string = format!("%{}%", term.to_lowercase());
             Some(
@@ -185,10 +187,12 @@ mod tests {
     #[test]
     fn test_build_filter_none_params() {
         let actual = build_filter_expression(MetadataLanguage::English, None, None, None, None);
-        let expected = Some(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true));
+        let expected =
+            Some(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true));
         assert_eq!(actual, expected);
         let actual = build_filter_expression(MetadataLanguage::Arabic, None, None, None, None);
-        let expected = Some(Expr::col(accessions_with_metadata::Column::HasArabicMetadata).eq(true));
+        let expected =
+            Some(Expr::col(accessions_with_metadata::Column::HasArabicMetadata).eq(true));
         assert_eq!(actual, expected);
     }
 
