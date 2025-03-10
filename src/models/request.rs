@@ -64,3 +64,10 @@ pub struct SubjectPagination {
     #[validate(length(min = 1, max = 500))]
     pub query_term: Option<String>,
 }
+
+/// Request for creating a new subject category.
+#[derive(Debug, Clone, Validate, Deserialize)]
+pub struct LoginRequest {
+    #[validate(length(min = 1, max = 100))]
+    pub email: String,
+}

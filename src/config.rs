@@ -55,7 +55,6 @@ pub fn build_app_config() -> AppConfig {
         })
         .collect();
     let listener_address = env::var("LISTENER_ADDRESS").expect("Missing LISTENER_ADDRESS env var");
-
     AppConfig {
         browsertrix,
         cors_urls,
