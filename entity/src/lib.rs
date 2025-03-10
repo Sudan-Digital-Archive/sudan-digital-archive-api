@@ -7,3 +7,5 @@ pub mod dublin_metadata_en_subjects;
 pub mod dublin_metadata_subject_ar;
 pub mod dublin_metadata_subject_en;
 pub mod sea_orm_active_enums;
+pub mod session;
+pub mod user;
