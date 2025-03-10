@@ -33,7 +33,9 @@ async fn main() {
     let accessions_repo = DBAccessionsRepo {
         db_session: db_session.clone(),
     };
-    let auth_repo = DBAuthRepo { db_session: db_session.clone() };
+    let auth_repo = DBAuthRepo {
+        db_session: db_session.clone(),
+    };
     let subjects_repo = DBSubjectsRepo { db_session };
     let mut http_btrix_repo = HTTPBrowsertrixRepo {
         client: reqwest::Client::new(),
@@ -50,7 +52,9 @@ async fn main() {
         accessions_repo: Arc::new(accessions_repo),
         browsertrix_repo: Arc::new(http_btrix_repo),
     };
-    let auth_service = AuthService { auth_repo: Arc::new(auth_repo) };
+    let auth_service = AuthService {
+        auth_repo: Arc::new(auth_repo),
+    };
     let subjects_service = SubjectsService {
         subjects_repo: Arc::new(subjects_repo),
     };

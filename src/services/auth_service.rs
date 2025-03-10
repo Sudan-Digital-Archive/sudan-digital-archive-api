@@ -10,10 +10,7 @@ pub struct AuthService {
 }
 
 impl AuthService {
-    pub async fn log_user_in(
-        &self,
-        login_request: LoginRequest,
-    ) -> Result<Uuid, DbErr> {
+    pub async fn log_user_in(&self, login_request: LoginRequest) -> Result<Uuid, DbErr> {
         let user = self
             .auth_repo
             .get_user_by_email(login_request.email)

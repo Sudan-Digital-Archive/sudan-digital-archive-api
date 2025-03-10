@@ -15,18 +15,10 @@ use axum::{Json, Router};
 use validator::Validate;
 
 pub fn get_auth_routes() -> Router<AppState> {
-    Router::new().nest(
-        "/auth",
-        Router::new()
-            .route("/", post(login)),
-    )
+    Router::new().nest("/auth", Router::new().route("/", post(login)))
 }
 
-
-async fn login(
-    State(state): State<AppState>,
-    Json(payload): Json<LoginRequest>,
-) -> Response {
+async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>) -> Response {
     if let Err(err) = payload.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }
@@ -35,5 +27,3 @@ async fn login(
     // TODO: Create async task to send an email
     // TODO: Create async task to delete expired db rows
 }
-
-

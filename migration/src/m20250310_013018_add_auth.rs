@@ -1,5 +1,5 @@
 use crate::extension::postgres::Type;
-use sea_orm_migration::{prelude::*, schema::*};
+use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -52,7 +52,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(User::Table)
                     .if_not_exists()
-                    .col(pk_auto(User::Id))
+                    .col(ColumnDef::new(User::Id).uuid().not_null().primary_key())
                     .col(ColumnDef::new(User::Email).string().not_null().unique_key())
                     .col(
                         ColumnDef::new(User::IsActive)
@@ -101,17 +101,14 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
+            .drop_table(Table::drop().table(Session::Table).to_owned())
+            .await?;
+        manager
             .drop_table(Table::drop().table(User::Table).to_owned())
             .await?;
-
         manager
             .drop_type(Type::drop().name(Role::Enum).to_owned())
             .await?;
-
-        manager
-            .drop_table(Table::drop().table(Session::Table).to_owned())
-            .await?;
-
         manager
             .alter_table(
                 Table::alter()
