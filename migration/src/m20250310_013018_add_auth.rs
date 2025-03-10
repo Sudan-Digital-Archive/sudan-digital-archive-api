@@ -52,7 +52,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(User::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(User::Id).uuid().not_null().primary_key())
+                    .col(ColumnDef::new(User::Id).uuid().primary_key())
                     .col(ColumnDef::new(User::Email).string().not_null().unique_key())
                     .col(
                         ColumnDef::new(User::IsActive)
@@ -70,7 +70,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Session::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(Session::Id).uuid().not_null().primary_key())
+                    .col(ColumnDef::new(Session::Id).uuid().primary_key())
                     .col(ColumnDef::new(Session::ExpiryTime).timestamp().not_null())
                     .col(ColumnDef::new(Session::UserId).uuid().not_null())
                     .foreign_key(

@@ -35,6 +35,7 @@ async fn main() {
     };
     let auth_repo = DBAuthRepo {
         db_session: db_session.clone(),
+        expiry_hours: app_config.jwt_expiry_hours,
     };
     let subjects_repo = DBSubjectsRepo { db_session };
     let mut http_btrix_repo = HTTPBrowsertrixRepo {

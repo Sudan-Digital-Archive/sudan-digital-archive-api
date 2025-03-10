@@ -22,8 +22,10 @@ async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>)
     if let Err(err) = payload.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }
-    let session_id = state.auth_service.log_user_in(payload).await;
+    // TODO: Return 500 JSON response is this is invalid or 404 if not found
+    state.auth_service.log_user_in(payload).await;
     todo!()
     // TODO: Create async task to send an email
     // TODO: Create async task to delete expired db rows
+    // TODO: Return a 200 JSON response 
 }

@@ -10,11 +10,17 @@ pub struct AuthService {
 }
 
 impl AuthService {
-    pub async fn log_user_in(&self, login_request: LoginRequest) -> Result<Uuid, DbErr> {
-        let user = self
+    pub async fn log_user_in(&self, login_request: LoginRequest) -> Result<Option<Uuid>, DbErr> {
+        let user_id = self
             .auth_repo
             .get_user_by_email(login_request.email)
             .await?;
-        todo!()
+        match user_id {
+            Some(user_id) => {
+                let session_id = self.auth_repo.create_session(user_id).await?;
+                Ok(Some(session_id))
+            }
+            None => Ok(None),
+        }
     }
 }

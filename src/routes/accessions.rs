@@ -34,13 +34,12 @@ async fn create_accession(
     if let Err(err) = payload.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }
-    let cloned_payload = payload.clone();
     let subjects_exist = state
         .subjects_service
         .clone()
         .verify_subjects_exist(
-            cloned_payload.metadata_subjects,
-            cloned_payload.metadata_language,
+            payload.metadata_subjects.clone(),
+            payload.metadata_language.clone(),
         )
         .await;
     match subjects_exist {
@@ -53,9 +52,10 @@ async fn create_accession(
             }
         }
     };
-    let cloned_state = state.clone();
+    let accessions_service = state.accessions_service.clone();
+    let payload = payload.clone();
     tokio::spawn(async move {
-        cloned_state.accessions_service.create_one(payload).await;
+        accessions_service.create_one(payload).await;
     });
     (StatusCode::CREATED, "Started browsertrix crawl task!").into_response()
 }

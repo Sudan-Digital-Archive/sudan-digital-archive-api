@@ -25,6 +25,7 @@ pub struct AppConfig {
     pub cors_urls: Vec<HeaderValue>,
     pub postgres_url: String,
     pub listener_address: String,
+    pub jwt_expiry_hours: i64,
 }
 
 /// Builds application configuration from environment variables
@@ -55,11 +56,16 @@ pub fn build_app_config() -> AppConfig {
         })
         .collect();
     let listener_address = env::var("LISTENER_ADDRESS").expect("Missing LISTENER_ADDRESS env var");
+    let jwt_expiry_hours = env::var("JWT_EXPIRY_HOURS")
+        .expect("Missing JWT_EXPIRY_HOURS env var")
+        .parse()
+        .expect("JWT_EXPIRY_HOURS should be a number");
     AppConfig {
         browsertrix,
         cors_urls,
         postgres_url,
         listener_address,
+        jwt_expiry_hours
     }
 }
 
