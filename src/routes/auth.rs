@@ -12,6 +12,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
+use tracing::{error, info, warn};
 use validator::Validate;
 
 pub fn get_auth_routes() -> Router<AppState> {
@@ -22,10 +23,34 @@ async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>)
     if let Err(err) = payload.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }
-    // TODO: Return 500 JSON response is this is invalid or 404 if not found
-    state.auth_service.log_user_in(payload).await;
-    todo!()
-    // TODO: Create async task to send an email
-    // TODO: Create async task to delete expired db rows
-    // TODO: Return a 200 JSON response 
+    let login_result = state
+        .auth_service
+        .clone()
+        .log_user_in(payload.clone())
+        .await;
+    match login_result {
+        Ok(token) => match token {
+            Some(token) => {
+                info!(
+                    "Sending login email to user with email {} and deleting expired sessions",
+                    payload.email
+                );
+                tokio::spawn(async move {
+                    state.auth_service.clone().delete_expired_sessions().await;
+                    state.auth_service.send_login_email(token, payload.email).await;
+                });
+                (StatusCode::OK, "Login email sent").into_response()
+            }
+            None => {
+                let message = format!("User with email {} not found", payload.email);
+                warn!(message);
+                (StatusCode::NOT_FOUND, message).into_response()
+            }
+        },
+        Err(err) => {
+            let message = format!("Server error occurred: {}", err);
+            error!(message);
+            (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
+        }
+    }
 }

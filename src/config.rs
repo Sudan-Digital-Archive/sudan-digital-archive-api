@@ -65,7 +65,7 @@ pub fn build_app_config() -> AppConfig {
         cors_urls,
         postgres_url,
         listener_address,
-        jwt_expiry_hours
+        jwt_expiry_hours,
     }
 }
 

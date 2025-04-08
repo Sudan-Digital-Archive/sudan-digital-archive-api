@@ -138,6 +138,7 @@ impl AccessionsRepo for DBAccessionsRepo {
             crawl_id: ActiveValue::Set(crawl_id),
             job_run_id: ActiveValue::Set(job_run_id),
             seed_url: ActiveValue::Set(create_accession_request.url),
+            is_private: ActiveValue::Set(false),
         };
         accession.save(&txn).await?;
         txn.commit().await?;

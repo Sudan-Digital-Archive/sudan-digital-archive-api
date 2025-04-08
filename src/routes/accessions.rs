@@ -52,10 +52,8 @@ async fn create_accession(
             }
         }
     };
-    let accessions_service = state.accessions_service.clone();
-    let payload = payload.clone();
     tokio::spawn(async move {
-        accessions_service.create_one(payload).await;
+        state.accessions_service.create_one(payload).await;
     });
     (StatusCode::CREATED, "Started browsertrix crawl task!").into_response()
 }

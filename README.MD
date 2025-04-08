@@ -1,3 +1,15 @@
+# TODOs:
+
+- Configure email stuff
+- Add async email task to login
+- Add JWT routes that
+  - Builds JWT upon receipt of a session token
+  - Verify sending this JWT works too
+- Add auth to create and check that works
+  - Allow creation of private/public records
+- Add PUT update route behind auth. Overwrites everything, doesn't trigger recrawl.
+- Make sure list filtering hides private records
+
 # Overview
 
 This is the API for the Sudan Digital Archive.
