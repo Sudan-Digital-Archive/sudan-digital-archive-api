@@ -30,7 +30,8 @@ impl EmailsRepo for PostmarkEmailsRepo {
             subject: "your login email".to_string(),
             html_body: email,
         };
-        let resp = self.client
+        let resp = self
+            .client
             .post("https://api.postmarkapp.com/email")
             // hardcode  for testing - careful not to unset since they are strict
             .header("X-Postmark-Server-Token", "POSTMARK_API_TEST")
@@ -39,7 +40,7 @@ impl EmailsRepo for PostmarkEmailsRepo {
             .await?;
         match resp.error_for_status() {
             Ok(_) => Ok(()),
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 }

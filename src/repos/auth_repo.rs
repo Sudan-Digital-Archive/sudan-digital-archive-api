@@ -1,14 +1,14 @@
+use crate::models::request::AuthorizeRequest;
 use ::entity::session::ActiveModel as SessionActiveModel;
 use ::entity::session::Entity as Session;
 use ::entity::user::Entity as User;
 use async_trait::async_trait;
-use chrono::{Duration, Utc};
+use chrono::{Duration, NaiveDateTime, Utc};
 use entity::{session, user};
 use sea_orm::{ActiveModelTrait, ActiveValue};
 use sea_orm::{ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter};
 use tracing::{error, info};
 use uuid::Uuid;
-
 #[derive(Debug, Clone, Default)]
 pub struct DBAuthRepo {
     pub db_session: DatabaseConnection,
@@ -19,8 +19,11 @@ pub struct DBAuthRepo {
 pub trait AuthRepo: Send + Sync {
     async fn get_user_by_email(&self, email: String) -> Result<Option<Uuid>, DbErr>;
     async fn create_session(&self, user_id: Uuid) -> Result<Uuid, DbErr>;
-    async fn send_magic_link_email(&self, session_id: Uuid) -> Result<(), DbErr>;
     async fn delete_expired_sessions(&self);
+    async fn get_session_expiry(
+        &self,
+        authorize_request: AuthorizeRequest,
+    ) -> Result<Option<NaiveDateTime>, DbErr>;
 }
 
 #[async_trait]
@@ -60,6 +63,21 @@ impl AuthRepo for DBAuthRepo {
             Err(err) => {
                 error!(%err, "Error deleting expired sessions");
             }
+        }
+    }
+    async fn get_session_expiry(
+        &self,
+        authorize_request: AuthorizeRequest,
+    ) -> Result<Option<NaiveDateTime>, DbErr> {
+        let session = Session::find()
+            .filter(session::Column::UserId.eq(authorize_request.user_id))
+            .filter(session::Column::Id.eq(authorize_request.session_id))
+            .filter(session::Column::ExpiryTime.gt(Utc::now().naive_utc()))
+            .one(&self.db_session)
+            .await?;
+        match session {
+            Some(found_session) => Ok(Some(found_session.expiry_time)),
+            None => Ok(None),
         }
     }
 }

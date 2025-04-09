@@ -1,10 +1,6 @@
 # TODOs:
 
-- Configure email stuff
-- Add async email task to login
-- Add JWT routes that
-  - Builds JWT upon receipt of a session token
-  - Verify sending this JWT works too
+- E2E test auth and make sure secure - can hit login route and token there gives you a valid JWT
 - Add auth to create and check that works
   - Allow creation of private/public records
 - Add PUT update route behind auth. Overwrites everything, doesn't trigger recrawl.

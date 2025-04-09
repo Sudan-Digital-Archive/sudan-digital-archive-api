@@ -1,12 +1,12 @@
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use std::sync::LazyLock;
 
-static JWT_KEYS: LazyLock<JWTKeys> = LazyLock::new(|| {
+pub static JWT_KEYS: LazyLock<JWTKeys> = LazyLock::new(|| {
     let secret = std::env::var("JWT_SECRET").expect("Missing JWT_SECRET env var");
     JWTKeys::new(secret.as_bytes())
 });
-struct JWTKeys {
-    encoding: EncodingKey,
+pub struct JWTKeys {
+    pub encoding: EncodingKey,
     decoding: DecodingKey,
 }
 

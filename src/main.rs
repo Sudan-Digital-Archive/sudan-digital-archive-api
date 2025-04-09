@@ -39,7 +39,10 @@ async fn main() {
         db_session: db_session.clone(),
         expiry_hours: app_config.jwt_expiry_hours,
     };
-    let emails_repo = PostmarkEmailsRepo {client: Client::new(), api_key: "my key".to_string()};
+    let emails_repo = PostmarkEmailsRepo {
+        client: Client::new(),
+        api_key: "my key".to_string(),
+    };
     let subjects_repo = DBSubjectsRepo { db_session };
     let mut http_btrix_repo = HTTPBrowsertrixRepo {
         client: Client::new(),

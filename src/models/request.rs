@@ -6,6 +6,7 @@
 use crate::models::common::{BrowserProfile, MetadataLanguage};
 use chrono::NaiveDateTime;
 use serde::Deserialize;
+use uuid::Uuid;
 use validator::Validate;
 
 /// Request for creating a new accession with metadata.
@@ -70,4 +71,10 @@ pub struct SubjectPagination {
 pub struct LoginRequest {
     #[validate(length(min = 1, max = 100))]
     pub email: String,
+}
+
+#[derive(Debug, Clone, Validate, Deserialize)]
+pub struct AuthorizeRequest {
+    pub session_id: Uuid,
+    pub user_id: Uuid,
 }
