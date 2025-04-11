@@ -7,24 +7,21 @@ use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
+use jsonwebtoken::errors::ErrorKind::ExpiredSignature;
 use jsonwebtoken::{decode, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fmt;
 #[derive(Debug)]
 pub enum AuthError {
-    WrongCredentials,
-    MissingCredentials,
-    TokenCreation,
     InvalidToken,
+    TokenExpired,
 }
 impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
-            AuthError::WrongCredentials => (StatusCode::UNAUTHORIZED, "Wrong credentials"),
-            AuthError::MissingCredentials => (StatusCode::BAD_REQUEST, "Missing credentials"),
-            AuthError::TokenCreation => (StatusCode::INTERNAL_SERVER_ERROR, "Token creation error"),
             AuthError::InvalidToken => (StatusCode::BAD_REQUEST, "Invalid token"),
+            AuthError::TokenExpired => (StatusCode::UNAUTHORIZED, "Token expired"),
         };
         let body = Json(json!({
             "error": error_message,
@@ -54,10 +51,21 @@ where
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
             .map_err(|_| AuthError::InvalidToken)?;
-        let token_data =
-            decode::<JWTClaims>(bearer.token(), &JWT_KEYS.decoding, &Validation::default())
-                .map_err(|_| AuthError::InvalidToken)?;
 
-        Ok(token_data.claims)
+        let mut validation = Validation::default();
+        validation.validate_exp = true; 
+
+        let token_data = decode::<JWTClaims>(
+            bearer.token(),
+            &JWT_KEYS.decoding,
+            &validation,
+        )
+        .map_err(|e| match e.kind() {
+            ExpiredSignature => AuthError::TokenExpired,
+            _ => AuthError::InvalidToken,
+        })?;
+
+        let claims = token_data.claims;
+        Ok(claims)
     }
 }
