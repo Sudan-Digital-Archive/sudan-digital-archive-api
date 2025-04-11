@@ -1,10 +1,14 @@
 # TODOs:
 
-- E2E test auth and make sure secure - can hit login route and token there gives you a valid JWT
+- Add auth to a delete endpoint and check that works on remote with strict cookie settings
+- Tidy up unit tests for new auth stuff
+- Tidy up env var for jwt secret keys and make sure the secret has enough entropy
+- Decompose filtering logic after unit tests are complete
+- Come up with more sensible config driven way of handling cookies during local development
 - Add auth to create and check that works
   - Allow creation of private/public records
 - Add PUT update route behind auth. Overwrites everything, doesn't trigger recrawl.
-- Make sure list filtering hides private records
+- Add new endpoint for filtering that includes private records
 
 # Overview
 
