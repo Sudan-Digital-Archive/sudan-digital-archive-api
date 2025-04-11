@@ -11,7 +11,7 @@ enum Accession {
 }
 
 #[derive(DeriveIden)]
-enum User {
+enum ArchiveUser {
     Table,
     Id,
     Email,
@@ -50,17 +50,26 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(User::Table)
+                    .table(ArchiveUser::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(User::Id).uuid().primary_key())
-                    .col(ColumnDef::new(User::Email).string().not_null().unique_key())
+                    .col(ColumnDef::new(ArchiveUser::Id).uuid().primary_key())
                     .col(
-                        ColumnDef::new(User::IsActive)
+                        ColumnDef::new(ArchiveUser::Email)
+                            .string()
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(
+                        ColumnDef::new(ArchiveUser::IsActive)
                             .boolean()
                             .not_null()
                             .default(false),
                     )
-                    .col(ColumnDef::new(User::Role).custom(Role::Enum).not_null())
+                    .col(
+                        ColumnDef::new(ArchiveUser::Role)
+                            .custom(Role::Enum)
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -77,7 +86,7 @@ impl MigrationTrait for Migration {
                         ForeignKey::create()
                             .name("fk_session_user")
                             .from(Session::Table, Session::UserId)
-                            .to(User::Table, User::Id),
+                            .to(ArchiveUser::Table, ArchiveUser::Id),
                     )
                     .to_owned(),
             )
@@ -232,10 +241,7 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(Session::Table).to_owned())
             .await?;
         manager
-            .drop_table(Table::drop().table(User::Table).to_owned())
-            .await?;
-        manager
-            .drop_type(Type::drop().name(Role::Enum).to_owned())
+            .drop_table(Table::drop().table(ArchiveUser::Table).to_owned())
             .await?;
         manager
             .alter_table(
@@ -244,6 +250,9 @@ impl MigrationTrait for Migration {
                     .drop_column(Accession::IsPrivate)
                     .to_owned(),
             )
+            .await?;
+        manager
+            .drop_type(Type::drop().name(Role::Enum).to_owned())
             .await?;
         Ok(())
     }

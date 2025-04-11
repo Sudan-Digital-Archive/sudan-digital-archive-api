@@ -26,6 +26,7 @@ pub struct AppConfig {
     pub postgres_url: String,
     pub listener_address: String,
     pub jwt_expiry_hours: i64,
+    pub jwt_cookie_domain: String,
 }
 
 /// Builds application configuration from environment variables
@@ -47,6 +48,8 @@ pub fn build_app_config() -> AppConfig {
         login_url,
         create_crawl_url,
     };
+    let jwt_cookie_domain =
+        env::var("JWT_COOKIE_DOMAIN").expect("Missing JWT_COOKIE_DOMAIN env var");
     let cors_urls_env_var = env::var("CORS_URL").expect("Missing CORS_URL env var");
     let cors_urls = cors_urls_env_var
         .split(",")
@@ -66,6 +69,7 @@ pub fn build_app_config() -> AppConfig {
         postgres_url,
         listener_address,
         jwt_expiry_hours,
+        jwt_cookie_domain,
     }
 }
 

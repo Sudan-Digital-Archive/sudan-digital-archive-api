@@ -62,6 +62,7 @@ async fn main() {
     let auth_service = AuthService {
         auth_repo: Arc::new(auth_repo),
         emails_repo: Arc::new(emails_repo),
+        jwt_cookie_domain: app_config.jwt_cookie_domain,
     };
     let subjects_service = SubjectsService {
         subjects_repo: Arc::new(subjects_repo),

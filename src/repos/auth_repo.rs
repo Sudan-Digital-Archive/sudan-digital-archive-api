@@ -1,10 +1,10 @@
 use crate::models::request::AuthorizeRequest;
+use ::entity::archive_user::Entity as ArchiveUser;
 use ::entity::session::ActiveModel as SessionActiveModel;
 use ::entity::session::Entity as Session;
-use ::entity::user::Entity as User;
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDateTime, Utc};
-use entity::{session, user};
+use entity::{archive_user, session};
 use sea_orm::{ActiveModelTrait, ActiveValue};
 use sea_orm::{ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter};
 use tracing::{error, info};
@@ -29,8 +29,9 @@ pub trait AuthRepo: Send + Sync {
 #[async_trait]
 impl AuthRepo for DBAuthRepo {
     async fn get_user_by_email(&self, email: String) -> Result<Option<Uuid>, DbErr> {
-        let user = User::find()
-            .filter(user::Column::Email.eq(email))
+        let user = ArchiveUser::find()
+            .filter(archive_user::Column::Email.eq(email))
+            .filter(archive_user::Column::IsActive.eq(true))
             .one(&self.db_session)
             .await?;
         match user {

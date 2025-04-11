@@ -52,7 +52,7 @@ You therefore should manually test anything that involves I/O to
 external resources e.g. database since none of that functionality
 will run itests.
 
-## Deployment
+## Deployment
 
 Merging to main triggers a push of the container image to Digital Ocean registry.
 This overwrites the most recent `latest` tag and will automatically trigger a
