@@ -3,15 +3,17 @@
 //! This module provides HTTP endpoints for creating, retrieving, and listing accessions.
 //! It uses in-memory repositories for testing to avoid I/O operations.
 
+use ::entity::sea_orm_active_enums::Role;
 use crate::app_factory::AppState;
 use crate::models::request::{AccessionPagination, CreateAccessionRequest};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{get, post, delete};
 use axum::{Json, Router};
 use axum_extra::extract::Query;
 use validator::Validate;
+use crate::models::auth::JWTClaims;
 
 /// Creates routes for accession-related endpoints under `/accessions`.
 pub fn get_accessions_routes() -> Router<AppState> {
@@ -20,7 +22,8 @@ pub fn get_accessions_routes() -> Router<AppState> {
         Router::new()
             .route("/", get(list_accessions))
             .route("/", post(create_accession))
-            .route("/{accession_id}", get(get_one_accession)),
+            .route("/{accession_id}", get(get_one_accession))
+            .route("/{accession_id}", delete(delete_accession)),
     )
 }
 
@@ -78,6 +81,18 @@ async fn list_accessions(
     }
 
     state.accessions_service.list(pagination.0).await
+}
+
+async fn delete_accession(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+    claims: JWTClaims,
+) -> Response {
+    if claims.role != Role::Admin {
+        return (StatusCode::FORBIDDEN, "Insufficient permissions").into_response();
+    }
+
+    state.accessions_service.delete_one(id).await
 }
 
 #[cfg(test)]

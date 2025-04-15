@@ -1,5 +1,6 @@
 use crate::models::request::AuthorizeRequest;
 use ::entity::archive_user::Entity as ArchiveUser;
+use ::entity::archive_user::Model as ArchiveUserModel;
 use ::entity::session::ActiveModel as SessionActiveModel;
 use ::entity::session::Entity as Session;
 use async_trait::async_trait;
@@ -24,6 +25,7 @@ pub trait AuthRepo: Send + Sync {
         &self,
         authorize_request: AuthorizeRequest,
     ) -> Result<Option<NaiveDateTime>, DbErr>;
+    async fn get_one(&self, user_id: Uuid) -> Result<Option<ArchiveUserModel>, DbErr>;
 }
 
 #[async_trait]
@@ -78,6 +80,18 @@ impl AuthRepo for DBAuthRepo {
             .await?;
         match session {
             Some(found_session) => Ok(Some(found_session.expiry_time)),
+            None => Ok(None),
+        }
+    }
+
+    async fn get_one(&self, user_id: Uuid) -> Result<Option<ArchiveUserModel>, DbErr> {
+        let user = ArchiveUser::find()
+            .filter(archive_user::Column::Id.eq(user_id))
+            .filter(archive_user::Column::IsActive.eq(true))
+            .one(&self.db_session)
+            .await?;
+        match user {
+            Some(user) => Ok(Some(user)),
             None => Ok(None),
         }
     }

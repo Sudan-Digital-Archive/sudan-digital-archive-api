@@ -5,6 +5,7 @@
 
 use crate::models::common::MetadataLanguage;
 use crate::models::request::{AccessionPagination, CreateAccessionRequest};
+use ::entity::accession::Entity as Accession;
 use ::entity::accession::ActiveModel as AccessionActiveModel;
 use ::entity::dublin_metadata_ar::ActiveModel as DublinMetadataArActiveModel;
 use ::entity::dublin_metadata_ar_subjects::ActiveModel as DublinMetadataSubjectsArActiveModel;
@@ -65,6 +66,12 @@ pub trait AccessionsRepo: Send + Sync {
         &self,
         params: AccessionPagination,
     ) -> Result<(Vec<AccessionWithMetadataModel>, u64), DbErr>;
+
+    /// Deletes an accession record by its ID.
+    ///
+    /// # Arguments
+    /// * `id` - The ID of the accession to delete
+    async fn delete_one(&self, id: i32) -> Result<u64, DbErr>;
 }
 
 #[async_trait]
@@ -174,5 +181,10 @@ impl AccessionsRepo for DBAccessionsRepo {
         }
         let num_pages = accession_pages.num_pages().await?;
         Ok((accession_pages.fetch_page(params.page).await?, num_pages))
+    }
+
+    async fn delete_one(&self, id: i32) -> Result<u64, DbErr> {
+        let delete_result = Accession::delete_by_id(id).exec(&self.db_session).await?;
+        Ok(delete_result.rows_affected)
     }
 }

@@ -1,4 +1,5 @@
 use crate::auth::JWT_KEYS;
+use ::entity::sea_orm_active_enums::Role;
 use axum::response::{IntoResponse, Response};
 use axum::{
     extract::FromRequestParts, http::request::Parts, http::StatusCode, Json, RequestPartsExt,
@@ -33,10 +34,11 @@ impl IntoResponse for AuthError {
 pub struct JWTClaims {
     pub sub: String,
     pub exp: usize,
+    pub role: Role,
 }
 impl fmt::Display for JWTClaims {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Email: {}\nExpiry: {}", self.sub, self.exp)
+        write!(f, "Sub: {}\nExp: {}\nRole: {:?}", self.sub, self.exp, self.role)
     }
 }
 

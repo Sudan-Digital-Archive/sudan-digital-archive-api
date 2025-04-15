@@ -183,4 +183,29 @@ impl AccessionsService {
             }
         }
     }
+
+    /// Deletes a single accession by ID.
+    ///
+    /// # Arguments
+    /// * `id` - The unique identifier of the accession
+    ///
+    /// # Returns
+    /// Response indicating success or failure of the deletion
+    pub async fn delete_one(self, id: i32) -> Response {
+        info!("Deleting accession with id {id}");
+        let delete_result = self.accessions_repo.delete_one(id).await;
+        match delete_result {
+            Err(err) => {
+                error!(%err, "Error occurred deleting accession");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
+            }
+            Ok(delete_result) => {
+                if delete_result > 0 {
+                    (StatusCode::OK, "Accession deleted").into_response()
+                } else {
+                    (StatusCode::NOT_FOUND, "No such record").into_response()
+                }
+            }
+        }
+    }
 }
