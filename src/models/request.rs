@@ -78,3 +78,15 @@ pub struct AuthorizeRequest {
     pub session_id: Uuid,
     pub user_id: Uuid,
 }
+
+#[derive(Debug, Clone, Validate, Deserialize)]
+pub struct UpdateAccessionRequest {
+    pub metadata_language: MetadataLanguage,
+    #[validate(length(min = 1, max = 200))]
+    pub metadata_title: String,
+    #[validate(length(min = 1, max = 2000))]
+    pub metadata_description: Option<String>,
+    pub metadata_time: NaiveDateTime,
+    #[validate(length(min = 1, max = 200))]
+    pub metadata_subjects: Vec<i32>,
+}

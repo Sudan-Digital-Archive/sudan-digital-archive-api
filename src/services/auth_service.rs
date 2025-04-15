@@ -136,7 +136,7 @@ impl AuthService {
     }
 
     pub async fn login(self, payload: LoginRequest) -> Result<Response, String> {
-        let login_result = self
+        let login_result = self.clone()
             .log_user_in(payload.clone())
             .await
             .map_err(|err| format!("Database error: {}", err))?;

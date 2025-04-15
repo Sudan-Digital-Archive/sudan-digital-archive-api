@@ -5,11 +5,11 @@
 
 use ::entity::sea_orm_active_enums::Role;
 use crate::app_factory::AppState;
-use crate::models::request::{AccessionPagination, CreateAccessionRequest};
+use crate::models::request::{AccessionPagination, CreateAccessionRequest, UpdateAccessionRequest};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post, delete};
+use axum::routing::{get, post, put, delete};
 use axum::{Json, Router};
 use axum_extra::extract::Query;
 use validator::Validate;
@@ -23,7 +23,9 @@ pub fn get_accessions_routes() -> Router<AppState> {
             .route("/", get(list_accessions))
             .route("/", post(create_accession))
             .route("/{accession_id}", get(get_one_accession))
-            .route("/{accession_id}", delete(delete_accession)),
+            .route("/{accession_id}", delete(delete_accession))
+            .route("/{accession_id}", put(update_accession)),
+            
     )
 }
 
@@ -93,6 +95,18 @@ async fn delete_accession(
     }
 
     state.accessions_service.delete_one(id).await
+}
+
+async fn update_accession(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+    // TODO: Later should add a role like researcher and validate user has
+    // researcher or admin role
+    _claims: JWTClaims,
+    Json(payload): Json<UpdateAccessionRequest>,
+
+) -> Response {
+    state.accessions_service.update_one(id, payload).await
 }
 
 #[cfg(test)]

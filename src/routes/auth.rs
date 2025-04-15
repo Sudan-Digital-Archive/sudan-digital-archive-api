@@ -12,7 +12,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use tracing::{error, info, warn};
+use tracing::error;
 use validator::Validate;
 
 pub fn get_auth_routes() -> Router<AppState> {

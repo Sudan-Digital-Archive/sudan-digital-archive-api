@@ -4,7 +4,7 @@
 //! accession records with their associated metadata in both Arabic and English.
 
 use crate::models::common::MetadataLanguage;
-use crate::models::request::{AccessionPagination, CreateAccessionRequest};
+use crate::models::request::{AccessionPagination, CreateAccessionRequest, UpdateAccessionRequest};
 use ::entity::accession::Entity as Accession;
 use ::entity::accession::ActiveModel as AccessionActiveModel;
 use ::entity::dublin_metadata_ar::ActiveModel as DublinMetadataArActiveModel;
@@ -72,6 +72,17 @@ pub trait AccessionsRepo: Send + Sync {
     /// # Arguments
     /// * `id` - The ID of the accession to delete
     async fn delete_one(&self, id: i32) -> Result<u64, DbErr>;
+
+    /// Updates an existing accession record with new metadata.
+    ///
+    /// # Arguments
+    /// * `id` - The ID of the accession to update
+    /// * `update_accession_request` - The request containing updated metadata details
+    async fn update_one(
+        &self,
+        id: i32,
+        update_accession_request: UpdateAccessionRequest,
+    ) -> Result<Option<AccessionWithMetadataModel>, DbErr>;
 }
 
 #[async_trait]
@@ -186,5 +197,78 @@ impl AccessionsRepo for DBAccessionsRepo {
     async fn delete_one(&self, id: i32) -> Result<u64, DbErr> {
         let delete_result = Accession::delete_by_id(id).exec(&self.db_session).await?;
         Ok(delete_result.rows_affected)
+    }
+
+    async fn update_one(
+        &self,
+        id: i32,
+        update_accession_request: UpdateAccessionRequest,
+    ) -> Result<Option<AccessionWithMetadataModel>, DbErr> {
+        let txn = self.db_session.begin().await?;
+        let accession = Accession::find_by_id(id).one(&self.db_session).await?;
+
+        match accession {
+            Some(accession) => {
+                let mut accession: AccessionActiveModel = accession.into();
+
+                let (dublin_metadata_en_id, dublin_metadata_ar_id) = match update_accession_request
+                    .metadata_language
+                {
+                    MetadataLanguage::English => {
+                        let metadata = DublinMetadataEnActiveModel {
+                            id: Default::default(),
+                            title: ActiveValue::Set(update_accession_request.metadata_title),
+                            description: ActiveValue::Set(update_accession_request.metadata_description),
+                        };
+                        let inserted_metadata = metadata.save(&txn).await?;
+                        let metadata_id = inserted_metadata.try_into_model()?.id;
+                        let mut subject_links: Vec<DublinMetadataSubjectsEnActiveModel> = vec![];
+                        for subject_id in update_accession_request.metadata_subjects.iter() {
+                            let subjects_link = DublinMetadataSubjectsEnActiveModel {
+                                metadata_id: ActiveValue::Set(metadata_id),
+                                subject_id: ActiveValue::Set(*subject_id),
+                            };
+                            subject_links.push(subjects_link);
+                        }
+                        DublinMetadataSubjectsEn::insert_many(subject_links)
+                            .exec(&txn)
+                            .await?;
+                        (Some(metadata_id), None)
+                    }
+                    MetadataLanguage::Arabic => {
+                        let metadata = DublinMetadataArActiveModel {
+                            id: Default::default(),
+                            title: ActiveValue::Set(update_accession_request.metadata_title),
+                            description: ActiveValue::Set(update_accession_request.metadata_description),
+                        };
+                        let inserted_metadata = metadata.save(&txn).await?;
+                        let metadata_id = inserted_metadata.try_into_model()?.id;
+                        let mut subject_links: Vec<DublinMetadataSubjectsArActiveModel> = vec![];
+                        for subject_id in update_accession_request.metadata_subjects.iter() {
+                            let subjects_link = DublinMetadataSubjectsArActiveModel {
+                                metadata_id: ActiveValue::Set(metadata_id),
+                                subject_id: ActiveValue::Set(*subject_id),
+                            };
+                            subject_links.push(subjects_link);
+                        }
+                        DublinMetadataSubjectsAr::insert_many(subject_links)
+                            .exec(&txn)
+                            .await?;
+                        (None, Some(metadata_id))
+                    }
+                };
+
+                accession.dublin_metadata_en = ActiveValue::Set(dublin_metadata_en_id);
+                accession.dublin_metadata_ar = ActiveValue::Set(dublin_metadata_ar_id);
+                accession.dublin_metadata_date = ActiveValue::Set(update_accession_request.metadata_time);
+
+                 accession.update(&self.db_session).await?;
+                txn.commit().await?;
+                let accession = AccessionWithMetadata::find_by_id(id)
+                .one(&self.db_session)
+                .await?;
+            Ok(accession)            }
+            None => Ok(None),
+        }
     }
 }

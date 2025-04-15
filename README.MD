@@ -1,6 +1,5 @@
 # TODOs:
 
-- E2E test auth and make sure secure - can hit login route and token there gives you a valid JWT
 - Add auth to create and check that works
   - Allow creation of private/public records
 - Add PUT update route behind auth. Overwrites everything, doesn't trigger recrawl.
