@@ -1,21 +1,21 @@
-use sea_orm::DbErr;
-use ::entity::sea_orm_active_enums::Role;
-use ::entity::archive_user::Model as ArchiveUserModel;
 use crate::auth::JWT_KEYS;
 use crate::models::auth::JWTClaims;
 use crate::models::request::{AuthorizeRequest, LoginRequest};
 use crate::repos::{auth_repo::AuthRepo, emails_repo::EmailsRepo};
-use chrono::NaiveDateTime;
-use jsonwebtoken::errors::Error;
-use jsonwebtoken::{encode, Header};
-use std::sync::Arc;
-use tracing::{error, info};
-use uuid::Uuid;
+use ::entity::archive_user::Model as ArchiveUserModel;
+use ::entity::sea_orm_active_enums::Role;
 use axum::http::{
     header::{HeaderMap, HeaderValue, SET_COOKIE},
     StatusCode,
 };
 use axum::response::{IntoResponse, Response};
+use chrono::NaiveDateTime;
+use jsonwebtoken::errors::Error;
+use jsonwebtoken::{encode, Header};
+use sea_orm::DbErr;
+use std::sync::Arc;
+use tracing::{error, info};
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct AuthService {
@@ -78,7 +78,7 @@ impl AuthService {
         let claims = JWTClaims {
             sub: user_id.to_string(),
             exp: expiry_time.and_utc().timestamp() as usize,
-            role
+            role,
         };
         let jwt = encode(&Header::default(), &claims, &JWT_KEYS.encoding)?;
         let max_age = expiry_time.and_utc().timestamp().to_string();
@@ -91,25 +91,29 @@ impl AuthService {
         );
         Ok(cookie_string)
     }
-    
-    pub async fn get_user(&self, user_id: Uuid) -> Result<Option<ArchiveUserModel>, DbErr>{
+
+    pub async fn get_user(&self, user_id: Uuid) -> Result<Option<ArchiveUserModel>, DbErr> {
         self.auth_repo.get_one(user_id).await
     }
 
     pub async fn authorize(&self, payload: AuthorizeRequest) -> Result<Response, String> {
         let session_expiry_time_result = self
-            .clone().get_session_expiry(payload.clone())
+            .clone()
+            .get_session_expiry(payload.clone())
             .await
             .map_err(|err| format!("Failed to get session expiry: {}", err))?;
 
         match session_expiry_time_result {
             Some(sesh_exists) => {
-                let user_result = self.get_user(payload.user_id).await
+                let user_result = self
+                    .get_user(payload.user_id)
+                    .await
                     .map_err(|err| format!("Failed to get user: {}", err))?;
 
                 match user_result {
                     Some(user) => {
-                        let cookie_string_result = self.clone()
+                        let cookie_string_result = self
+                            .clone()
                             .build_auth_cookie_string(payload.user_id, user.role, sesh_exists)
                             .map_err(|err| format!("Failed to build cookie string: {}", err))?;
 
@@ -136,7 +140,8 @@ impl AuthService {
     }
 
     pub async fn login(self, payload: LoginRequest) -> Result<Response, String> {
-        let login_result = self.clone()
+        let login_result = self
+            .clone()
             .log_user_in(payload.clone())
             .await
             .map_err(|err| format!("Database error: {}", err))?;

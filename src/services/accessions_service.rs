@@ -3,12 +3,12 @@
 //! This module handles the business logic for creating, retrieving, and listing
 //! archival records, including their associated web crawls and metadata in both
 //! Arabic and English.
-use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
 use crate::models::request::AccessionPagination;
 use crate::models::request::{CreateAccessionRequest, CreateCrawlRequest, UpdateAccessionRequest};
 use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use crate::repos::accessions_repo::AccessionsRepo;
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
+use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -78,7 +78,10 @@ impl AccessionsService {
         }
     }
 
-    async fn enrich_one_with_browsertrix(self, query_result: Option<AccessionWithMetadataModel>) -> Response {
+    async fn enrich_one_with_browsertrix(
+        self,
+        query_result: Option<AccessionWithMetadataModel>,
+    ) -> Response {
         match query_result {
             Some(accession) => {
                 match self
@@ -232,7 +235,7 @@ impl AccessionsService {
                 if update_result.is_some() {
                     self.enrich_one_with_browsertrix(update_result).await
                 } else {
-                    error!("Error occurred finding accession after update");
+                    error!("Error occurred finding accession in view after update");
                     (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
                 }
             }

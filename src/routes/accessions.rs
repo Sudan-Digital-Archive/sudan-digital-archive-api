@@ -3,17 +3,17 @@
 //! This module provides HTTP endpoints for creating, retrieving, and listing accessions.
 //! It uses in-memory repositories for testing to avoid I/O operations.
 
-use ::entity::sea_orm_active_enums::Role;
 use crate::app_factory::AppState;
+use crate::models::auth::JWTClaims;
 use crate::models::request::{AccessionPagination, CreateAccessionRequest, UpdateAccessionRequest};
+use ::entity::sea_orm_active_enums::Role;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post, put, delete};
+use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use axum_extra::extract::Query;
 use validator::Validate;
-use crate::models::auth::JWTClaims;
 
 /// Creates routes for accession-related endpoints under `/accessions`.
 pub fn get_accessions_routes() -> Router<AppState> {
@@ -25,7 +25,6 @@ pub fn get_accessions_routes() -> Router<AppState> {
             .route("/{accession_id}", get(get_one_accession))
             .route("/{accession_id}", delete(delete_accession))
             .route("/{accession_id}", put(update_accession)),
-            
     )
 }
 
@@ -104,7 +103,6 @@ async fn update_accession(
     // researcher or admin role
     _claims: JWTClaims,
     Json(payload): Json<UpdateAccessionRequest>,
-
 ) -> Response {
     state.accessions_service.update_one(id, payload).await
 }

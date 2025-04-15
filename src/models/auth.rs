@@ -38,7 +38,11 @@ pub struct JWTClaims {
 }
 impl fmt::Display for JWTClaims {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Sub: {}\nExp: {}\nRole: {:?}", self.sub, self.exp, self.role)
+        write!(
+            f,
+            "Sub: {}\nExp: {}\nRole: {:?}",
+            self.sub, self.exp, self.role
+        )
     }
 }
 
@@ -55,17 +59,13 @@ where
             .map_err(|_| AuthError::InvalidToken)?;
 
         let mut validation = Validation::default();
-        validation.validate_exp = true; 
+        validation.validate_exp = true;
 
-        let token_data = decode::<JWTClaims>(
-            bearer.token(),
-            &JWT_KEYS.decoding,
-            &validation,
-        )
-        .map_err(|e| match e.kind() {
-            ExpiredSignature => AuthError::TokenExpired,
-            _ => AuthError::InvalidToken,
-        })?;
+        let token_data = decode::<JWTClaims>(bearer.token(), &JWT_KEYS.decoding, &validation)
+            .map_err(|e| match e.kind() {
+                ExpiredSignature => AuthError::TokenExpired,
+                _ => AuthError::InvalidToken,
+            })?;
 
         let claims = token_data.claims;
         Ok(claims)

@@ -5,8 +5,8 @@
 
 use crate::models::common::MetadataLanguage;
 use crate::models::request::{AccessionPagination, CreateAccessionRequest, UpdateAccessionRequest};
-use ::entity::accession::Entity as Accession;
 use ::entity::accession::ActiveModel as AccessionActiveModel;
+use ::entity::accession::Entity as Accession;
 use ::entity::dublin_metadata_ar::ActiveModel as DublinMetadataArActiveModel;
 use ::entity::dublin_metadata_ar_subjects::ActiveModel as DublinMetadataSubjectsArActiveModel;
 use ::entity::dublin_metadata_ar_subjects::Entity as DublinMetadataSubjectsAr;
@@ -209,16 +209,20 @@ impl AccessionsRepo for DBAccessionsRepo {
 
         match accession {
             Some(accession) => {
-                let mut accession: AccessionActiveModel = accession.into();
-
+                let mut accession_active: AccessionActiveModel = accession.clone().into();
                 let (dublin_metadata_en_id, dublin_metadata_ar_id) = match update_accession_request
                     .metadata_language
                 {
                     MetadataLanguage::English => {
                         let metadata = DublinMetadataEnActiveModel {
-                            id: Default::default(),
+                            id: match accession.dublin_metadata_en {
+                                Some(id) => ActiveValue::Set(id),
+                                None => Default::default(),
+                            },
                             title: ActiveValue::Set(update_accession_request.metadata_title),
-                            description: ActiveValue::Set(update_accession_request.metadata_description),
+                            description: ActiveValue::Set(
+                                update_accession_request.metadata_description,
+                            ),
                         };
                         let inserted_metadata = metadata.save(&txn).await?;
                         let metadata_id = inserted_metadata.try_into_model()?.id;
@@ -237,9 +241,14 @@ impl AccessionsRepo for DBAccessionsRepo {
                     }
                     MetadataLanguage::Arabic => {
                         let metadata = DublinMetadataArActiveModel {
-                            id: Default::default(),
+                            id: match accession.dublin_metadata_ar {
+                                Some(id) => ActiveValue::Set(id),
+                                None => Default::default(),
+                            },
                             title: ActiveValue::Set(update_accession_request.metadata_title),
-                            description: ActiveValue::Set(update_accession_request.metadata_description),
+                            description: ActiveValue::Set(
+                                update_accession_request.metadata_description,
+                            ),
                         };
                         let inserted_metadata = metadata.save(&txn).await?;
                         let metadata_id = inserted_metadata.try_into_model()?.id;
@@ -258,16 +267,18 @@ impl AccessionsRepo for DBAccessionsRepo {
                     }
                 };
 
-                accession.dublin_metadata_en = ActiveValue::Set(dublin_metadata_en_id);
-                accession.dublin_metadata_ar = ActiveValue::Set(dublin_metadata_ar_id);
-                accession.dublin_metadata_date = ActiveValue::Set(update_accession_request.metadata_time);
+                accession_active.dublin_metadata_en = ActiveValue::Set(dublin_metadata_en_id);
+                accession_active.dublin_metadata_ar = ActiveValue::Set(dublin_metadata_ar_id);
+                accession_active.dublin_metadata_date =
+                    ActiveValue::Set(update_accession_request.metadata_time);
 
-                 accession.update(&self.db_session).await?;
+                accession_active.update(&self.db_session).await?;
                 txn.commit().await?;
                 let accession = AccessionWithMetadata::find_by_id(id)
-                .one(&self.db_session)
-                .await?;
-            Ok(accession)            }
+                    .one(&self.db_session)
+                    .await?;
+                Ok(accession)
+            }
             None => Ok(None),
         }
     }
