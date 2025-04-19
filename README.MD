@@ -1,6 +1,6 @@
 # TODOs:
 
-- Make delete tag endpoint - handle foreign key violation stuff
+- Add lazy static JWT keys to config module
 - Refactor tests so that you have integration tests which mock out btrix
   calls but do hit the db; and then unit tests exist where it is easier,
   like on the expression filtering. Gonna be a lot better for testing
@@ -10,6 +10,8 @@
 - Check that PUT works with new auth
 - Check that DELETE works on remote API
 - Check that list filtering handles private stuff
+- Check that DELETE tag endpoint works and handles foreign key violations 
+  + doesn't leave orphaned records
 
 # Overview
 

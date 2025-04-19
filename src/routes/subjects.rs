@@ -6,13 +6,15 @@
 //! It uses in-memory repositories for testing to avoid I/O operations.
 
 use crate::app_factory::AppState;
-use crate::models::request::{CreateSubjectRequest, SubjectPagination};
-use axum::extract::{Query, State};
+use crate::models::request::{CreateSubjectRequest, SubjectPagination, DeleteSubjectRequest};
+use axum::extract::{Query, State, Path};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{get, post, delete};
 use axum::{Json, Router};
 use validator::Validate;
+use crate::models::auth::JWTClaims;
+use ::entity::sea_orm_active_enums::Role;
 
 /// Creates routes for subject-related endpoints under `/metadata-subjects`.
 pub fn get_subjects_routes() -> Router<AppState> {
@@ -20,7 +22,8 @@ pub fn get_subjects_routes() -> Router<AppState> {
         "/metadata-subjects",
         Router::new()
             .route("/", get(list_subjects))
-            .route("/", post(create_subject)),
+            .route("/", post(create_subject))
+            .route("/{subject_id}", delete(delete_subject)),
     )
 }
 
@@ -59,6 +62,21 @@ async fn list_subjects(
         .await
 }
 
+async fn delete_subject(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+    claims: JWTClaims,
+    Json(payload): Json<DeleteSubjectRequest>,
+
+) -> Response {
+    if claims.role != Role::Admin {
+        return (StatusCode::FORBIDDEN, "Insufficient permissions").into_response();
+    }
+    if let Err(err) = payload.validate() {
+        return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
+    }
+    state.subjects_service.delete_one(id, payload.lang).await
+}
 #[cfg(test)]
 mod tests {
 

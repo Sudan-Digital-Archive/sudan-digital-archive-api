@@ -140,4 +140,43 @@ impl SubjectsService {
             .verify_subjects_exist(metadata_subjects, metadata_language)
             .await
     }
+
+    /// Deletes a metadata subject by its ID.
+    ///
+    /// # Arguments
+    /// * `subject_id` - The ID of the subject to delete.
+    /// * `metadata_language` - Language of the subject to delete
+    ///
+    /// # Returns
+    /// Returns a success status or an error response.
+    pub async fn delete_one(
+        self,
+        subject_id: i32,
+        metadata_language: MetadataLanguage,
+    ) -> Response {
+        info!("Deleting {metadata_language} subject with id {subject_id}...");
+        let deletion_result = self
+            .subjects_repo
+            .delete_one(subject_id, metadata_language)
+            .await;
+
+        match deletion_result {
+            Ok(_) => (StatusCode::OK).into_response(),
+            Err(db_err) => {
+                if db_err.to_string().contains("violates foreign key constraint") {
+                    warn!(
+                        %db_err,
+                        "Can't delete {metadata_language} subject with id {subject_id} since it's being referenced by another table"
+                    );
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        format!("Subject with id {} is being referenced by another table", subject_id),
+                    )
+                        .into_response();
+                }
+                error!(%db_err, "Error occurred deleting {metadata_language} subject");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
+            }
+        }
+    }
 }

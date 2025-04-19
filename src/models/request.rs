@@ -106,3 +106,9 @@ pub struct UpdateAccessionRequest {
     #[validate(length(min = 1, max = 200))]
     pub metadata_subjects: Vec<i32>,
 }
+
+/// Request for deleting a subject category.
+#[derive(Debug, Clone, Validate, Deserialize)]
+pub struct DeleteSubjectRequest {
+    pub lang: MetadataLanguage,
+}
