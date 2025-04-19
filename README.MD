@@ -1,6 +1,7 @@
 # TODOs:
 
 - Add lazy static JWT keys to config module
+- Figure out swagger generation to manage route sprawl
 - Refactor tests so that you have integration tests which mock out btrix
   calls but do hit the db; and then unit tests exist where it is easier,
   like on the expression filtering. Gonna be a lot better for testing
