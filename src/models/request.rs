@@ -23,6 +23,7 @@ pub struct CreateAccessionRequest {
     pub browser_profile: Option<BrowserProfile>,
     #[validate(length(min = 1, max = 200))]
     pub metadata_subjects: Vec<i32>,
+    pub is_private: bool,
 }
 
 /// Request for initiating a new Browsertrix crawl.
@@ -45,6 +46,21 @@ pub struct AccessionPagination {
     pub query_term: Option<String>,
     pub date_from: Option<NaiveDateTime>,
     pub date_to: Option<NaiveDateTime>,
+}
+
+/// Pagination and filtering parameters for listing accessions, including private ones.
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct AccessionPaginationWithPrivate {
+    pub page: u64,
+    #[validate(range(min = 1, max = 200))]
+    pub per_page: u64,
+    pub lang: MetadataLanguage,
+    pub metadata_subjects: Option<Vec<i32>>,
+    #[validate(length(min = 1, max = 500))]
+    pub query_term: Option<String>,
+    pub date_from: Option<NaiveDateTime>,
+    pub date_to: Option<NaiveDateTime>,
+    pub is_private: bool,
 }
 
 /// Request for creating a new subject category.

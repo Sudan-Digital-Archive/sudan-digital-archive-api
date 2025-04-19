@@ -3,7 +3,7 @@
 //! This module handles the business logic for creating, retrieving, and listing
 //! archival records, including their associated web crawls and metadata in both
 //! Arabic and English.
-use crate::models::request::AccessionPagination;
+use crate::models::request::AccessionPaginationWithPrivate;
 use crate::models::request::{CreateAccessionRequest, CreateCrawlRequest, UpdateAccessionRequest};
 use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use crate::repos::accessions_repo::AccessionsRepo;
@@ -34,7 +34,7 @@ impl AccessionsService {
     ///
     /// # Returns
     /// JSON response containing paginated accessions or an error response
-    pub async fn list(self, params: AccessionPagination) -> Response {
+    pub async fn list(self, params: AccessionPaginationWithPrivate) -> Response {
         info!(
             "Getting page {} of {} accessions with per page {}...",
             params.page, params.lang, params.per_page
@@ -58,7 +58,6 @@ impl AccessionsService {
             }
         }
     }
-
     /// Retrieves a single accession by ID with its associated metadata and WACZ URL.
     ///
     /// # Arguments
@@ -66,9 +65,9 @@ impl AccessionsService {
     ///
     /// # Returns
     /// JSON response containing the accession details or an error response
-    pub async fn get_one(self, id: i32) -> Response {
-        info!("Getting accession with id {id}");
-        let query_result = self.accessions_repo.get_one(id).await;
+    pub async fn get_one(self, id: i32, private: bool) -> Response {
+        info!("Getting {private} accession with id {id}");
+        let query_result = self.accessions_repo.get_one(id, private).await;
         match query_result {
             Err(query_result) => {
                 error!(%query_result, "Error occurred retrieving accession");
@@ -161,6 +160,7 @@ impl AccessionsService {
                                     metadata_description: trimmed_description,
                                     metadata_time: payload.metadata_time,
                                     metadata_subjects: payload.metadata_subjects,
+                                    is_private: payload.is_private,
                                 };
                                 let write_result = self
                                     .accessions_repo

@@ -5,7 +5,10 @@
 
 use crate::app_factory::AppState;
 use crate::models::auth::JWTClaims;
-use crate::models::request::{AccessionPagination, CreateAccessionRequest, UpdateAccessionRequest};
+use crate::models::request::{
+    AccessionPagination, AccessionPaginationWithPrivate, CreateAccessionRequest,
+    UpdateAccessionRequest,
+};
 use ::entity::sea_orm_active_enums::Role;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -21,8 +24,10 @@ pub fn get_accessions_routes() -> Router<AppState> {
         "/accessions",
         Router::new()
             .route("/", get(list_accessions))
+            .route("/private", get(list_accessions_private))
             .route("/", post(create_accession))
             .route("/{accession_id}", get(get_one_accession))
+            .route("/private/{accession_id}", get(get_one_private_accession))
             .route("/{accession_id}", delete(delete_accession))
             .route("/{accession_id}", put(update_accession)),
     )
@@ -33,6 +38,9 @@ pub fn get_accessions_routes() -> Router<AppState> {
 /// Returns a 201 CREATED status on success, or 400 BAD REQUEST if validation fails.
 async fn create_accession(
     State(state): State<AppState>,
+    // TODO: Later should add a role like researcher and validate user has
+    // researcher or admin role
+    _claims: JWTClaims,
     Json(payload): Json<CreateAccessionRequest>,
 ) -> Response {
     if let Err(err) = payload.validate() {
@@ -66,7 +74,17 @@ async fn create_accession(
 ///
 /// Returns the accession details if found, or appropriate error response if not found.
 async fn get_one_accession(State(state): State<AppState>, Path(id): Path<i32>) -> Response {
-    state.accessions_service.get_one(id).await
+    state.accessions_service.get_one(id, false).await
+}
+
+async fn get_one_private_accession(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+    // TODO: Later should add a role like researcher and validate user has
+    // researcher or admin role
+    _claims: JWTClaims,
+) -> Response {
+    state.accessions_service.get_one(id, true).await
 }
 
 /// Lists accessions with pagination and filtering support.
@@ -76,6 +94,29 @@ async fn get_one_accession(State(state): State<AppState>, Path(id): Path<i32>) -
 async fn list_accessions(
     State(state): State<AppState>,
     pagination: Query<AccessionPagination>,
+) -> Response {
+    if let Err(err) = pagination.0.validate() {
+        return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
+    }
+    let list_params = AccessionPaginationWithPrivate {
+        page: pagination.0.page,
+        per_page: pagination.0.per_page,
+        lang: pagination.0.lang,
+        metadata_subjects: pagination.0.metadata_subjects,
+        query_term: pagination.0.query_term,
+        date_from: pagination.0.date_from,
+        date_to: pagination.0.date_to,
+        is_private: false,
+    };
+    state.accessions_service.list(list_params).await
+}
+
+async fn list_accessions_private(
+    State(state): State<AppState>,
+    pagination: Query<AccessionPaginationWithPrivate>,
+    // TODO: Later should add a role like researcher and validate user has
+    // researcher or admin role
+    _claims: JWTClaims,
 ) -> Response {
     if let Err(err) = pagination.0.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();

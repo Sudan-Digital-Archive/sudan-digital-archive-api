@@ -12,15 +12,22 @@ use sea_orm::sea_query::{ExprTrait, Func, SimpleExpr};
 use sea_orm::{sea_query, ColumnTrait};
 use sea_query::extension::postgres::PgBinOper;
 
+/// Defines the structure for filter parameters.
+#[derive(Debug, Clone, Default)]
+pub struct FilterParams {
+    pub metadata_language: MetadataLanguage,
+    pub metadata_subjects: Option<Vec<i32>>,
+    pub query_term: Option<String>,
+    pub date_from: Option<NaiveDateTime>,
+    pub date_to: Option<NaiveDateTime>,
+    pub is_private: bool,
+}
+
 /// Builds a dynamic filter expression for searching metadata across the archive.
 ///
 /// # Arguments
 ///
-/// * `metadata_language` - Language to search in (English or Arabic)
-/// * `metadata_subjects` - Optional array of subject IDs to filter by
-/// * `query_term` - Optional text to search in title and description fields
-/// * `date_from` - Optional start date for filtering
-/// * `date_to` - Optional end date for filtering
+/// * `params` - A struct containing all filter parameters
 ///
 /// # Returns
 ///
@@ -28,14 +35,8 @@ use sea_query::extension::postgres::PgBinOper;
 ///
 /// The function combines these parameters to create appropriate SQL conditions based on
 /// which parameters are provided, with proper language-specific handling for metadata fields.
-pub fn build_filter_expression(
-    metadata_language: MetadataLanguage,
-    metadata_subjects: Option<Vec<i32>>,
-    query_term: Option<String>,
-    date_from: Option<NaiveDateTime>,
-    date_to: Option<NaiveDateTime>,
-) -> Option<SimpleExpr> {
-    let (title, description, lang_filter, subjects_column) = match metadata_language {
+pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
+    let (title, description, lang_filter, subjects_column) = match params.metadata_language {
         MetadataLanguage::English => (
             Expr::col(accessions_with_metadata::Column::TitleEn),
             Expr::col(accessions_with_metadata::Column::DescriptionEn),
@@ -50,7 +51,12 @@ pub fn build_filter_expression(
         ),
     };
 
-    match (query_term, date_from, date_to, metadata_subjects) {
+    match (
+        params.query_term,
+        params.date_from,
+        params.date_to,
+        params.metadata_subjects,
+    ) {
         (Some(term), Some(from), Some(to), Some(subjects)) => {
             let query_string = format!("%{}%", term.to_lowercase());
             Some(
@@ -60,7 +66,8 @@ pub fn build_filter_expression(
                     .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
                     .and(lang_filter.eq(true))
-                    .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+                    .and(subjects_column.binary(PgBinOper::Overlap, subjects))
+                    .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
             )
         }
         (Some(term), Some(from), None, Some(subjects)) => {
@@ -71,7 +78,8 @@ pub fn build_filter_expression(
                     .or(Func::lower(description).like(&query_string))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
                     .and(lang_filter.eq(true))
-                    .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+                    .and(subjects_column.binary(PgBinOper::Overlap, subjects))
+                    .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
             )
         }
         (Some(term), None, Some(to), Some(subjects)) => {
@@ -82,7 +90,8 @@ pub fn build_filter_expression(
                     .or(Func::lower(description).like(&query_string))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
                     .and(lang_filter.eq(true))
-                    .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+                    .and(subjects_column.binary(PgBinOper::Overlap, subjects))
+                    .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
             )
         }
         (Some(term), None, None, Some(subjects)) => {
@@ -92,7 +101,8 @@ pub fn build_filter_expression(
                     .like(&query_string)
                     .or(Func::lower(description).like(&query_string))
                     .and(lang_filter.eq(true))
-                    .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+                    .and(subjects_column.binary(PgBinOper::Overlap, subjects))
+                    .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
             )
         }
         (None, Some(from), Some(to), Some(subjects)) => Some(
@@ -100,24 +110,28 @@ pub fn build_filter_expression(
                 .gte(from)
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
                 .and(lang_filter.eq(true))
-                .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+                .and(subjects_column.binary(PgBinOper::Overlap, subjects))
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
         ),
         (None, Some(from), None, Some(subjects)) => Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from)
                 .and(lang_filter.eq(true))
-                .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+                .and(subjects_column.binary(PgBinOper::Overlap, subjects))
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
         ),
         (None, None, Some(to), Some(subjects)) => Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .lte(to)
                 .and(lang_filter.eq(true))
-                .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+                .and(subjects_column.binary(PgBinOper::Overlap, subjects))
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
         ),
         (None, None, None, Some(subjects)) => Some(
             lang_filter
                 .eq(true)
-                .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+                .and(subjects_column.binary(PgBinOper::Overlap, subjects))
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
         ),
         (Some(term), Some(from), Some(to), None) => {
             let query_string = format!("%{}%", term.to_lowercase());
@@ -127,7 +141,8 @@ pub fn build_filter_expression(
                     .or(Func::lower(description).like(&query_string))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
-                    .and(lang_filter.eq(true)),
+                    .and(lang_filter.eq(true))
+                    .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
             )
         }
         (Some(term), Some(from), None, None) => {
@@ -137,7 +152,8 @@ pub fn build_filter_expression(
                     .like(&query_string)
                     .or(Func::lower(description).like(&query_string))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
-                    .and(lang_filter.eq(true)),
+                    .and(lang_filter.eq(true))
+                    .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
             )
         }
         (Some(term), None, Some(to), None) => {
@@ -147,7 +163,8 @@ pub fn build_filter_expression(
                     .like(&query_string)
                     .or(Func::lower(description).like(&query_string))
                     .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
-                    .and(lang_filter.eq(true)),
+                    .and(lang_filter.eq(true))
+                    .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
             )
         }
         (Some(term), None, None, None) => {
@@ -156,26 +173,34 @@ pub fn build_filter_expression(
                 Func::lower(title)
                     .like(&query_string)
                     .or(Func::lower(description).like(&query_string))
-                    .and(lang_filter.eq(true)),
+                    .and(lang_filter.eq(true))
+                    .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
             )
         }
         (None, Some(from), Some(to), None) => Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from)
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
-                .and(lang_filter.eq(true)),
+                .and(lang_filter.eq(true))
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
         ),
         (None, Some(from), None, None) => Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from)
-                .and(lang_filter.eq(true)),
+                .and(lang_filter.eq(true))
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
         ),
         (None, None, Some(to), None) => Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .lte(to)
-                .and(lang_filter.eq(true)),
+                .and(lang_filter.eq(true))
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
         ),
-        (None, None, None, None) => Some(lang_filter.eq(true)),
+        (None, None, None, None) => Some(
+            lang_filter
+                .eq(true)
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
+        ),
     }
 }
 
@@ -186,25 +211,49 @@ mod tests {
 
     #[test]
     fn test_build_filter_none_params() {
-        let actual = build_filter_expression(MetadataLanguage::English, None, None, None, None);
-        let expected =
-            Some(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true));
+        let params = FilterParams {
+            metadata_language: MetadataLanguage::English,
+            metadata_subjects: None,
+            query_term: None,
+            date_from: None,
+            date_to: None,
+            is_private: false,
+        };
+        let actual = build_filter_expression(params);
+        let expected = Some(
+            Expr::col(accessions_with_metadata::Column::HasEnglishMetadata)
+                .eq(true)
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
+        );
         assert_eq!(actual, expected);
-        let actual = build_filter_expression(MetadataLanguage::Arabic, None, None, None, None);
-        let expected =
-            Some(Expr::col(accessions_with_metadata::Column::HasArabicMetadata).eq(true));
+        let params = FilterParams {
+            metadata_language: MetadataLanguage::Arabic,
+            metadata_subjects: None,
+            query_term: None,
+            date_from: None,
+            date_to: None,
+            is_private: false,
+        };
+        let actual = build_filter_expression(params);
+        let expected = Some(
+            Expr::col(accessions_with_metadata::Column::HasArabicMetadata)
+                .eq(true)
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
+        );
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn test_build_filter_query_term_only() {
-        let actual = build_filter_expression(
-            MetadataLanguage::English,
-            None,
-            Some("TEst".to_string()),
-            None,
-            None,
-        );
+        let params = FilterParams {
+            metadata_language: MetadataLanguage::English,
+            metadata_subjects: None,
+            query_term: Some("TEst".to_string()),
+            date_from: None,
+            date_to: None,
+            is_private: false,
+        };
+        let actual = build_filter_expression(params);
         let (title, description) = (
             Expr::col(accessions_with_metadata::Column::TitleEn),
             Expr::col(accessions_with_metadata::Column::DescriptionEn),
@@ -214,20 +263,23 @@ mod tests {
             Func::lower(title)
                 .like(&query_string)
                 .or(Func::lower(description).like(&query_string))
-                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
+                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
         );
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn test_build_filter_arabic_query_term() {
-        let actual = build_filter_expression(
-            MetadataLanguage::Arabic,
-            None,
-            Some("اختبار".to_string()),
-            None,
-            None,
-        );
+        let params = FilterParams {
+            metadata_language: MetadataLanguage::Arabic,
+            metadata_subjects: None,
+            query_term: Some("اختبار".to_string()),
+            date_from: None,
+            date_to: None,
+            is_private: false,
+        };
+        let actual = build_filter_expression(params);
         let (title, description) = (
             Expr::col(accessions_with_metadata::Column::TitleAr),
             Expr::col(accessions_with_metadata::Column::DescriptionAr),
@@ -237,7 +289,8 @@ mod tests {
             Func::lower(title)
                 .like(&query_string)
                 .or(Func::lower(description).like(&query_string))
-                .and(Expr::col(accessions_with_metadata::Column::HasArabicMetadata).eq(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasArabicMetadata).eq(true))
+                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
         );
         assert_eq!(actual, expected);
     }
@@ -253,18 +306,22 @@ mod tests {
             .and_hms_opt(23, 59, 59)
             .unwrap();
 
-        let actual = build_filter_expression(
-            MetadataLanguage::English,
-            None,
-            None,
-            Some(from_date),
-            Some(to_date),
-        );
+        let params = FilterParams {
+            metadata_language: MetadataLanguage::English,
+            metadata_subjects: None,
+            query_term: None,
+            date_from: Some(from_date),
+            date_to: Some(to_date),
+            is_private: false,
+        };
+
+        let actual = build_filter_expression(params);
         let expected = Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from_date)
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to_date))
-                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
+                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
         );
         assert_eq!(actual, expected);
     }
@@ -276,12 +333,21 @@ mod tests {
             .and_hms_opt(0, 0, 0)
             .unwrap();
 
-        let actual =
-            build_filter_expression(MetadataLanguage::English, None, None, Some(from_date), None);
+        let params = FilterParams {
+            metadata_language: MetadataLanguage::English,
+            metadata_subjects: None,
+            query_term: None,
+            date_from: Some(from_date),
+            date_to: None,
+            is_private: false,
+        };
+
+        let actual = build_filter_expression(params);
         let expected = Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from_date)
-                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
+                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
         );
         assert_eq!(actual, expected);
     }
@@ -293,12 +359,21 @@ mod tests {
             .and_hms_opt(23, 59, 59)
             .unwrap();
 
-        let actual =
-            build_filter_expression(MetadataLanguage::English, None, None, None, Some(to_date));
+        let params = FilterParams {
+            metadata_language: MetadataLanguage::English,
+            metadata_subjects: None,
+            query_term: None,
+            date_from: None,
+            date_to: Some(to_date),
+            is_private: false,
+        };
+
+        let actual = build_filter_expression(params);
         let expected = Some(
             accessions_with_metadata::Column::DublinMetadataDate
                 .lte(to_date)
-                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
+                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
         );
         assert_eq!(actual, expected);
     }
@@ -314,13 +389,16 @@ mod tests {
             .and_hms_opt(23, 59, 59)
             .unwrap();
 
-        let actual = build_filter_expression(
-            MetadataLanguage::English,
-            None,
-            Some("test".to_string()),
-            Some(from_date),
-            Some(to_date),
-        );
+        let params = FilterParams {
+            metadata_language: MetadataLanguage::English,
+            metadata_subjects: None,
+            query_term: Some("test".to_string()),
+            date_from: Some(from_date),
+            date_to: Some(to_date),
+            is_private: false,
+        };
+
+        let actual = build_filter_expression(params);
 
         let (title, description) = (
             Expr::col(accessions_with_metadata::Column::TitleEn),
@@ -333,27 +411,32 @@ mod tests {
                 .or(Func::lower(description).like(&query_string))
                 .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from_date))
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to_date))
-                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
+                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
         );
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn test_query_term_case_insensitive() {
-        let actual_lower = build_filter_expression(
-            MetadataLanguage::English,
-            None,
-            Some("test".to_string()),
-            None,
-            None,
-        );
-        let actual_upper = build_filter_expression(
-            MetadataLanguage::English,
-            None,
-            Some("TEST".to_string()),
-            None,
-            None,
-        );
+        let params_lower = FilterParams {
+            metadata_language: MetadataLanguage::English,
+            metadata_subjects: None,
+            query_term: Some("test".to_string()),
+            date_from: None,
+            date_to: None,
+            is_private: false,
+        };
+        let actual_lower = build_filter_expression(params_lower);
+        let params_upper = FilterParams {
+            metadata_language: MetadataLanguage::English,
+            metadata_subjects: None,
+            query_term: Some("TEST".to_string()),
+            date_from: None,
+            date_to: None,
+            is_private: false,
+        };
+        let actual_upper = build_filter_expression(params_upper);
 
         let (title, description) = (
             Expr::col(accessions_with_metadata::Column::TitleEn),
@@ -364,7 +447,8 @@ mod tests {
             Func::lower(title)
                 .like(&query_string)
                 .or(Func::lower(description).like(&query_string))
-                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true)),
+                .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
+                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
         );
 
         assert_eq!(actual_lower, expected);
@@ -374,19 +458,22 @@ mod tests {
     #[test]
     fn test_build_filter_metadata_subjects_only() {
         let subjects = vec![1, 2, 3];
-        let actual = build_filter_expression(
-            MetadataLanguage::English,
-            Some(subjects.clone()),
-            None,
-            None,
-            None,
-        );
+        let params = FilterParams {
+            metadata_language: MetadataLanguage::English,
+            metadata_subjects: Some(subjects.clone()),
+            query_term: None,
+            date_from: None,
+            date_to: None,
+            is_private: false,
+        };
+        let actual = build_filter_expression(params);
 
         let subjects_column = Expr::col(accessions_with_metadata::Column::SubjectsEnIds);
         let expected = Some(
             Expr::col(accessions_with_metadata::Column::HasEnglishMetadata)
                 .eq(true)
-                .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+                .and(subjects_column.binary(PgBinOper::Overlap, subjects))
+                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
         );
 
         assert_eq!(actual, expected);
@@ -395,13 +482,15 @@ mod tests {
     #[test]
     fn test_build_filter_query_term_and_metadata_subjects() {
         let subjects = vec![1, 2, 3];
-        let actual = build_filter_expression(
-            MetadataLanguage::English,
-            Some(subjects.clone()),
-            Some("test".to_string()),
-            None,
-            None,
-        );
+        let params = FilterParams {
+            metadata_language: MetadataLanguage::English,
+            metadata_subjects: Some(subjects.clone()),
+            query_term: Some("test".to_string()),
+            date_from: None,
+            date_to: None,
+            is_private: false,
+        };
+        let actual = build_filter_expression(params);
 
         let (title, description) = (
             Expr::col(accessions_with_metadata::Column::TitleEn),
@@ -414,7 +503,8 @@ mod tests {
                 .like(&query_string)
                 .or(Func::lower(description).like(&query_string))
                 .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
-                .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+                .and(subjects_column.binary(PgBinOper::Overlap, subjects))
+                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
         );
 
         assert_eq!(actual, expected);

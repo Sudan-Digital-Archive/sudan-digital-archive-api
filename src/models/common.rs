@@ -11,6 +11,12 @@ pub enum MetadataLanguage {
     Arabic,
 }
 
+impl Default for MetadataLanguage {
+    fn default() -> Self {
+        MetadataLanguage::English
+    }
+}
+
 /// Supported browser profiles for hard to archive sites
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]

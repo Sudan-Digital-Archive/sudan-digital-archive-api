@@ -1,9 +1,15 @@
 # TODOs:
 
-- Add auth to create and check that works
-  - Allow creation of private/public records
-- Add PUT update route behind auth. Overwrites everything, doesn't trigger recrawl.
-- Make sure list filtering hides private records
+- Make delete tag endpoint - handle foreign key violation stuff
+- Refactor tests so that you have integration tests which mock out btrix
+  calls but do hit the db; and then unit tests exist where it is easier,
+  like on the expression filtering. Gonna be a lot better for testing
+  auth this way and that will speed stuff up.
+- Check that GET works with new auth as does get one private
+- Check that CREATE works with new auth
+- Check that PUT works with new auth
+- Check that DELETE works on remote API
+- Check that list filtering handles private stuff
 
 # Overview
 

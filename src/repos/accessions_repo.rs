@@ -4,25 +4,27 @@
 //! accession records with their associated metadata in both Arabic and English.
 
 use crate::models::common::MetadataLanguage;
-use crate::models::request::{AccessionPagination, CreateAccessionRequest, UpdateAccessionRequest};
+use crate::models::request::{
+    AccessionPaginationWithPrivate, CreateAccessionRequest, UpdateAccessionRequest,
+};
+use crate::repos::filter_builder::{build_filter_expression, FilterParams};
 use ::entity::accession::ActiveModel as AccessionActiveModel;
 use ::entity::accession::Entity as Accession;
+use ::entity::accessions_with_metadata;
+use ::entity::accessions_with_metadata::Entity as AccessionWithMetadata;
+use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
 use ::entity::dublin_metadata_ar::ActiveModel as DublinMetadataArActiveModel;
 use ::entity::dublin_metadata_ar_subjects::ActiveModel as DublinMetadataSubjectsArActiveModel;
 use ::entity::dublin_metadata_ar_subjects::Entity as DublinMetadataSubjectsAr;
 use ::entity::dublin_metadata_en::ActiveModel as DublinMetadataEnActiveModel;
 use ::entity::dublin_metadata_en_subjects::ActiveModel as DublinMetadataSubjectsEnActiveModel;
 use ::entity::dublin_metadata_en_subjects::Entity as DublinMetadataSubjectsEn;
-
-use crate::repos::filter_builder::build_filter_expression;
-use ::entity::accessions_with_metadata::Entity as AccessionWithMetadata;
-use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
 use async_trait::async_trait;
 use chrono::Utc;
 use entity::sea_orm_active_enums::CrawlStatus;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, DatabaseConnection, DbErr, EntityTrait, PaginatorTrait,
-    QueryFilter, TransactionTrait, TryIntoModel,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
+    PaginatorTrait, QueryFilter, TransactionTrait, TryIntoModel,
 };
 use uuid::Uuid;
 
@@ -56,7 +58,11 @@ pub trait AccessionsRepo: Send + Sync {
     ) -> Result<(), DbErr>;
 
     /// Retrieves an accession record by its ID along with associated metadata.
-    async fn get_one(&self, id: i32) -> Result<Option<AccessionWithMetadataModel>, DbErr>;
+    async fn get_one(
+        &self,
+        id: i32,
+        private: bool,
+    ) -> Result<Option<AccessionWithMetadataModel>, DbErr>;
 
     /// Lists accessions with pagination and filtering options.
     ///
@@ -64,7 +70,7 @@ pub trait AccessionsRepo: Send + Sync {
     /// * `params` - Parameters for filtering and pagination
     async fn list_paginated(
         &self,
-        params: AccessionPagination,
+        params: AccessionPaginationWithPrivate,
     ) -> Result<(Vec<AccessionWithMetadataModel>, u64), DbErr>;
 
     /// Deletes an accession record by its ID.
@@ -156,15 +162,21 @@ impl AccessionsRepo for DBAccessionsRepo {
             crawl_id: ActiveValue::Set(crawl_id),
             job_run_id: ActiveValue::Set(job_run_id),
             seed_url: ActiveValue::Set(create_accession_request.url),
-            is_private: ActiveValue::Set(false),
+            is_private: ActiveValue::Set(create_accession_request.is_private),
         };
         accession.save(&txn).await?;
         txn.commit().await?;
         Ok(())
     }
 
-    async fn get_one(&self, id: i32) -> Result<Option<AccessionWithMetadataModel>, DbErr> {
-        let accession = AccessionWithMetadata::find_by_id(id)
+    async fn get_one(
+        &self,
+        id: i32,
+        private: bool,
+    ) -> Result<Option<AccessionWithMetadataModel>, DbErr> {
+        let accession = AccessionWithMetadata::find()
+            .filter(accessions_with_metadata::Column::Id.eq(id))
+            .filter(accessions_with_metadata::Column::IsPrivate.eq(private))
             .one(&self.db_session)
             .await?;
         Ok(accession)
@@ -172,15 +184,17 @@ impl AccessionsRepo for DBAccessionsRepo {
 
     async fn list_paginated(
         &self,
-        params: AccessionPagination,
+        params: AccessionPaginationWithPrivate,
     ) -> Result<(Vec<AccessionWithMetadataModel>, u64), DbErr> {
-        let filter_expression = build_filter_expression(
-            params.lang,
-            params.metadata_subjects,
-            params.query_term,
-            params.date_from,
-            params.date_to,
-        );
+        let filter_params = FilterParams {
+            metadata_language: params.lang,
+            metadata_subjects: params.metadata_subjects,
+            query_term: params.query_term,
+            date_from: params.date_from,
+            date_to: params.date_to,
+            is_private: params.is_private,
+        };
+        let filter_expression = build_filter_expression(filter_params);
         let accession_pages;
         if let Some(query_filter) = filter_expression {
             accession_pages = AccessionWithMetadata::find()
