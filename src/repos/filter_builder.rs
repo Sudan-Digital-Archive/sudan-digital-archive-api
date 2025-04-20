@@ -264,7 +264,7 @@ mod tests {
                 .like(&query_string)
                 .or(Func::lower(description).like(&query_string))
                 .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
-                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
         );
         assert_eq!(actual, expected);
     }
@@ -290,7 +290,7 @@ mod tests {
                 .like(&query_string)
                 .or(Func::lower(description).like(&query_string))
                 .and(Expr::col(accessions_with_metadata::Column::HasArabicMetadata).eq(true))
-                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
         );
         assert_eq!(actual, expected);
     }
@@ -321,7 +321,7 @@ mod tests {
                 .gte(from_date)
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to_date))
                 .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
-                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
         );
         assert_eq!(actual, expected);
     }
@@ -347,7 +347,7 @@ mod tests {
             accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from_date)
                 .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
-                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
         );
         assert_eq!(actual, expected);
     }
@@ -373,7 +373,7 @@ mod tests {
             accessions_with_metadata::Column::DublinMetadataDate
                 .lte(to_date)
                 .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
-                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
         );
         assert_eq!(actual, expected);
     }
@@ -412,7 +412,7 @@ mod tests {
                 .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from_date))
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to_date))
                 .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
-                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
         );
         assert_eq!(actual, expected);
     }
@@ -448,7 +448,7 @@ mod tests {
                 .like(&query_string)
                 .or(Func::lower(description).like(&query_string))
                 .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
-                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
         );
 
         assert_eq!(actual_lower, expected);
@@ -473,7 +473,7 @@ mod tests {
             Expr::col(accessions_with_metadata::Column::HasEnglishMetadata)
                 .eq(true)
                 .and(subjects_column.binary(PgBinOper::Overlap, subjects))
-                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
         );
 
         assert_eq!(actual, expected);
@@ -504,7 +504,7 @@ mod tests {
                 .or(Func::lower(description).like(&query_string))
                 .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
                 .and(subjects_column.binary(PgBinOper::Overlap, subjects))
-                .and(Expr::col(accessions_with_metadata::Column::IsPrivate).eq(false)),
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
         );
 
         assert_eq!(actual, expected);
