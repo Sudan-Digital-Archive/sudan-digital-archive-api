@@ -1,7 +1,5 @@
 # TODOs:
 
-- Add lazy static JWT keys to config module
-- Figure out swagger generation to manage route sprawl
 - Refactor tests so that you have integration tests which mock out btrix
   calls but do hit the db; and then unit tests exist where it is easier,
   like on the expression filtering. Gonna be a lot better for testing
@@ -11,8 +9,10 @@
 - Check that PUT works with new auth
 - Check that DELETE works on remote API
 - Check that list filtering handles private stuff
-- Check that DELETE tag endpoint works and handles foreign key violations 
+- Check that DELETE subject endpoint works and handles foreign key violations 
   + doesn't leave orphaned records
+- Check that CREATE subject endpoint works
+- Swap out logging the email stuff for an actual email via postmark
 
 # Overview
 

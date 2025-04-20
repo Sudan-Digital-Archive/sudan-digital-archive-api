@@ -32,6 +32,9 @@ pub fn get_subjects_routes() -> Router<AppState> {
 /// Returns a 201 CREATED status on success, or 400 BAD REQUEST if validation fails.
 async fn create_subject(
     State(state): State<AppState>,
+    // TODO: Later should add a role like researcher and validate user has
+    // researcher or admin role
+    _claims: JWTClaims,
     Json(payload): Json<CreateSubjectRequest>,
 ) -> Response {
     if let Err(err) = payload.validate() {
