@@ -1,9 +1,6 @@
 # TODOs:
 
-- Refactor tests so that you have integration tests which mock out btrix
-  calls but do hit the db; and then unit tests exist where it is easier,
-  like on the expression filtering. Gonna be a lot better for testing
-  auth this way and that will speed stuff up.
+- Add new tests for new routes, add auth to tests
 - Check that GET works with new auth as does get one private
 - Check that CREATE works with new auth
 - Check that PUT works with new auth

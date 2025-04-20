@@ -155,7 +155,7 @@ mod tests {
     use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
     use crate::test_tools::{
         build_test_accessions_service, build_test_app, mock_one_accession_with_metadata,
-        mock_paginated_ar, mock_paginated_en,
+        mock_paginated_ar, mock_paginated_en, get_mock_jwt
     };
     use axum::{
         body::Body,
@@ -178,6 +178,7 @@ mod tests {
                 metadata_time: Default::default(),
                 browser_profile: None,
                 metadata_subjects: vec![1, 2, 3],
+                is_private: false
             })
             .await;
     }
@@ -194,6 +195,8 @@ mod tests {
                 metadata_description: None,
                 metadata_time: Default::default(),
                 browser_profile: None,
+                is_private: true
+
             })
             .await;
     }
@@ -206,6 +209,7 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/api/v1/accessions")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(http::header::AUTHORIZATION, format!("Bearer {}", get_mock_jwt()))
                     .body(Body::from(
                         serde_json::to_vec(&json!({
     "url": "https://www.theguardian.com/business/2025/jan/10/britain-energy-costs-labour-power-plants-uk-cold-weather?utm_source=firefox-newtab-en-gb",
@@ -215,7 +219,8 @@ mod tests {
     "metadata_description": "Blah de blah",
     "metadata_time": "2024-11-01T23:32:00",
     "browser_profile": null,
-    "metadata_subjects": [1]
+    "metadata_subjects": [1],
+    "is_private": false
 })).unwrap(),
                     ))
                     .unwrap(),
@@ -239,6 +244,7 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/api/v1/accessions")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(http::header::AUTHORIZATION, format!("Bearer {}", get_mock_jwt()))
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "url": "https://facebook.com/some/story",
@@ -248,7 +254,8 @@ mod tests {
                             "metadata_description": null,
                             "metadata_time": "2024-11-01T23:32:00",
                             "browser_profile": "facebook",
-                            "metadata_subjects": [1]
+                            "metadata_subjects": [1],
+                            "is_private": true
                         }))
                         .unwrap(),
                     ))

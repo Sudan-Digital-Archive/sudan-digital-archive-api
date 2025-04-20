@@ -87,7 +87,7 @@ mod tests {
         ListSubjectsArResponse, ListSubjectsEnResponse, SubjectResponse,
     };
     use crate::test_tools::{
-        build_test_app, mock_paginated_subjects_ar, mock_paginated_subjects_en,
+        build_test_app, mock_paginated_subjects_ar, mock_paginated_subjects_en,get_mock_jwt
     };
     use axum::{
         body::Body,
@@ -107,6 +107,7 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/api/v1/metadata-subjects")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(http::header::AUTHORIZATION, format!("Bearer {}", get_mock_jwt()))
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "lang": "english",
@@ -134,6 +135,7 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/api/v1/metadata-subjects")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(http::header::AUTHORIZATION, format!("Bearer {}", get_mock_jwt()))
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "lang": "arabic",
