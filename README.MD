@@ -1,6 +1,5 @@
 # TODOs:
 
-- Add new tests for auth, and new subjects routes
 - Check that GET works with new auth as does get one private
 - Check that CREATE works with new auth
 - Check that PUT works with new auth

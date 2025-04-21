@@ -98,6 +98,29 @@ mod tests {
     use tower::ServiceExt;
 
     #[tokio::test]
+    async fn create_one_subject_no_auth() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/api/v1/metadata-subjects")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(Body::from(
+                        serde_json::to_vec(&json!({
+                            "lang": "english",
+                            "metadata_subject": "some cool archive"
+                        }))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+    #[tokio::test]
     async fn create_one_subject_en() {
         let app = build_test_app();
         let response = app
@@ -199,5 +222,55 @@ mod tests {
         let mocked_resp = mock_paginated_subjects_ar();
         assert_eq!(actual.num_pages, mocked_resp.1);
         assert_eq!(actual.items.len(), mocked_resp.0.len());
+    }
+
+    #[tokio::test]
+    async fn delete_one_subject_no_auth() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::DELETE)
+                    .uri("/api/v1/metadata-subjects/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(Body::from(
+                        serde_json::to_vec(&json!({
+                            "lang": "arabic",
+                            "metadata_subject": "some cool archive"
+                        }))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+    #[tokio::test]
+    async fn delete_one_subject_with_auth() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::DELETE)
+                    .uri("/api/v1/metadata-subjects/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(
+                        http::header::AUTHORIZATION,
+                        format!("Bearer {}", get_mock_jwt()),
+                    )
+                    .body(Body::from(
+                        serde_json::to_vec(&json!({
+                            "lang": "english",
+                        }))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
     }
 }
