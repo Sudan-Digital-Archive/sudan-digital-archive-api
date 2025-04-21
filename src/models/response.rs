@@ -51,7 +51,7 @@ pub struct GetOneAccessionResponse {
 }
 
 /// Response for listing accessions with pagination.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ListAccessionsResponse {
     pub items: Vec<AccessionsWithMetadataModel>,
     pub num_pages: u64,

@@ -1,6 +1,6 @@
 # TODOs:
 
-- Add new tests for new routes, add auth to tests
+- Add new tests for auth, and new subjects routes
 - Check that GET works with new auth as does get one private
 - Check that CREATE works with new auth
 - Check that PUT works with new auth
@@ -10,6 +10,7 @@
   + doesn't leave orphaned records
 - Check that CREATE subject endpoint works
 - Swap out logging the email stuff for an actual email via postmark
+- Remove logging TODO on auth service for local dev
 
 # Overview
 

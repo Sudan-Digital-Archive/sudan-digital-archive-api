@@ -154,8 +154,8 @@ mod tests {
     use crate::models::request::CreateAccessionRequest;
     use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
     use crate::test_tools::{
-        build_test_accessions_service, build_test_app, mock_one_accession_with_metadata,
-        mock_paginated_ar, mock_paginated_en, get_mock_jwt
+        build_test_accessions_service, build_test_app, get_mock_jwt,
+        mock_one_accession_with_metadata, mock_paginated_ar, mock_paginated_en,
     };
     use axum::{
         body::Body,
@@ -178,7 +178,7 @@ mod tests {
                 metadata_time: Default::default(),
                 browser_profile: None,
                 metadata_subjects: vec![1, 2, 3],
-                is_private: false
+                is_private: false,
             })
             .await;
     }
@@ -195,8 +195,7 @@ mod tests {
                 metadata_description: None,
                 metadata_time: Default::default(),
                 browser_profile: None,
-                is_private: true
-
+                is_private: true,
             })
             .await;
     }
@@ -244,7 +243,10 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/api/v1/accessions")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(http::header::AUTHORIZATION, format!("Bearer {}", get_mock_jwt()))
+                    .header(
+                        http::header::AUTHORIZATION,
+                        format!("Bearer {}", get_mock_jwt()),
+                    )
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "url": "https://facebook.com/some/story",
@@ -272,6 +274,57 @@ mod tests {
     }
     #[tokio::test]
     async fn get_one_accession() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/accessions/1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let actual: GetOneAccessionResponse = serde_json::from_slice(&body).unwrap();
+        let mocked_resp = mock_one_accession_with_metadata();
+        let expected = GetOneAccessionResponse {
+            accession: mocked_resp,
+            wacz_url: "my url".to_owned(),
+        };
+        assert_eq!(actual, expected)
+    }
+
+    #[tokio::test]
+    async fn get_one_private_accession_no_auth() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/accessions/private/1")
+                    .header(
+                        http::header::AUTHORIZATION,
+                        format!("Bearer {}", get_mock_jwt()),
+                    )
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let actual: GetOneAccessionResponse = serde_json::from_slice(&body).unwrap();
+        let mocked_resp = mock_one_accession_with_metadata();
+        let expected = GetOneAccessionResponse {
+            accession: mocked_resp,
+            wacz_url: "my url".to_owned(),
+        };
+        assert_eq!(actual, expected)
+    }
+
+    #[tokio::test]
+    async fn get_one_private_accession_with_auth() {
         let app = build_test_app();
         let response = app
             .oneshot(
@@ -336,5 +389,158 @@ mod tests {
         let expected = mocked_resp;
         assert_eq!(actual.num_pages, expected.1);
         assert_eq!(actual.items.len(), expected.0.len());
+    }
+
+    #[tokio::test]
+    async fn list_accessions_private_no_auth() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/accessions/private?page=0&per_page=1&lang=english&private=true")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn list_accessions_private_with_auth_en() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/accessions?page=0&per_page=1&lang=english")
+                    .header(
+                        http::header::AUTHORIZATION,
+                        format!("Bearer {}", get_mock_jwt()),
+                    )
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let actual: ListAccessionsResponse = serde_json::from_slice(&body).unwrap();
+        let mocked_resp = mock_paginated_en();
+        let expected = mocked_resp;
+        assert_eq!(actual.num_pages, expected.1);
+        assert_eq!(actual.items.len(), expected.0.len());
+    }
+    #[tokio::test]
+    async fn delete_one_accession_no_auth() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::DELETE)
+                    .uri("/api/v1/accessions/1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn delete_one_accession_with_auth() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::DELETE)
+                    .uri("/api/v1/accessions/1")
+                    .header(
+                        http::header::AUTHORIZATION,
+                        format!("Bearer {}", get_mock_jwt()),
+                    )
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let actual = String::from_utf8((&body).to_vec()).unwrap();
+        let expected = "Accession deleted".to_string();
+        assert_eq!(actual, expected);
+    }
+    #[tokio::test]
+    async fn update_one_accession_no_auth() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::PUT)
+                    .uri("/api/v1/accessions/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(Body::from(
+                        serde_json::to_vec(&json!({
+                            "metadata_language": "english",
+                            "metadata_title": "Guardian piece",
+                            "metadata_subject": "UK energy costs",
+                            "metadata_description": "Blah de blah",
+                            "metadata_time": "2024-11-01T23:32:00",
+                            "browser_profile": null,
+                            "metadata_subjects": [1],
+                            "is_private": false
+                        }))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn update_one_accession_with_auth() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::PUT)
+                    .uri("/api/v1/accessions/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(
+                        http::header::AUTHORIZATION,
+                        format!("Bearer {}", get_mock_jwt()),
+                    )
+                    .body(Body::from(
+                        serde_json::to_vec(&json!({
+                            "metadata_language": "english",
+                            "metadata_title": "Guardian piece",
+                            "metadata_subject": "UK energy costs",
+                            "metadata_description": "Blah de blah",
+                            "metadata_time": "2024-11-01T23:32:00",
+                            "metadata_subjects": [1],
+                            "is_private": false
+                        }))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let actual: GetOneAccessionResponse = serde_json::from_slice(&body).unwrap();
+        let mocked_resp = mock_one_accession_with_metadata();
+        let expected = GetOneAccessionResponse {
+            accession: mocked_resp,
+            wacz_url: "my url".to_owned(),
+        };
+        assert_eq!(actual, expected)
     }
 }

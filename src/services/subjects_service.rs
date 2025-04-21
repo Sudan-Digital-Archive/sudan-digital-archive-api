@@ -163,14 +163,20 @@ impl SubjectsService {
         match deletion_result {
             Ok(_) => (StatusCode::OK).into_response(),
             Err(db_err) => {
-                if db_err.to_string().contains("violates foreign key constraint") {
+                if db_err
+                    .to_string()
+                    .contains("violates foreign key constraint")
+                {
                     warn!(
                         %db_err,
                         "Can't delete {metadata_language} subject with id {subject_id} since it's being referenced by another table"
                     );
                     return (
                         StatusCode::BAD_REQUEST,
-                        format!("Subject with id {} is being referenced by another table", subject_id),
+                        format!(
+                            "Subject with id {} is being referenced by another table",
+                            subject_id
+                        ),
                     )
                         .into_response();
                 }

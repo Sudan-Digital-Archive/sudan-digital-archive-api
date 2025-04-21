@@ -21,7 +21,7 @@ pub fn get_auth_routes() -> Router<AppState> {
         Router::new()
             .route("/", post(login))
             .route("/authorize", post(authorize))
-            .route("/jwt-dev-test", get(protected)),
+            .route("/", get(verify)),
     )
 }
 
@@ -58,8 +58,7 @@ async fn authorize(
     }
 }
 
-async fn protected(State(_state): State<AppState>, claims: JWTClaims) -> Response {
-    let user_data = format!("Welcome to the protected area :)\nYour data:\n{claims}",);
-
+async fn verify(State(_state): State<AppState>, claims: JWTClaims) -> Response {
+    let user_data = format!("Verifying your JWT...\nYour data:\n{claims}");
     (StatusCode::OK, user_data).into_response()
 }

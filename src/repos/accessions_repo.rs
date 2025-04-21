@@ -285,7 +285,7 @@ impl AccessionsRepo for DBAccessionsRepo {
                 accession_active.dublin_metadata_ar = ActiveValue::Set(dublin_metadata_ar_id);
                 accession_active.dublin_metadata_date =
                     ActiveValue::Set(update_accession_request.metadata_time);
-
+                accession_active.is_private = ActiveValue::Set(update_accession_request.is_private);
                 accession_active.update(&self.db_session).await?;
                 txn.commit().await?;
                 let accession = AccessionWithMetadata::find_by_id(id)

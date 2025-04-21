@@ -105,6 +105,7 @@ pub struct UpdateAccessionRequest {
     pub metadata_time: NaiveDateTime,
     #[validate(length(min = 1, max = 200))]
     pub metadata_subjects: Vec<i32>,
+    pub is_private: bool,
 }
 
 /// Request for deleting a subject category.

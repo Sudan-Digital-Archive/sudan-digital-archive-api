@@ -3,32 +3,34 @@
 //! to facilitate testing without requiring actual database or external API connections.
 
 use crate::app_factory::{create_app, AppState};
+use crate::auth::JWT_KEYS;
+use crate::models::auth::JWTClaims;
 use crate::models::common::MetadataLanguage;
-use crate::models::request::{AccessionPaginationWithPrivate, CreateAccessionRequest, CreateCrawlRequest};
+use crate::models::request::{
+    AccessionPaginationWithPrivate, CreateAccessionRequest, CreateCrawlRequest,
+};
 use crate::models::response::CreateCrawlResponse;
 use crate::repos::accessions_repo::AccessionsRepo;
-use crate::repos::browsertrix_repo::BrowsertrixRepo;
-use crate::repos::subjects_repo::SubjectsRepo;
 use crate::repos::auth_repo::AuthRepo;
-use crate::services::accessions_service::AccessionsService;
-use crate::services::subjects_service::SubjectsService;
-use crate::services::auth_service::AuthService;
+use crate::repos::browsertrix_repo::BrowsertrixRepo;
 use crate::repos::emails_repo::EmailsRepo;
+use crate::repos::subjects_repo::SubjectsRepo;
+use crate::services::accessions_service::AccessionsService;
+use crate::services::auth_service::AuthService;
+use crate::services::subjects_service::SubjectsService;
+use ::entity::sea_orm_active_enums::Role;
 use async_trait::async_trait;
 use axum::Router;
+use chrono::{DateTime, Utc};
 use entity::accessions_with_metadata::Model as AccessionsWithMetadataModel;
 use entity::dublin_metadata_subject_ar::Model as DublinMetadataSubjectArModel;
 use entity::dublin_metadata_subject_en::Model as DublinMetadataSubjectEnModel;
 use entity::sea_orm_active_enums::CrawlStatus;
+use jsonwebtoken::{encode, Header};
 use reqwest::{Error, RequestBuilder, Response};
 use sea_orm::DbErr;
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::auth::JWT_KEYS;
-use crate::models::auth::JWTClaims;
-use jsonwebtoken::{Header, encode};
-use ::entity::sea_orm_active_enums::Role;
-use chrono::{Utc, DateTime};
 
 /// In-memory implementation of AccessionsRepo for testing.
 /// Returns predefined mock data instead of interacting with a database.
@@ -50,7 +52,11 @@ impl AccessionsRepo for InMemoryAccessionsRepo {
     }
 
     /// Returns a predefined mock accession.
-    async fn get_one(&self, _id: i32, _private: bool) -> Result<Option<AccessionsWithMetadataModel>, DbErr> {
+    async fn get_one(
+        &self,
+        _id: i32,
+        _private: bool,
+    ) -> Result<Option<AccessionsWithMetadataModel>, DbErr> {
         Ok(Some(mock_one_accession_with_metadata()))
     }
 
@@ -135,10 +141,10 @@ pub struct InMemoryEmailsRepo {}
 
 #[async_trait]
 impl EmailsRepo for InMemoryEmailsRepo {
-    async fn send_email(&self, _email: String) -> Result<(), Error>{
+    async fn send_email(&self, _email: String) -> Result<(), Error> {
         Ok(())
     }
-    }
+}
 
 /// In-memory implementation of AuthRepo for testing.
 #[derive(Clone, Debug, Default)]
@@ -303,7 +309,7 @@ pub fn mock_one_accession_with_metadata() -> AccessionsWithMetadataModel {
         seed_url: "".to_string(),
         subjects_en_ids: Some(vec![1]),
         subjects_ar_ids: Some(vec![3]),
-        is_private: true
+        is_private: true,
     }
 }
 
@@ -336,6 +342,7 @@ pub fn get_mock_jwt() -> String {
         exp: expiry_time.timestamp() as usize,
         role: Role::Admin,
     };
-    let jwt = encode(&Header::default(), &claims, &JWT_KEYS.encoding).expect("Failed to encode JWT");
+    let jwt =
+        encode(&Header::default(), &claims, &JWT_KEYS.encoding).expect("Failed to encode JWT");
     jwt
 }

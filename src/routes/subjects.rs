@@ -6,15 +6,15 @@
 //! It uses in-memory repositories for testing to avoid I/O operations.
 
 use crate::app_factory::AppState;
-use crate::models::request::{CreateSubjectRequest, SubjectPagination, DeleteSubjectRequest};
-use axum::extract::{Query, State, Path};
+use crate::models::auth::JWTClaims;
+use crate::models::request::{CreateSubjectRequest, DeleteSubjectRequest, SubjectPagination};
+use ::entity::sea_orm_active_enums::Role;
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post, delete};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use validator::Validate;
-use crate::models::auth::JWTClaims;
-use ::entity::sea_orm_active_enums::Role;
 
 /// Creates routes for subject-related endpoints under `/metadata-subjects`.
 pub fn get_subjects_routes() -> Router<AppState> {
@@ -70,7 +70,6 @@ async fn delete_subject(
     Path(id): Path<i32>,
     claims: JWTClaims,
     Json(payload): Json<DeleteSubjectRequest>,
-
 ) -> Response {
     if claims.role != Role::Admin {
         return (StatusCode::FORBIDDEN, "Insufficient permissions").into_response();
@@ -87,7 +86,7 @@ mod tests {
         ListSubjectsArResponse, ListSubjectsEnResponse, SubjectResponse,
     };
     use crate::test_tools::{
-        build_test_app, mock_paginated_subjects_ar, mock_paginated_subjects_en,get_mock_jwt
+        build_test_app, get_mock_jwt, mock_paginated_subjects_ar, mock_paginated_subjects_en,
     };
     use axum::{
         body::Body,
@@ -107,7 +106,10 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/api/v1/metadata-subjects")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(http::header::AUTHORIZATION, format!("Bearer {}", get_mock_jwt()))
+                    .header(
+                        http::header::AUTHORIZATION,
+                        format!("Bearer {}", get_mock_jwt()),
+                    )
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "lang": "english",
@@ -135,7 +137,10 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/api/v1/metadata-subjects")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(http::header::AUTHORIZATION, format!("Bearer {}", get_mock_jwt()))
+                    .header(
+                        http::header::AUTHORIZATION,
+                        format!("Bearer {}", get_mock_jwt()),
+                    )
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "lang": "arabic",
