@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use reqwest::{Client, Error};
 use serde::Serialize;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Default)]
 pub struct PostmarkEmailsRepo {
     pub client: Client,
     pub api_key: String,

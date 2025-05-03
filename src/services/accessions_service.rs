@@ -206,7 +206,7 @@ impl AccessionsService {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
             }
             Ok(delete_result) => {
-                if delete_result > 0 {
+                if delete_result.is_some() {
                     (StatusCode::OK, "Accession deleted").into_response()
                 } else {
                     (StatusCode::NOT_FOUND, "No such record").into_response()

@@ -145,6 +145,24 @@ async fn update_accession(
     _claims: JWTClaims,
     Json(payload): Json<UpdateAccessionRequest>,
 ) -> Response {
+    let subjects_exist = state
+        .subjects_service
+        .clone()
+        .verify_subjects_exist(
+            payload.metadata_subjects.clone(),
+            payload.metadata_language.clone(),
+        )
+        .await;
+    match subjects_exist {
+        Err(err) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response();
+        }
+        Ok(flag) => {
+            if !flag {
+                return (StatusCode::BAD_REQUEST, "Subjects do not exist").into_response();
+            }
+        }
+    };
     state.accessions_service.update_one(id, payload).await
 }
 

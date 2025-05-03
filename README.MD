@@ -1,13 +1,5 @@
 # TODOs:
 
-- Check that GET works with new auth as does get one private
-- Check that CREATE works with new auth
-- Check that PUT works with new auth
-- Check that DELETE works on remote API
-- Check that list filtering handles private stuff
-- Check that DELETE subject endpoint works and handles foreign key violations 
-  + doesn't leave orphaned records
-- Check that CREATE subject endpoint works
 - Swap out logging the email stuff for an actual email via postmark
 - Remove logging TODO on auth service for local dev
 

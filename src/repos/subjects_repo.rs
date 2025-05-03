@@ -88,7 +88,7 @@ pub trait SubjectsRepo: Send + Sync {
         &self,
         subject_id: i32,
         metadata_language: MetadataLanguage,
-    ) -> Result<bool, DbErr>;
+    ) -> Result<Option<()>, DbErr>;
 }
 
 #[async_trait]
@@ -194,21 +194,23 @@ impl SubjectsRepo for DBSubjectsRepo {
         &self,
         subject_id: i32,
         metadata_language: MetadataLanguage,
-    ) -> Result<bool, DbErr> {
+    ) -> Result<Option<()>, DbErr> {
         let deletion = match metadata_language {
             MetadataLanguage::English => {
                 DublinMetadataSubjectEn::delete_by_id(subject_id)
                     .exec(&self.db_session)
-                    .await?;
-                true
+                    .await?
             }
             MetadataLanguage::Arabic => {
                 DublinMetadataSubjectAr::delete_by_id(subject_id)
                     .exec(&self.db_session)
-                    .await?;
-                true
+                    .await?
             }
         };
-        Ok(deletion)
+        if deletion.rows_affected > 0 {
+            Ok(Some(()))
+        } else {
+            Ok(None)
+        }
     }
 }

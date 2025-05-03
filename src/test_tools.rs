@@ -68,8 +68,8 @@ impl AccessionsRepo for InMemoryAccessionsRepo {
         Ok(mock_paginated_en())
     }
 
-    async fn delete_one(&self, _id: i32) -> Result<u64, DbErr> {
-        Ok(1)
+    async fn delete_one(&self, _id: i32) -> Result<Option<()>, DbErr> {
+        Ok(Some(()))
     }
 
     async fn update_one(
@@ -102,8 +102,8 @@ impl SubjectsRepo for InMemorySubjectsRepo {
         &self,
         _subject_id: i32,
         _metadata_language: MetadataLanguage,
-    ) -> Result<bool, DbErr> {
-        Ok(true)
+    ) -> Result<Option<()>, DbErr> {
+        Ok(Some(()))
     }
     /// Returns predefined mock Arabic subjects.
     async fn list_paginated_ar(

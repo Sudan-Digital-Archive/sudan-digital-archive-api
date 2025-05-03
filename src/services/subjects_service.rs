@@ -161,7 +161,13 @@ impl SubjectsService {
             .await;
 
         match deletion_result {
-            Ok(_) => (StatusCode::OK).into_response(),
+            Ok(successful_delete) => {
+                if successful_delete.is_some() {
+                    (StatusCode::OK, "Subject deleted").into_response()
+                } else {
+                    (StatusCode::NOT_FOUND, "No such record").into_response()
+                }
+            }
             Err(db_err) => {
                 if db_err
                     .to_string()

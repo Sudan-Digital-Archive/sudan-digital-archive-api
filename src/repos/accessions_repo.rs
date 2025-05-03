@@ -8,24 +8,28 @@ use crate::models::request::{
     AccessionPaginationWithPrivate, CreateAccessionRequest, UpdateAccessionRequest,
 };
 use crate::repos::filter_builder::{build_filter_expression, FilterParams};
-use ::entity::accession::ActiveModel as AccessionActiveModel;
-use ::entity::accession::Entity as Accession;
-use ::entity::accessions_with_metadata;
-use ::entity::accessions_with_metadata::Entity as AccessionWithMetadata;
-use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
-use ::entity::dublin_metadata_ar::ActiveModel as DublinMetadataArActiveModel;
-use ::entity::dublin_metadata_ar_subjects::ActiveModel as DublinMetadataSubjectsArActiveModel;
-use ::entity::dublin_metadata_ar_subjects::Entity as DublinMetadataSubjectsAr;
-use ::entity::dublin_metadata_en::ActiveModel as DublinMetadataEnActiveModel;
-use ::entity::dublin_metadata_en_subjects::ActiveModel as DublinMetadataSubjectsEnActiveModel;
-use ::entity::dublin_metadata_en_subjects::Entity as DublinMetadataSubjectsEn;
 use async_trait::async_trait;
 use chrono::Utc;
+use entity::accession::ActiveModel as AccessionActiveModel;
+use entity::accession::Entity as Accession;
+
+use entity::accessions_with_metadata;
+use entity::accessions_with_metadata::Entity as AccessionWithMetadata;
+use entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
+use entity::dublin_metadata_ar::ActiveModel as DublinMetadataArActiveModel;
+use entity::dublin_metadata_ar::Entity as DublinMetadataAr;
+use entity::dublin_metadata_ar_subjects::ActiveModel as DublinMetadataSubjectsArActiveModel;
+use entity::dublin_metadata_ar_subjects::Entity as DublinMetadataSubjectsAr;
+use entity::dublin_metadata_en::ActiveModel as DublinMetadataEnActiveModel;
+use entity::dublin_metadata_en::Entity as DublinMetadataEn;
+use entity::dublin_metadata_en_subjects::ActiveModel as DublinMetadataSubjectsEnActiveModel;
+use entity::dublin_metadata_en_subjects::Entity as DublinMetadataSubjectsEn;
 use entity::sea_orm_active_enums::CrawlStatus;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
     PaginatorTrait, QueryFilter, TransactionTrait, TryIntoModel,
 };
+
 use uuid::Uuid;
 
 /// Repository implementation for database operations on accessions.
@@ -77,7 +81,7 @@ pub trait AccessionsRepo: Send + Sync {
     ///
     /// # Arguments
     /// * `id` - The ID of the accession to delete
-    async fn delete_one(&self, id: i32) -> Result<u64, DbErr>;
+    async fn delete_one(&self, id: i32) -> Result<Option<()>, DbErr>;
 
     /// Updates an existing accession record with new metadata.
     ///
@@ -208,9 +212,40 @@ impl AccessionsRepo for DBAccessionsRepo {
         Ok((accession_pages.fetch_page(params.page).await?, num_pages))
     }
 
-    async fn delete_one(&self, id: i32) -> Result<u64, DbErr> {
-        let delete_result = Accession::delete_by_id(id).exec(&self.db_session).await?;
-        Ok(delete_result.rows_affected)
+    async fn delete_one(&self, id: i32) -> Result<Option<()>, DbErr> {
+        let txn = self.db_session.begin().await?;
+        let accession = Accession::find_by_id(id).one(&txn).await?;
+        let _adl = Accession::delete_by_id(id).exec(&txn).await?;
+        match accession {
+            Some(accession_record) => {
+                if let Some(metadata_id) = accession_record.dublin_metadata_en {
+                    let metadata_en = DublinMetadataEn::find_by_id(metadata_id).one(&txn).await?;
+                    if let Some(metadata_record) = metadata_en {
+                        DublinMetadataSubjectsEn::delete_many()
+                            .filter(<entity::dublin_metadata_en_subjects::Entity as EntityTrait>::Column::MetadataId.eq(metadata_record.id))
+                            .exec(&txn)
+                            .await?;
+                        DublinMetadataEn::delete_by_id(metadata_id)
+                            .exec(&txn)
+                            .await?;
+                    }
+                }
+                if let Some(metadata_id) = accession_record.dublin_metadata_ar {
+                    let metadata_ar = DublinMetadataAr::find_by_id(metadata_id).one(&txn).await?;
+                    if let Some(metadata_record) = metadata_ar {
+                        DublinMetadataSubjectsAr::delete_many().filter(<entity::dublin_metadata_ar_subjects::Entity as EntityTrait>::Column::MetadataId.eq(metadata_record.id))
+                            .exec(&txn)
+                            .await?;
+                        DublinMetadataAr::delete_by_id(metadata_id)
+                            .exec(&txn)
+                            .await?;
+                    }
+                }
+                txn.commit().await?;
+                Ok(Some(()))
+            }
+            None => Ok(None),
+        }
     }
 
     async fn update_one(
@@ -240,15 +275,19 @@ impl AccessionsRepo for DBAccessionsRepo {
                         };
                         let inserted_metadata = metadata.save(&txn).await?;
                         let metadata_id = inserted_metadata.try_into_model()?.id;
-                        let mut subject_links: Vec<DublinMetadataSubjectsEnActiveModel> = vec![];
+                        let mut new_subject_links: Vec<DublinMetadataSubjectsEnActiveModel> =
+                            vec![];
                         for subject_id in update_accession_request.metadata_subjects.iter() {
                             let subjects_link = DublinMetadataSubjectsEnActiveModel {
                                 metadata_id: ActiveValue::Set(metadata_id),
                                 subject_id: ActiveValue::Set(*subject_id),
                             };
-                            subject_links.push(subjects_link);
+                            new_subject_links.push(subjects_link);
                         }
-                        DublinMetadataSubjectsEn::insert_many(subject_links)
+                        DublinMetadataSubjectsEn::delete_many().filter(<entity::dublin_metadata_en_subjects::Entity as EntityTrait>::Column::MetadataId.eq(metadata_id))
+                            .exec(&txn)
+                            .await?;
+                        DublinMetadataSubjectsEn::insert_many(new_subject_links)
                             .exec(&txn)
                             .await?;
                         (Some(metadata_id), None)
@@ -266,15 +305,19 @@ impl AccessionsRepo for DBAccessionsRepo {
                         };
                         let inserted_metadata = metadata.save(&txn).await?;
                         let metadata_id = inserted_metadata.try_into_model()?.id;
-                        let mut subject_links: Vec<DublinMetadataSubjectsArActiveModel> = vec![];
+                        let mut new_subject_links: Vec<DublinMetadataSubjectsArActiveModel> =
+                            vec![];
                         for subject_id in update_accession_request.metadata_subjects.iter() {
                             let subjects_link = DublinMetadataSubjectsArActiveModel {
                                 metadata_id: ActiveValue::Set(metadata_id),
                                 subject_id: ActiveValue::Set(*subject_id),
                             };
-                            subject_links.push(subjects_link);
+                            new_subject_links.push(subjects_link);
                         }
-                        DublinMetadataSubjectsAr::insert_many(subject_links)
+                        DublinMetadataSubjectsAr::delete_many().filter(<entity::dublin_metadata_ar_subjects::Entity as EntityTrait>::Column::MetadataId.eq(metadata_id))
+                            .exec(&txn)
+                            .await?;
+                        DublinMetadataSubjectsAr::insert_many(new_subject_links)
                             .exec(&txn)
                             .await?;
                         (None, Some(metadata_id))
@@ -286,7 +329,7 @@ impl AccessionsRepo for DBAccessionsRepo {
                 accession_active.dublin_metadata_date =
                     ActiveValue::Set(update_accession_request.metadata_time);
                 accession_active.is_private = ActiveValue::Set(update_accession_request.is_private);
-                accession_active.update(&self.db_session).await?;
+                accession_active.update(&txn).await?;
                 txn.commit().await?;
                 let accession = AccessionWithMetadata::find_by_id(id)
                     .one(&self.db_session)
