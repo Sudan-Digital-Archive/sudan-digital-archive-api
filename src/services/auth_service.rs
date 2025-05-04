@@ -47,14 +47,17 @@ impl AuthService {
     }
 
     pub async fn send_login_email(self, session_id: Uuid, user_id: Uuid, user_email: String) {
-        // TODO: Delete me
-        info!(%session_id, %user_id, "session id, user id");
+        let email_body = format!(
+            "Click here to login: https://sudandigitalarchive.com/login?session_id={}&user_id={}",
+            session_id, user_id
+        );
         let result = self
             .emails_repo
-            .send_email(format!(
-                "Your magic token is {} for user {}",
-                session_id, user_id
-            ))
+            .send_email(
+                user_email.clone(),
+                "Login to Sudan Digital Archive".to_string(),
+                email_body,
+            )
             .await;
         match result {
             Ok(_) => info!("Magic link email sent successfully for user {}", user_email),

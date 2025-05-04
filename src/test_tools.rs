@@ -141,7 +141,7 @@ pub struct InMemoryEmailsRepo {}
 
 #[async_trait]
 impl EmailsRepo for InMemoryEmailsRepo {
-    async fn send_email(&self, _email: String) -> Result<(), Error> {
+    async fn send_email(&self, _to: String, _subject: String, _email: String) -> Result<(), Error> {
         Ok(())
     }
 }

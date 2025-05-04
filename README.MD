@@ -1,8 +1,3 @@
-# TODOs:
-
-- Swap out logging the email stuff for an actual email via postmark
-- Remove logging TODO on auth service for local dev
-
 # Overview
 
 This is the API for the Sudan Digital Archive.
@@ -31,7 +26,6 @@ sea-orm-cli generate entity -u $DATABASE_URL -o entity/src
 The code generation typically doesn't work with the layout of the app - it writes
 stuff into `mod.rs` not `lib.rs` so I would focus instead on using it just for 
 modelling what's in the database, where it is perfect.
-
 
 ## Dockerfile
 

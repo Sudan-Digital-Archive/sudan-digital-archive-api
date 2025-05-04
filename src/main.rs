@@ -41,7 +41,9 @@ async fn main() {
     };
     let emails_repo = PostmarkEmailsRepo {
         client: Client::new(),
-        api_key: "my key".to_string(),
+        archive_sender_email: app_config.archive_sender_email,
+        api_key: app_config.postmark_api_key,
+        postmark_api_base: app_config.postmark_api_base,
     };
     let subjects_repo = DBSubjectsRepo { db_session };
     let mut http_btrix_repo = HTTPBrowsertrixRepo {
