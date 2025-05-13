@@ -26,7 +26,7 @@ pub trait EmailsRepo: Send + Sync {
 #[async_trait]
 impl EmailsRepo for PostmarkEmailsRepo {
     async fn send_email(&self, to: String, subject: String, email: String) -> Result<(), Error> {
-        let test_message = EmailMessage {
+        let message = EmailMessage {
             from: self.archive_sender_email.clone(),
             to,
             subject,
@@ -34,10 +34,9 @@ impl EmailsRepo for PostmarkEmailsRepo {
         };
         let resp = self
             .client
-            // .post("https://api.postmarkapp.com/email")
             .post(format!("{}/email", self.postmark_api_base))
             .header("X-Postmark-Server-Token", self.api_key.clone())
-            .json(&test_message)
+            .json(&message)
             .send()
             .await?;
         match resp.error_for_status() {

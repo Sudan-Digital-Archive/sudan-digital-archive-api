@@ -79,7 +79,8 @@ pub fn create_app(app_state: AppState, cors_origins: Vec<HeaderValue>, test: boo
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST])
         .allow_origin(cors_origins)
-        .allow_headers([CONTENT_TYPE]);
+        .allow_headers([CONTENT_TYPE])
+        .allow_credentials(true);
     let all_routes: Router<AppState> = build_routes();
     let base_routes = all_routes.layer(cors);
     // rate limiting breaks tests *sigh* #security #pita

@@ -1,11 +1,8 @@
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use std::env;
-use std::sync::LazyLock;
+use once_cell::sync::Lazy;
+use tracing::{error, info};
 
-pub static JWT_KEYS: LazyLock<JWTKeys> = LazyLock::new(|| {
-    let secret = env::var("JWT_SECRET").expect("Missing JWT_SECRET env var");
-    JWTKeys::new(secret.as_bytes())
-});
 pub struct JWTKeys {
     pub encoding: EncodingKey,
     pub decoding: DecodingKey,
@@ -19,3 +16,20 @@ impl JWTKeys {
         }
     }
 }
+
+pub static JWT_KEYS: Lazy<JWTKeys> = Lazy::new(|| {
+    info!("Initializing JWT_KEYS...");
+    let secret = match env::var("JWT_SECRET") {
+        Ok(val) => {
+            info!("JWT_SECRET found: {}", val);
+            val
+        }
+        Err(e) => {
+            error!("Missing JWT_SECRET env var: {}", e);
+            panic!("Missing JWT_SECRET env var: {}", e);
+        }
+    };
+    let secret_bytes = secret.as_bytes();
+    info!("JWT_SECRET as bytes: {:?}", secret_bytes);
+    JWTKeys::new(secret_bytes)
+});

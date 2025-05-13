@@ -48,7 +48,7 @@ impl AuthService {
 
     pub async fn send_login_email(self, session_id: Uuid, user_id: Uuid, user_email: String) {
         let email_body = format!(
-            "Click here to login: https://sudandigitalarchive.com/login?session_id={}&user_id={}",
+            "Click here to login: https://sudandigitalarchive.com/jwt-auth?sessionId={}&userId={}",
             session_id, user_id
         );
         let result = self
@@ -85,13 +85,17 @@ impl AuthService {
         };
         let jwt = encode(&Header::default(), &claims, &JWT_KEYS.encoding)?;
         let max_age = expiry_time.and_utc().timestamp().to_string();
-        // TODO: Find a smarter way of doing this lol
-        // Uncomment for local dev
-        //let cookie_string = format!("jwt={}; Max-Age={}", jwt, max_age);
-        let cookie_string = format!(
-            "jwt={}; HttpOnly; Secure; Domain={}; Max-Age={}; SameSite=Strict",
-            jwt, self.jwt_cookie_domain, max_age
-        );
+        let cookie_string = if self.jwt_cookie_domain == "localhost" {
+             format!(
+                "jwt={}; Path=/; SameSite=Strict; Secure; Max-Age={}",
+                jwt, max_age
+            )
+        } else {
+            format!(
+                "jwt={}; HttpOnly; Secure; Domain={}; Path=/; Max-Age={}; SameSite=Strict",
+                jwt, self.jwt_cookie_domain, max_age
+            )
+        };
         Ok(cookie_string)
     }
 
