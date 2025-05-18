@@ -226,7 +226,7 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/api/v1/accessions")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(http::header::AUTHORIZATION, format!("Bearer {}", get_mock_jwt()))
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
                     .body(Body::from(
                         serde_json::to_vec(&json!({
     "url": "https://www.theguardian.com/business/2025/jan/10/britain-energy-costs-labour-power-plants-uk-cold-weather?utm_source=firefox-newtab-en-gb",
@@ -262,8 +262,8 @@ mod tests {
                     .uri("/api/v1/accessions")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .header(
-                        http::header::AUTHORIZATION,
-                        format!("Bearer {}", get_mock_jwt()),
+                        http::header::COOKIE,
+                        format!("jwt={}", get_mock_jwt()),
                     )
                     .body(Body::from(
                         serde_json::to_vec(&json!({
@@ -322,8 +322,8 @@ mod tests {
                 Request::builder()
                     .uri("/api/v1/accessions/private/1")
                     .header(
-                        http::header::AUTHORIZATION,
-                        format!("Bearer {}", get_mock_jwt()),
+                        http::header::COOKIE,
+                        format!("jwt={}", get_mock_jwt()),
                     )
                     .body(Body::empty())
                     .unwrap(),
@@ -433,8 +433,8 @@ mod tests {
                 Request::builder()
                     .uri("/api/v1/accessions?page=0&per_page=1&lang=english")
                     .header(
-                        http::header::AUTHORIZATION,
-                        format!("Bearer {}", get_mock_jwt()),
+                        http::header::COOKIE,
+                        format!("jwt={}", get_mock_jwt()),
                     )
                     .body(Body::empty())
                     .unwrap(),
@@ -476,8 +476,8 @@ mod tests {
                     .method(http::Method::DELETE)
                     .uri("/api/v1/accessions/1")
                     .header(
-                        http::header::AUTHORIZATION,
-                        format!("Bearer {}", get_mock_jwt()),
+                        http::header::COOKIE,
+                        format!("jwt={}", get_mock_jwt()),
                     )
                     .body(Body::empty())
                     .unwrap(),
@@ -531,8 +531,8 @@ mod tests {
                     .uri("/api/v1/accessions/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .header(
-                        http::header::AUTHORIZATION,
-                        format!("Bearer {}", get_mock_jwt()),
+                        http::header::COOKIE,
+                        format!("jwt={}", get_mock_jwt()),
                     )
                     .body(Body::from(
                         serde_json::to_vec(&json!({

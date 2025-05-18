@@ -4,10 +4,7 @@ use axum::response::{IntoResponse, Response};
 use axum::{
     extract::FromRequestParts, http::request::Parts, http::StatusCode, Json, RequestPartsExt,
 };
-use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
-    TypedHeader,
-};
+use axum_extra::extract::CookieJar;
 use jsonwebtoken::errors::ErrorKind::ExpiredSignature;
 use jsonwebtoken::{decode, Validation};
 use serde::{Deserialize, Serialize};
@@ -56,15 +53,20 @@ where
     // see https://docs.rs/axum-extra/latest/axum_extra/extract/cookie/struct.CookieJar.html
     // https://github.com/tokio-rs/axum/discussions/1771
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let TypedHeader(Authorization(bearer)) = parts
-            .extract::<TypedHeader<Authorization<Bearer>>>()
+        let cookie_jar = parts
+            .extract::<CookieJar>()
             .await
             .map_err(|_| AuthError::InvalidToken)?;
+
+        let token = cookie_jar
+            .get("jwt")
+            .map(|cookie| cookie.value().to_string())
+            .ok_or(AuthError::InvalidToken)?;
 
         let mut validation = Validation::default();
         validation.validate_exp = true;
 
-        let token_data = decode::<JWTClaims>(bearer.token(), &JWT_KEYS.decoding, &validation)
+        let token_data = decode::<JWTClaims>(&token, &JWT_KEYS.decoding, &validation)
             .map_err(|e| match e.kind() {
                 ExpiredSignature => AuthError::TokenExpired,
                 _ => AuthError::InvalidToken,
