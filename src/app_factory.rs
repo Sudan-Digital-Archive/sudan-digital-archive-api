@@ -77,7 +77,7 @@ pub fn create_app(app_state: AppState, cors_origins: Vec<HeaderValue>, test: boo
         governor_limiter.retain_recent();
     });
     let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST])
+        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PUT])
         .allow_origin(cors_origins)
         .allow_headers([CONTENT_TYPE])
         .allow_credentials(true);
