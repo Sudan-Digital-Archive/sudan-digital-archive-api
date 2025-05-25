@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
+    pub is_private: bool,
     pub crawl_status: CrawlStatus,
     pub crawl_timestamp: DateTime,
     pub crawl_id: Uuid,

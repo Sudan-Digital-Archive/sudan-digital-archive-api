@@ -14,10 +14,12 @@
 //! Note: Rate limiting is disabled in test mode.
 
 use crate::routes::accessions::get_accessions_routes;
+use crate::routes::auth::get_auth_routes;
 use crate::routes::subjects::get_subjects_routes;
 
 use crate::routes::health::healthcheck;
 use crate::services::accessions_service::AccessionsService;
+use crate::services::auth_service::AuthService;
 use crate::services::subjects_service::SubjectsService;
 use axum::extract::MatchedPath;
 use axum::http::Request;
@@ -41,6 +43,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 #[derive(Clone)]
 pub struct AppState {
     pub accessions_service: AccessionsService,
+    pub auth_service: AuthService,
     pub subjects_service: SubjectsService,
 }
 
@@ -74,9 +77,10 @@ pub fn create_app(app_state: AppState, cors_origins: Vec<HeaderValue>, test: boo
         governor_limiter.retain_recent();
     });
     let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST])
+        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PUT])
         .allow_origin(cors_origins)
-        .allow_headers([CONTENT_TYPE]);
+        .allow_headers([CONTENT_TYPE])
+        .allow_credentials(true);
     let all_routes: Router<AppState> = build_routes();
     let base_routes = all_routes.layer(cors);
     // rate limiting breaks tests *sigh* #security #pita
@@ -121,9 +125,11 @@ fn build_routes() -> Router<AppState> {
         .layer(ValidateRequestHeaderLayer::accept("application/json"));
     let accessions_routes = get_accessions_routes();
     let subjects_routes = get_subjects_routes();
+    let auth_routes = get_auth_routes();
     Router::new()
         .nest("/api/v1", accessions_routes)
         .nest("/api/v1", subjects_routes)
+        .nest("/api/v1", auth_routes)
         .nest("/health", Router::new().route("/", get(healthcheck)))
         .layer(middleware)
 }

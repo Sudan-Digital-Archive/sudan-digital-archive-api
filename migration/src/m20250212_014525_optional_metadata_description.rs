@@ -1,3 +1,4 @@
+use sea_orm::{ConnectionTrait, DbErr, Statement};
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -38,6 +39,14 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let db = manager.get_connection();
+        let db_backend = manager.get_database_backend();
+        db
+            .execute(Statement::from_string(db_backend,
+                "UPDATE dublin_metadata_en SET description = 'No description provided' WHERE description IS NULL;",
+            ))
+            .await?;
+
         manager
             .alter_table(
                 Table::alter()
@@ -52,6 +61,13 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
+
+        db.execute(Statement::from_string(
+            db_backend,
+            "UPDATE dublin_metadata_ar SET description = 'لا يوجد وصف' WHERE description IS NULL;",
+        ))
+        .await?;
+
         manager
             .alter_table(
                 Table::alter()

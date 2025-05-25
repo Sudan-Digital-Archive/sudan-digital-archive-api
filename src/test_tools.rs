@@ -3,20 +3,30 @@
 //! to facilitate testing without requiring actual database or external API connections.
 
 use crate::app_factory::{create_app, AppState};
+use crate::auth::JWT_KEYS;
+use crate::models::auth::JWTClaims;
 use crate::models::common::MetadataLanguage;
-use crate::models::request::{AccessionPagination, CreateAccessionRequest, CreateCrawlRequest};
+use crate::models::request::{
+    AccessionPaginationWithPrivate, CreateAccessionRequest, CreateCrawlRequest,
+};
 use crate::models::response::CreateCrawlResponse;
 use crate::repos::accessions_repo::AccessionsRepo;
+use crate::repos::auth_repo::AuthRepo;
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
+use crate::repos::emails_repo::EmailsRepo;
 use crate::repos::subjects_repo::SubjectsRepo;
 use crate::services::accessions_service::AccessionsService;
+use crate::services::auth_service::AuthService;
 use crate::services::subjects_service::SubjectsService;
+use ::entity::sea_orm_active_enums::Role;
 use async_trait::async_trait;
 use axum::Router;
+use chrono::{DateTime, Utc};
 use entity::accessions_with_metadata::Model as AccessionsWithMetadataModel;
 use entity::dublin_metadata_subject_ar::Model as DublinMetadataSubjectArModel;
 use entity::dublin_metadata_subject_en::Model as DublinMetadataSubjectEnModel;
 use entity::sea_orm_active_enums::CrawlStatus;
+use jsonwebtoken::{encode, Header};
 use reqwest::{Error, RequestBuilder, Response};
 use sea_orm::DbErr;
 use std::sync::Arc;
@@ -42,16 +52,32 @@ impl AccessionsRepo for InMemoryAccessionsRepo {
     }
 
     /// Returns a predefined mock accession.
-    async fn get_one(&self, _id: i32) -> Result<Option<AccessionsWithMetadataModel>, DbErr> {
+    async fn get_one(
+        &self,
+        _id: i32,
+        _private: bool,
+    ) -> Result<Option<AccessionsWithMetadataModel>, DbErr> {
         Ok(Some(mock_one_accession_with_metadata()))
     }
 
     /// Returns predefined mock paginated accessions.
     async fn list_paginated(
         &self,
-        _params: AccessionPagination,
+        _params: AccessionPaginationWithPrivate,
     ) -> Result<(Vec<AccessionsWithMetadataModel>, u64), DbErr> {
         Ok(mock_paginated_en())
+    }
+
+    async fn delete_one(&self, _id: i32) -> Result<Option<()>, DbErr> {
+        Ok(Some(()))
+    }
+
+    async fn update_one(
+        &self,
+        _id: i32,
+        _update_accession_request: crate::models::request::UpdateAccessionRequest,
+    ) -> Result<Option<AccessionsWithMetadataModel>, DbErr> {
+        Ok(Some(mock_one_accession_with_metadata()))
     }
 }
 
@@ -72,7 +98,13 @@ impl SubjectsRepo for InMemorySubjectsRepo {
             subject: "some cool archive".to_string(),
         })
     }
-
+    async fn delete_one(
+        &self,
+        _subject_id: i32,
+        _metadata_language: MetadataLanguage,
+    ) -> Result<Option<()>, DbErr> {
+        Ok(Some(()))
+    }
     /// Returns predefined mock Arabic subjects.
     async fn list_paginated_ar(
         &self,
@@ -100,6 +132,52 @@ impl SubjectsRepo for InMemorySubjectsRepo {
         _metadata_language: MetadataLanguage,
     ) -> Result<bool, DbErr> {
         Ok(true)
+    }
+}
+
+/// In-memory implementation of EmailsRepo for testing.
+#[derive(Clone, Debug, Default)]
+pub struct InMemoryEmailsRepo {}
+
+#[async_trait]
+impl EmailsRepo for InMemoryEmailsRepo {
+    async fn send_email(&self, _to: String, _subject: String, _email: String) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// In-memory implementation of AuthRepo for testing.
+#[derive(Clone, Debug, Default)]
+pub struct InMemoryAuthRepo {}
+
+#[async_trait]
+impl AuthRepo for InMemoryAuthRepo {
+    async fn get_user_by_email(&self, _email: String) -> Result<Option<Uuid>, DbErr> {
+        Ok(Some(Uuid::new_v4()))
+    }
+
+    async fn create_session(&self, _user_id: Uuid) -> Result<Uuid, DbErr> {
+        Ok(Uuid::new_v4())
+    }
+
+    async fn delete_expired_sessions(&self) {
+        // No-op for tests
+    }
+
+    async fn get_session_expiry(
+        &self,
+        _authorize_request: crate::models::request::AuthorizeRequest,
+    ) -> Result<Option<chrono::NaiveDateTime>, DbErr> {
+        Ok(Some(chrono::NaiveDateTime::default()))
+    }
+
+    async fn get_one(&self, _user_id: Uuid) -> Result<Option<entity::archive_user::Model>, DbErr> {
+        Ok(Some(entity::archive_user::Model {
+            id: Uuid::new_v4(),
+            email: "test@example.com".to_string(),
+            role: entity::sea_orm_active_enums::Role::Admin,
+            is_active: true,
+        }))
     }
 }
 
@@ -169,6 +247,17 @@ pub fn build_test_accessions_service() -> AccessionsService {
     }
 }
 
+pub fn build_test_auth_service() -> AuthService {
+    let auth_repo = Arc::new(InMemoryAuthRepo::default());
+    let emails_repo = Arc::new(InMemoryEmailsRepo::default());
+
+    AuthService {
+        auth_repo,
+        emails_repo,
+        jwt_cookie_domain: "test".to_string(),
+    }
+}
+
 /// Builds a test subjects service with in-memory repository.
 pub fn build_test_subjects_service() -> SubjectsService {
     let subjects_repo = Arc::new(InMemorySubjectsRepo::default());
@@ -180,9 +269,11 @@ pub fn build_test_subjects_service() -> SubjectsService {
 pub fn build_test_app() -> Router {
     let accessions_service = build_test_accessions_service();
     let subjects_service = build_test_subjects_service();
+    let auth_service = build_test_auth_service();
     let app_state = AppState {
         accessions_service,
         subjects_service,
+        auth_service,
     };
     create_app(app_state, vec![], true)
 }
@@ -218,6 +309,7 @@ pub fn mock_one_accession_with_metadata() -> AccessionsWithMetadataModel {
         seed_url: "".to_string(),
         subjects_en_ids: Some(vec![1]),
         subjects_ar_ids: Some(vec![3]),
+        is_private: true,
     }
 }
 
@@ -241,4 +333,16 @@ pub fn mock_paginated_subjects_ar() -> (Vec<DublinMetadataSubjectArModel>, u64) 
         }],
         10,
     )
+}
+
+pub fn get_mock_jwt() -> String {
+    let expiry_time: DateTime<Utc> = Utc::now() + chrono::Duration::hours(24);
+    let claims = JWTClaims {
+        sub: "some user id".to_string(),
+        exp: expiry_time.timestamp() as usize,
+        role: Role::Admin,
+    };
+    let jwt =
+        encode(&Header::default(), &claims, &JWT_KEYS.encoding).expect("Failed to encode JWT");
+    jwt
 }

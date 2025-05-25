@@ -77,8 +77,6 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(DublinMetadataEn::Id)
                             .integer()
                             .primary_key()
-                            .unique_key()
-                            .not_null()
                             .auto_increment(),
                     )
                     .col(ColumnDef::new(DublinMetadataEn::Title).string().not_null())
@@ -104,8 +102,6 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(DublinMetadataAr::Id)
                             .integer()
                             .primary_key()
-                            .unique_key()
-                            .not_null()
                             .auto_increment(),
                     )
                     .col(ColumnDef::new(DublinMetadataAr::Title).string().not_null())
@@ -130,7 +126,6 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(Accession::Id)
                             .integer()
-                            .not_null()
                             .auto_increment()
                             .primary_key(),
                     )

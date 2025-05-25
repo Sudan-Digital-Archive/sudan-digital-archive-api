@@ -4,9 +4,10 @@ use serde::Deserialize;
 use std::fmt;
 
 /// Supported languages for metadata content.
-#[derive(Debug, Deserialize, Clone, Copy)]
+#[derive(Debug, Default,Deserialize, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum MetadataLanguage {
+    #[default]
     English,
     Arabic,
 }

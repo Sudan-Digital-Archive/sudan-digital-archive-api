@@ -6,6 +6,7 @@
 use crate::models::common::{BrowserProfile, MetadataLanguage};
 use chrono::NaiveDateTime;
 use serde::Deserialize;
+use uuid::Uuid;
 use validator::Validate;
 
 /// Request for creating a new accession with metadata.
@@ -22,6 +23,7 @@ pub struct CreateAccessionRequest {
     pub browser_profile: Option<BrowserProfile>,
     #[validate(length(min = 1, max = 200))]
     pub metadata_subjects: Vec<i32>,
+    pub is_private: bool,
 }
 
 /// Request for initiating a new Browsertrix crawl.
@@ -46,6 +48,21 @@ pub struct AccessionPagination {
     pub date_to: Option<NaiveDateTime>,
 }
 
+/// Pagination and filtering parameters for listing accessions, including private ones.
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct AccessionPaginationWithPrivate {
+    pub page: u64,
+    #[validate(range(min = 1, max = 200))]
+    pub per_page: u64,
+    pub lang: MetadataLanguage,
+    pub metadata_subjects: Option<Vec<i32>>,
+    #[validate(length(min = 1, max = 500))]
+    pub query_term: Option<String>,
+    pub date_from: Option<NaiveDateTime>,
+    pub date_to: Option<NaiveDateTime>,
+    pub is_private: bool,
+}
+
 /// Request for creating a new subject category.
 #[derive(Debug, Clone, Validate, Deserialize)]
 pub struct CreateSubjectRequest {
@@ -63,4 +80,36 @@ pub struct SubjectPagination {
     pub lang: MetadataLanguage,
     #[validate(length(min = 1, max = 500))]
     pub query_term: Option<String>,
+}
+
+/// Request for creating a new subject category.
+#[derive(Debug, Clone, Validate, Deserialize)]
+pub struct LoginRequest {
+    #[validate(length(min = 1, max = 100))]
+    pub email: String,
+}
+
+#[derive(Debug, Clone, Validate, Deserialize)]
+pub struct AuthorizeRequest {
+    pub session_id: Uuid,
+    pub user_id: Uuid,
+}
+
+#[derive(Debug, Clone, Validate, Deserialize)]
+pub struct UpdateAccessionRequest {
+    pub metadata_language: MetadataLanguage,
+    #[validate(length(min = 1, max = 200))]
+    pub metadata_title: String,
+    #[validate(length(min = 1, max = 2000))]
+    pub metadata_description: Option<String>,
+    pub metadata_time: NaiveDateTime,
+    #[validate(length(min = 1, max = 200))]
+    pub metadata_subjects: Vec<i32>,
+    pub is_private: bool,
+}
+
+/// Request for deleting a subject category.
+#[derive(Debug, Clone, Validate, Deserialize)]
+pub struct DeleteSubjectRequest {
+    pub lang: MetadataLanguage,
 }

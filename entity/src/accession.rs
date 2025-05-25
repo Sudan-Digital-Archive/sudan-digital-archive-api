@@ -2,9 +2,8 @@
 
 use super::sea_orm_active_enums::CrawlStatus;
 use sea_orm::entity::prelude::*;
-use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "accession")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -18,6 +17,7 @@ pub struct Model {
     pub org_id: Uuid,
     pub job_run_id: String,
     pub seed_url: String,
+    pub is_private: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -3,12 +3,12 @@
 //! This module handles the business logic for creating, retrieving, and listing
 //! archival records, including their associated web crawls and metadata in both
 //! Arabic and English.
-
-use crate::models::request::AccessionPagination;
-use crate::models::request::{CreateAccessionRequest, CreateCrawlRequest};
+use crate::models::request::AccessionPaginationWithPrivate;
+use crate::models::request::{CreateAccessionRequest, CreateCrawlRequest, UpdateAccessionRequest};
 use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use crate::repos::accessions_repo::AccessionsRepo;
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
+use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -34,7 +34,7 @@ impl AccessionsService {
     ///
     /// # Returns
     /// JSON response containing paginated accessions or an error response
-    pub async fn list(self, params: AccessionPagination) -> Response {
+    pub async fn list(self, params: AccessionPaginationWithPrivate) -> Response {
         info!(
             "Getting page {} of {} accessions with per page {}...",
             params.page, params.lang, params.per_page
@@ -58,7 +58,6 @@ impl AccessionsService {
             }
         }
     }
-
     /// Retrieves a single accession by ID with its associated metadata and WACZ URL.
     ///
     /// # Arguments
@@ -66,43 +65,49 @@ impl AccessionsService {
     ///
     /// # Returns
     /// JSON response containing the accession details or an error response
-    pub async fn get_one(self, id: i32) -> Response {
-        info!("Getting accession with id {id}");
-        let query_result = self.accessions_repo.get_one(id).await;
+    pub async fn get_one(self, id: i32, private: bool) -> Response {
+        info!("Getting {private} accession with id {id}");
+        let query_result = self.accessions_repo.get_one(id, private).await;
         match query_result {
             Err(query_result) => {
                 error!(%query_result, "Error occurred retrieving accession");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
             }
-            Ok(query_result) => match query_result {
-                Some(accession) => {
-                    match self
-                        .browsertrix_repo
-                        .get_wacz_url(&accession.job_run_id)
-                        .await
-                    {
-                        Ok(wacz_url) => {
-                            let resp = GetOneAccessionResponse {
-                                accession,
-                                wacz_url,
-                            };
-                            Json(resp).into_response()
-                        }
-                        Err(err) => {
-                            error!(%err, "Error occurred retrieving wacz url");
-                            (
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                "Error retrieving wacz url",
-                            )
-                                .into_response()
-                        }
-                    }
-                }
-                None => (StatusCode::NOT_FOUND, "No such record").into_response(),
-            },
+            Ok(query_result) => self.enrich_one_with_browsertrix(query_result).await,
         }
     }
 
+    async fn enrich_one_with_browsertrix(
+        self,
+        query_result: Option<AccessionWithMetadataModel>,
+    ) -> Response {
+        match query_result {
+            Some(accession) => {
+                match self
+                    .browsertrix_repo
+                    .get_wacz_url(&accession.job_run_id)
+                    .await
+                {
+                    Ok(wacz_url) => {
+                        let resp = GetOneAccessionResponse {
+                            accession,
+                            wacz_url,
+                        };
+                        Json(resp).into_response()
+                    }
+                    Err(err) => {
+                        error!(%err, "Error occurred retrieving wacz url");
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Error retrieving wacz url",
+                        )
+                            .into_response()
+                    }
+                }
+            }
+            None => (StatusCode::NOT_FOUND, "No such record").into_response(),
+        }
+    }
     /// Creates a new accession by initiating a web crawl and storing the metadata.
     ///
     /// This method performs the following steps:
@@ -155,6 +160,7 @@ impl AccessionsService {
                                     metadata_description: trimmed_description,
                                     metadata_time: payload.metadata_time,
                                     metadata_subjects: payload.metadata_subjects,
+                                    is_private: payload.is_private,
                                 };
                                 let write_result = self
                                     .accessions_repo
@@ -179,6 +185,58 @@ impl AccessionsService {
                             sleep(time_to_sleep).await;
                         }
                     }
+                }
+            }
+        }
+    }
+
+    /// Deletes a single accession by ID.
+    ///
+    /// # Arguments
+    /// * `id` - The unique identifier of the accession
+    ///
+    /// # Returns
+    /// Response indicating success or failure of the deletion
+    pub async fn delete_one(self, id: i32) -> Response {
+        info!("Deleting accession with id {id}");
+        let delete_result = self.accessions_repo.delete_one(id).await;
+        match delete_result {
+            Err(err) => {
+                error!(%err, "Error occurred deleting accession");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
+            }
+            Ok(delete_result) => {
+                if delete_result.is_some() {
+                    (StatusCode::OK, "Accession deleted").into_response()
+                } else {
+                    (StatusCode::NOT_FOUND, "No such record").into_response()
+                }
+            }
+        }
+    }
+
+    /// Updates a single accession by ID.
+    ///
+    /// # Arguments
+    /// * `id` - The unique identifier of the accession
+    /// * `payload` - The update request containing new metadata
+    ///
+    /// # Returns
+    /// Response indicating success or failure of the update
+    pub async fn update_one(self, id: i32, payload: UpdateAccessionRequest) -> Response {
+        info!("Updating accession with id {id}");
+        let update_result = self.accessions_repo.update_one(id, payload).await;
+        match update_result {
+            Err(err) => {
+                error!(%err, "Error occurred updating accession");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
+            }
+            Ok(update_result) => {
+                if update_result.is_some() {
+                    self.enrich_one_with_browsertrix(update_result).await
+                } else {
+                    error!("Error occurred finding accession in view after update");
+                    (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
                 }
             }
         }

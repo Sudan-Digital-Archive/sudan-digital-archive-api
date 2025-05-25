@@ -78,6 +78,17 @@ pub trait SubjectsRepo: Send + Sync {
         subject_ids: Vec<i32>,
         metadata_language: MetadataLanguage,
     ) -> Result<bool, DbErr>;
+
+    /// Deletes a subject term by its ID.
+    ///
+    /// # Arguments
+    /// * `subject_id` - The ID of the subject to delete.
+    /// * `metadata_language` - Language of the subject to delete
+    async fn delete_one(
+        &self,
+        subject_id: i32,
+        metadata_language: MetadataLanguage,
+    ) -> Result<Option<()>, DbErr>;
 }
 
 #[async_trait]
@@ -177,5 +188,29 @@ impl SubjectsRepo for DBSubjectsRepo {
             }
         };
         Ok(flag)
+    }
+
+    async fn delete_one(
+        &self,
+        subject_id: i32,
+        metadata_language: MetadataLanguage,
+    ) -> Result<Option<()>, DbErr> {
+        let deletion = match metadata_language {
+            MetadataLanguage::English => {
+                DublinMetadataSubjectEn::delete_by_id(subject_id)
+                    .exec(&self.db_session)
+                    .await?
+            }
+            MetadataLanguage::Arabic => {
+                DublinMetadataSubjectAr::delete_by_id(subject_id)
+                    .exec(&self.db_session)
+                    .await?
+            }
+        };
+        if deletion.rows_affected > 0 {
+            Ok(Some(()))
+        } else {
+            Ok(None)
+        }
     }
 }

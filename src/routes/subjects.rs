@@ -6,11 +6,13 @@
 //! It uses in-memory repositories for testing to avoid I/O operations.
 
 use crate::app_factory::AppState;
-use crate::models::request::{CreateSubjectRequest, SubjectPagination};
-use axum::extract::{Query, State};
+use crate::models::auth::JWTClaims;
+use crate::models::request::{CreateSubjectRequest, DeleteSubjectRequest, SubjectPagination};
+use ::entity::sea_orm_active_enums::Role;
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use validator::Validate;
 
@@ -20,7 +22,8 @@ pub fn get_subjects_routes() -> Router<AppState> {
         "/metadata-subjects",
         Router::new()
             .route("/", get(list_subjects))
-            .route("/", post(create_subject)),
+            .route("/", post(create_subject))
+            .route("/{subject_id}", delete(delete_subject)),
     )
 }
 
@@ -29,6 +32,9 @@ pub fn get_subjects_routes() -> Router<AppState> {
 /// Returns a 201 CREATED status on success, or 400 BAD REQUEST if validation fails.
 async fn create_subject(
     State(state): State<AppState>,
+    // TODO: Later should add a role like researcher and validate user has
+    // researcher or admin role
+    _claims: JWTClaims,
     Json(payload): Json<CreateSubjectRequest>,
 ) -> Response {
     if let Err(err) = payload.validate() {
@@ -59,6 +65,20 @@ async fn list_subjects(
         .await
 }
 
+async fn delete_subject(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+    claims: JWTClaims,
+    Json(payload): Json<DeleteSubjectRequest>,
+) -> Response {
+    if claims.role != Role::Admin {
+        return (StatusCode::FORBIDDEN, "Insufficient permissions").into_response();
+    }
+    if let Err(err) = payload.validate() {
+        return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
+    }
+    state.subjects_service.delete_one(id, payload.lang).await
+}
 #[cfg(test)]
 mod tests {
 
@@ -66,7 +86,7 @@ mod tests {
         ListSubjectsArResponse, ListSubjectsEnResponse, SubjectResponse,
     };
     use crate::test_tools::{
-        build_test_app, mock_paginated_subjects_ar, mock_paginated_subjects_en,
+        build_test_app, get_mock_jwt, mock_paginated_subjects_ar, mock_paginated_subjects_en,
     };
     use axum::{
         body::Body,
@@ -78,6 +98,29 @@ mod tests {
     use tower::ServiceExt;
 
     #[tokio::test]
+    async fn create_one_subject_no_auth() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/api/v1/metadata-subjects")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(Body::from(
+                        serde_json::to_vec(&json!({
+                            "lang": "english",
+                            "metadata_subject": "some cool archive"
+                        }))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+    #[tokio::test]
     async fn create_one_subject_en() {
         let app = build_test_app();
         let response = app
@@ -86,6 +129,10 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/api/v1/metadata-subjects")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(
+                        http::header::COOKIE,
+                        format!("jwt={}", get_mock_jwt()),
+                    )
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "lang": "english",
@@ -113,6 +160,10 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/api/v1/metadata-subjects")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(
+                        http::header::COOKIE,
+                        format!("jwt={}", get_mock_jwt()),
+                    )
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "lang": "arabic",
@@ -171,5 +222,55 @@ mod tests {
         let mocked_resp = mock_paginated_subjects_ar();
         assert_eq!(actual.num_pages, mocked_resp.1);
         assert_eq!(actual.items.len(), mocked_resp.0.len());
+    }
+
+    #[tokio::test]
+    async fn delete_one_subject_no_auth() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::DELETE)
+                    .uri("/api/v1/metadata-subjects/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(Body::from(
+                        serde_json::to_vec(&json!({
+                            "lang": "arabic",
+                            "metadata_subject": "some cool archive"
+                        }))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+    #[tokio::test]
+    async fn delete_one_subject_with_auth() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::DELETE)
+                    .uri("/api/v1/metadata-subjects/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(
+                        http::header::COOKIE,
+                        format!("jwt={}", get_mock_jwt()),
+                    )
+                    .body(Body::from(
+                        serde_json::to_vec(&json!({
+                            "lang": "english",
+                        }))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
     }
 }

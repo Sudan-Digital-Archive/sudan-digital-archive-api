@@ -21,15 +21,23 @@ pub struct BrowsertrixConfig {
 /// Global application configuration
 #[derive(Debug, Clone, Default)]
 pub struct AppConfig {
+    pub archive_sender_email: String,
     pub browsertrix: BrowsertrixConfig,
     pub cors_urls: Vec<HeaderValue>,
     pub postgres_url: String,
     pub listener_address: String,
+    pub jwt_expiry_hours: i64,
+    pub jwt_cookie_domain: String,
+    pub postmark_api_base: String,
+    pub postmark_api_key: String,
 }
 
 /// Builds application configuration from environment variables
 pub fn build_app_config() -> AppConfig {
     let postgres_url = env::var("POSTGRES_URL").expect("Missing POSTGRES_URL env var");
+    let archive_sender_email = env::var("ARCHIVE_SENDER_EMAIL").expect("Missing ARCHIVE_SENDER_EMAIL env var");
+    let postmark_api_base = env::var("POSTMARK_API_BASE").expect("Missing POSTMARK_API_BASE env var");
+    let postmark_api_key = env::var("POSTMARK_API_KEY").expect("Missing POSTMARK_API_KEY env var");
     let username = env::var("BROWSERTRIX_USERNAME").expect("Missing BROWSERTRIX_USERNAME env var");
     let password = env::var("BROWSERTRIX_PASSWORD").expect("Missing BROWSERTRIX_PASSWORD env var");
     let org_id = env::var("BROWSERTRIX_ORGID").expect("Missing BROWSERTRIX_ORGID env var");
@@ -46,6 +54,8 @@ pub fn build_app_config() -> AppConfig {
         login_url,
         create_crawl_url,
     };
+    let jwt_cookie_domain =
+        env::var("JWT_COOKIE_DOMAIN").expect("Missing JWT_COOKIE_DOMAIN env var");
     let cors_urls_env_var = env::var("CORS_URL").expect("Missing CORS_URL env var");
     let cors_urls = cors_urls_env_var
         .split(",")
@@ -55,12 +65,20 @@ pub fn build_app_config() -> AppConfig {
         })
         .collect();
     let listener_address = env::var("LISTENER_ADDRESS").expect("Missing LISTENER_ADDRESS env var");
-
+    let jwt_expiry_hours = env::var("JWT_EXPIRY_HOURS")
+        .expect("Missing JWT_EXPIRY_HOURS env var")
+        .parse()
+        .expect("JWT_EXPIRY_HOURS should be a number");
     AppConfig {
+        archive_sender_email,
         browsertrix,
         cors_urls,
         postgres_url,
         listener_address,
+        jwt_expiry_hours,
+        jwt_cookie_domain,
+        postmark_api_base,
+        postmark_api_key,
     }
 }
 
