@@ -51,7 +51,7 @@ async fn create_accession(
         .clone()
         .verify_subjects_exist(
             payload.metadata_subjects.clone(),
-            payload.metadata_language.clone(),
+            payload.metadata_language,
         )
         .await;
     match subjects_exist {
@@ -150,7 +150,7 @@ async fn update_accession(
         .clone()
         .verify_subjects_exist(
             payload.metadata_subjects.clone(),
-            payload.metadata_language.clone(),
+            payload.metadata_language,
         )
         .await;
     match subjects_exist {

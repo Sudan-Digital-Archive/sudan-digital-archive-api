@@ -37,6 +37,8 @@ jobs:
         run: cargo clippy -- -D warnings
 
       - name: Run tests
+        env:
+          JWT_SECRET: "testsecret"
         run: cargo test --verbose
 
       - name: Install doctl
