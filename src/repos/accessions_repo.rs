@@ -215,7 +215,7 @@ impl AccessionsRepo for DBAccessionsRepo {
     async fn delete_one(&self, id: i32) -> Result<Option<()>, DbErr> {
         let txn = self.db_session.begin().await?;
         let accession = Accession::find_by_id(id).one(&txn).await?;
-        let _adl = Accession::delete_by_id(id).exec(&txn).await?;
+        Accession::delete_by_id(id).exec(&txn).await?;
         match accession {
             Some(accession_record) => {
                 if let Some(metadata_id) = accession_record.dublin_metadata_en {
