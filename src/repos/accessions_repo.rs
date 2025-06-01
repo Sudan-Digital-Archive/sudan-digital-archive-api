@@ -19,10 +19,12 @@ use entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
 use entity::dublin_metadata_ar::ActiveModel as DublinMetadataArActiveModel;
 use entity::dublin_metadata_ar::Entity as DublinMetadataAr;
 use entity::dublin_metadata_ar_subjects::ActiveModel as DublinMetadataSubjectsArActiveModel;
+use entity::dublin_metadata_subject_ar::Entity as DublinMetadataSubjectAr;
 use entity::dublin_metadata_ar_subjects::Entity as DublinMetadataSubjectsAr;
 use entity::dublin_metadata_en::ActiveModel as DublinMetadataEnActiveModel;
 use entity::dublin_metadata_en::Entity as DublinMetadataEn;
 use entity::dublin_metadata_en_subjects::ActiveModel as DublinMetadataSubjectsEnActiveModel;
+use entity::dublin_metadata_subject_en::Entity as DublinMetadataSubjectEn;
 use entity::dublin_metadata_en_subjects::Entity as DublinMetadataSubjectsEn;
 use entity::sea_orm_active_enums::CrawlStatus;
 use sea_orm::{
@@ -225,7 +227,8 @@ impl AccessionsRepo for DBAccessionsRepo {
                             .filter(<entity::dublin_metadata_en_subjects::Entity as EntityTrait>::Column::MetadataId.eq(metadata_record.id))
                             .exec(&txn)
                             .await?;
-                        DublinMetadataEn::delete_by_id(metadata_id)
+                            DublinMetadataSubjectEn::delete_by_id(metadata_record.id).exec(&txn).await?;
+                            DublinMetadataEn::delete_by_id(metadata_id)
                             .exec(&txn)
                             .await?;
                     }
@@ -236,6 +239,7 @@ impl AccessionsRepo for DBAccessionsRepo {
                         DublinMetadataSubjectsAr::delete_many().filter(<entity::dublin_metadata_ar_subjects::Entity as EntityTrait>::Column::MetadataId.eq(metadata_record.id))
                             .exec(&txn)
                             .await?;
+                        DublinMetadataSubjectAr::delete_by_id(metadata_record.id).exec(&txn).await?;
                         DublinMetadataAr::delete_by_id(metadata_id)
                             .exec(&txn)
                             .await?;
