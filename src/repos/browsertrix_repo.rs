@@ -119,7 +119,8 @@ impl BrowsertrixRepo for HTTPBrowsertrixRepo {
         if resp.status() == StatusCode::UNAUTHORIZED {
             info!("Got 403 HTTP code, reauthenticating...");
             self.refresh_auth().await;
-            resp = req.send().await?;
+            let req_with_refreshed_auth = req.bearer_auth(self.access_token.read().await);
+            resp = req_with_refreshed_auth.send().await?;
         }
         Ok(resp)
     }
