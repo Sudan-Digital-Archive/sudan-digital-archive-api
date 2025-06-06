@@ -129,10 +129,7 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/api/v1/metadata-subjects")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(
-                        http::header::COOKIE,
-                        format!("jwt={}", get_mock_jwt()),
-                    )
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "lang": "english",
@@ -160,10 +157,7 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/api/v1/metadata-subjects")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(
-                        http::header::COOKIE,
-                        format!("jwt={}", get_mock_jwt()),
-                    )
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "lang": "arabic",
@@ -256,10 +250,7 @@ mod tests {
                     .method(http::Method::DELETE)
                     .uri("/api/v1/metadata-subjects/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(
-                        http::header::COOKIE,
-                        format!("jwt={}", get_mock_jwt()),
-                    )
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "lang": "english",

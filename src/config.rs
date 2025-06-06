@@ -35,8 +35,10 @@ pub struct AppConfig {
 /// Builds application configuration from environment variables
 pub fn build_app_config() -> AppConfig {
     let postgres_url = env::var("POSTGRES_URL").expect("Missing POSTGRES_URL env var");
-    let archive_sender_email = env::var("ARCHIVE_SENDER_EMAIL").expect("Missing ARCHIVE_SENDER_EMAIL env var");
-    let postmark_api_base = env::var("POSTMARK_API_BASE").expect("Missing POSTMARK_API_BASE env var");
+    let archive_sender_email =
+        env::var("ARCHIVE_SENDER_EMAIL").expect("Missing ARCHIVE_SENDER_EMAIL env var");
+    let postmark_api_base =
+        env::var("POSTMARK_API_BASE").expect("Missing POSTMARK_API_BASE env var");
     let postmark_api_key = env::var("POSTMARK_API_KEY").expect("Missing POSTMARK_API_KEY env var");
     let username = env::var("BROWSERTRIX_USERNAME").expect("Missing BROWSERTRIX_USERNAME env var");
     let password = env::var("BROWSERTRIX_PASSWORD").expect("Missing BROWSERTRIX_PASSWORD env var");

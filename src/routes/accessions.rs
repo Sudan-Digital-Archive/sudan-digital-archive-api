@@ -49,10 +49,7 @@ async fn create_accession(
     let subjects_exist = state
         .subjects_service
         .clone()
-        .verify_subjects_exist(
-            payload.metadata_subjects.clone(),
-            payload.metadata_language,
-        )
+        .verify_subjects_exist(payload.metadata_subjects.clone(), payload.metadata_language)
         .await;
     match subjects_exist {
         Err(err) => {
@@ -148,10 +145,7 @@ async fn update_accession(
     let subjects_exist = state
         .subjects_service
         .clone()
-        .verify_subjects_exist(
-            payload.metadata_subjects.clone(),
-            payload.metadata_language,
-        )
+        .verify_subjects_exist(payload.metadata_subjects.clone(), payload.metadata_language)
         .await;
     match subjects_exist {
         Err(err) => {
@@ -261,10 +255,7 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/api/v1/accessions")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(
-                        http::header::COOKIE,
-                        format!("jwt={}", get_mock_jwt()),
-                    )
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "url": "https://facebook.com/some/story",
@@ -321,10 +312,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/accessions/private/1")
-                    .header(
-                        http::header::COOKIE,
-                        format!("jwt={}", get_mock_jwt()),
-                    )
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -432,10 +420,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/accessions?page=0&per_page=1&lang=english")
-                    .header(
-                        http::header::COOKIE,
-                        format!("jwt={}", get_mock_jwt()),
-                    )
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -475,10 +460,7 @@ mod tests {
                 Request::builder()
                     .method(http::Method::DELETE)
                     .uri("/api/v1/accessions/1")
-                    .header(
-                        http::header::COOKIE,
-                        format!("jwt={}", get_mock_jwt()),
-                    )
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -530,10 +512,7 @@ mod tests {
                     .method(http::Method::PUT)
                     .uri("/api/v1/accessions/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(
-                        http::header::COOKIE,
-                        format!("jwt={}", get_mock_jwt()),
-                    )
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "metadata_language": "english",

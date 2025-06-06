@@ -86,7 +86,7 @@ impl AuthService {
         let jwt = encode(&Header::default(), &claims, &JWT_KEYS.encoding)?;
         let max_age = expiry_time.and_utc().timestamp().to_string();
         let cookie_string = if self.jwt_cookie_domain == "localhost" {
-             format!(
+            format!(
                 "jwt={}; Path=/; SameSite=Strict; Secure; Max-Age={}",
                 jwt, max_age
             )
