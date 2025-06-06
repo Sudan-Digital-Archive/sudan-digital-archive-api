@@ -100,10 +100,7 @@ impl BrowsertrixRepo for HTTPBrowsertrixRepo {
             "{}/orgs/{}/crawls/{job_run_id}/replay.json",
             self.base_url, self.org_id
         );
-        let req = self
-            .client
-            .get(get_wacz_url.clone())
-            .bearer_auth(self.access_token.read().await.clone());
+        let req = self.client.get(get_wacz_url.clone());
         let get_wacz_url_resp = self.make_request(req).await?;
         let get_wacz_url_resp_json: GetWaczUrlResponse = get_wacz_url_resp.json().await?;
         let wacz_url = &get_wacz_url_resp_json.resources[0].path;
@@ -111,9 +108,11 @@ impl BrowsertrixRepo for HTTPBrowsertrixRepo {
     }
 
     async fn make_request(&self, req: RequestBuilder) -> Result<Response, Error> {
-        let mut resp = req
+        let original_req = req
             .try_clone()
-            .expect("Requests should not be made with streams fool")
+            .expect("Requests should not be made with streams fool");
+        let mut resp = original_req
+            .bearer_auth(self.access_token.read().await)
             .send()
             .await?;
         if resp.status() == StatusCode::UNAUTHORIZED {
@@ -158,8 +157,7 @@ impl BrowsertrixRepo for HTTPBrowsertrixRepo {
         let create_crawl_req = self
             .client
             .post(self.create_crawl_url.clone())
-            .json(&json_payload)
-            .bearer_auth(self.access_token.read().await.clone());
+            .json(&json_payload);
         let create_crawl_resp = self.make_request(create_crawl_req).await?;
         let create_crawl_resp_json: CreateCrawlResponse = create_crawl_resp.json().await?;
         Ok(create_crawl_resp_json)
@@ -170,10 +168,7 @@ impl BrowsertrixRepo for HTTPBrowsertrixRepo {
             "{}/orgs/{}/crawlconfigs/{crawl_id}",
             self.base_url, self.org_id
         );
-        let get_crawl_req = self
-            .client
-            .get(get_crawl_status_url.clone())
-            .bearer_auth(self.access_token.read().await.clone());
+        let get_crawl_req = self.client.get(get_crawl_status_url.clone());
         let get_crawl_resp = self.make_request(get_crawl_req).await?;
         let get_crawl_resp_json: GetCrawlResponse = get_crawl_resp.json().await?;
         Ok(get_crawl_resp_json.last_crawl_state)

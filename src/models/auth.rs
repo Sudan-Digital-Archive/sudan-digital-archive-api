@@ -66,10 +66,12 @@ where
         let mut validation = Validation::default();
         validation.validate_exp = true;
 
-        let token_data = decode::<JWTClaims>(&token, &JWT_KEYS.decoding, &validation)
-            .map_err(|e| match e.kind() {
-                ExpiredSignature => AuthError::TokenExpired,
-                _ => AuthError::InvalidToken,
+        let token_data =
+            decode::<JWTClaims>(&token, &JWT_KEYS.decoding, &validation).map_err(|e| {
+                match e.kind() {
+                    ExpiredSignature => AuthError::TokenExpired,
+                    _ => AuthError::InvalidToken,
+                }
             })?;
 
         let claims = token_data.claims;
