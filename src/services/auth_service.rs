@@ -48,7 +48,7 @@ impl AuthService {
 
     pub async fn send_login_email(self, session_id: Uuid, user_id: Uuid, user_email: String) {
         let email_body = format!(
-            "Click here to login: https://sudandigitalarchive.com/jwt-auth?sessionId={}&userId={}",
+            "<a href='https://sudandigitalarchive.com/jwt-auth?sessionId={}&userId={}'>Click to login!</a>",
             session_id, user_id
         );
         let result = self
