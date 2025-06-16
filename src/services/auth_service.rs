@@ -74,12 +74,12 @@ impl AuthService {
 
     pub fn build_auth_cookie_string(
         self,
-        user_id: Uuid,
+        user_email: String,
         role: Role,
         expiry_time: NaiveDateTime,
     ) -> Result<String, Error> {
         let claims = JWTClaims {
-            sub: user_id.to_string(),
+            sub: user_email,
             exp: expiry_time.and_utc().timestamp() as usize,
             role,
         };
@@ -121,7 +121,7 @@ impl AuthService {
                     Some(user) => {
                         let cookie_string_result = self
                             .clone()
-                            .build_auth_cookie_string(payload.user_id, user.role, sesh_exists)
+                            .build_auth_cookie_string(user.email, user.role, sesh_exists)
                             .map_err(|err| format!("Failed to build cookie string: {}", err))?;
 
                         let mut headers = HeaderMap::new();

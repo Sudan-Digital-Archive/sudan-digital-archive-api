@@ -61,7 +61,7 @@ pub trait AccessionsRepo: Send + Sync {
         crawl_id: Uuid,
         job_run_id: String,
         crawl_status: CrawlStatus,
-    ) -> Result<(), DbErr>;
+    ) -> Result<i32, DbErr>;
 
     /// Retrieves an accession record by its ID along with associated metadata.
     async fn get_one(
@@ -106,7 +106,7 @@ impl AccessionsRepo for DBAccessionsRepo {
         crawl_id: Uuid,
         job_run_id: String,
         crawl_status: CrawlStatus,
-    ) -> Result<(), DbErr> {
+    ) -> Result<i32, DbErr> {
         let txn = self.db_session.begin().await?;
         let (dublin_metadata_en_id, dublin_metadata_ar_id) = match create_accession_request
             .metadata_language
@@ -170,9 +170,9 @@ impl AccessionsRepo for DBAccessionsRepo {
             seed_url: ActiveValue::Set(create_accession_request.url),
             is_private: ActiveValue::Set(create_accession_request.is_private),
         };
-        accession.save(&txn).await?;
+        accession.clone().save(&txn).await?;
         txn.commit().await?;
-        Ok(())
+        Ok(*accession.id.as_ref())
     }
 
     async fn get_one(

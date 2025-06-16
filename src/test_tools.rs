@@ -47,8 +47,8 @@ impl AccessionsRepo for InMemoryAccessionsRepo {
         _crawl_id: Uuid,
         _job_run_id: String,
         _crawl_status: CrawlStatus,
-    ) -> Result<(), DbErr> {
-        Ok(())
+    ) -> Result<i32, DbErr> {
+        Ok(10)
     }
 
     /// Returns a predefined mock accession.
@@ -241,9 +241,11 @@ impl BrowsertrixRepo for InMemoryBrowsertrixRepo {
 pub fn build_test_accessions_service() -> AccessionsService {
     let accessions_repo = Arc::new(InMemoryAccessionsRepo::default());
     let browsertrix_repo = Arc::new(InMemoryBrowsertrixRepo {});
+    let emails_repo = Arc::new(InMemoryEmailsRepo::default());
     AccessionsService {
         accessions_repo,
         browsertrix_repo,
+        emails_repo,
     }
 }
 
@@ -338,7 +340,7 @@ pub fn mock_paginated_subjects_ar() -> (Vec<DublinMetadataSubjectArModel>, u64) 
 pub fn get_mock_jwt() -> String {
     let expiry_time: DateTime<Utc> = Utc::now() + chrono::Duration::hours(24);
     let claims = JWTClaims {
-        sub: "some user id".to_string(),
+        sub: "someuser@gmail.com".to_string(),
         exp: expiry_time.timestamp() as usize,
         role: Role::Admin,
     };

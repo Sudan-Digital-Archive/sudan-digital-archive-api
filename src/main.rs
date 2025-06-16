@@ -60,6 +60,7 @@ async fn main() {
     let accessions_service = AccessionsService {
         accessions_repo: Arc::new(accessions_repo),
         browsertrix_repo: Arc::new(http_btrix_repo),
+        emails_repo: Arc::new(emails_repo.clone()),
     };
     let auth_service = AuthService {
         auth_repo: Arc::new(auth_repo),
