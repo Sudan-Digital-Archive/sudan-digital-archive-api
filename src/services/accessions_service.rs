@@ -3,7 +3,6 @@
 //! This module handles the business logic for creating, retrieving, and listing
 //! archival records, including their associated web crawls and metadata in both
 //! Arabic and English.
-use crate::models::auth::JWTClaims;
 use crate::models::request::AccessionPaginationWithPrivate;
 use crate::models::request::{CreateAccessionRequest, CreateCrawlRequest, UpdateAccessionRequest};
 use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
@@ -124,8 +123,8 @@ impl AccessionsService {
     ///
     /// # Arguments
     /// * `payload` - The creation request containing URL and metadata
-    /// * `claims` - JWT claims containing user information
-    pub async fn create_one(self, payload: CreateAccessionRequest, claims: JWTClaims) {
+    /// * `user_email` - Email address to send user to upon successful crawl
+    pub async fn create_one(self, payload: CreateAccessionRequest, user_email: String) {
         let create_crawl_request = CreateCrawlRequest {
             url: payload.url.clone(),
             browser_profile: payload.browser_profile.clone(),
@@ -189,7 +188,7 @@ impl AccessionsService {
                                         let email_result = self
                                             .emails_repo
                                             .send_email(
-                                                claims.sub,
+                                                user_email,
                                                 "Your URL has been archived!".to_string(),
                                                 email_body,
                                             )

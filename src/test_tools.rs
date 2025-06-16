@@ -348,12 +348,3 @@ pub fn get_mock_jwt() -> String {
         encode(&Header::default(), &claims, &JWT_KEYS.encoding).expect("Failed to encode JWT");
     jwt
 }
-
-pub fn get_mock_jwt_claims() -> JWTClaims {
-    let expiry_time: DateTime<Utc> = Utc::now() + chrono::Duration::hours(24);
-    JWTClaims {
-        sub: "someuser@gmail.com".to_string(),
-        exp: expiry_time.timestamp() as usize,
-        role: Role::Admin,
-    }
-}

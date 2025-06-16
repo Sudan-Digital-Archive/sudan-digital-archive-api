@@ -62,7 +62,10 @@ async fn create_accession(
         }
     };
     tokio::spawn(async move {
-        state.accessions_service.create_one(payload, claims).await;
+        state
+            .accessions_service
+            .create_one(payload, claims.sub)
+            .await;
     });
     (StatusCode::CREATED, "Started browsertrix crawl task!").into_response()
 }
@@ -166,7 +169,7 @@ mod tests {
     use crate::models::request::CreateAccessionRequest;
     use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
     use crate::test_tools::{
-        build_test_accessions_service, build_test_app, get_mock_jwt, get_mock_jwt_claims,
+        build_test_accessions_service, build_test_app, get_mock_jwt,
         mock_one_accession_with_metadata, mock_paginated_ar, mock_paginated_en,
     };
     use axum::{
@@ -193,7 +196,7 @@ mod tests {
                     metadata_subjects: vec![1, 2, 3],
                     is_private: false,
                 },
-                get_mock_jwt_claims(),
+                "archiver@gmail.com".to_string(),
             )
             .await;
     }
@@ -213,7 +216,7 @@ mod tests {
                     browser_profile: None,
                     is_private: true,
                 },
-                get_mock_jwt_claims(),
+                "emailsare4eva@aol.com".to_string(),
             )
             .await;
     }
