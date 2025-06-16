@@ -3,11 +3,13 @@
 //! This module handles the business logic for creating, retrieving, and listing
 //! archival records, including their associated web crawls and metadata in both
 //! Arabic and English.
+use crate::models::auth::JWTClaims;
 use crate::models::request::AccessionPaginationWithPrivate;
 use crate::models::request::{CreateAccessionRequest, CreateCrawlRequest, UpdateAccessionRequest};
 use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use crate::repos::accessions_repo::AccessionsRepo;
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
+use crate::repos::emails_repo::EmailsRepo;
 use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -24,6 +26,7 @@ use tracing::{error, info};
 pub struct AccessionsService {
     pub accessions_repo: Arc<dyn AccessionsRepo>,
     pub browsertrix_repo: Arc<dyn BrowsertrixRepo>,
+    pub emails_repo: Arc<dyn EmailsRepo>,
 }
 
 impl AccessionsService {
@@ -121,7 +124,8 @@ impl AccessionsService {
     ///
     /// # Arguments
     /// * `payload` - The creation request containing URL and metadata
-    pub async fn create_one(self, payload: CreateAccessionRequest) {
+    /// * `claims` - JWT claims containing user information
+    pub async fn create_one(self, payload: CreateAccessionRequest, claims: JWTClaims) {
         let create_crawl_request = CreateCrawlRequest {
             url: payload.url.clone(),
             browser_profile: payload.browser_profile.clone(),
@@ -153,7 +157,7 @@ impl AccessionsService {
                                     .metadata_description
                                     .map(|description| description.trim().to_string());
                                 let create_accessions_request = CreateAccessionRequest {
-                                    url: payload.url,
+                                    url: payload.url.clone(),
                                     browser_profile: payload.browser_profile,
                                     metadata_language: payload.metadata_language,
                                     metadata_title: trimmed_title,
@@ -172,8 +176,32 @@ impl AccessionsService {
                                         CrawlStatus::Complete,
                                     )
                                     .await;
-                                if let Err(err) = write_result {
-                                    error!(%err, "Error occurred writing crawl result to db!");
+                                match write_result {
+                                    Err(err) => {
+                                        error!(%err, "Error occurred writing crawl result to db!");
+                                    }
+                                    Ok(id) => {
+                                        info!("Crawl result written to db successfully");
+                                        let email_body = format!(
+            "<a href='https://sudandigitalarchive.com/archive/{}?isPrivate={}&lang={}'>We have archived your url {}</a>",
+            id, payload.url, payload.is_private,payload.metadata_language
+        );
+                                        let email_result = self
+                                            .emails_repo
+                                            .send_email(
+                                                claims.sub,
+                                                "Your URL has been archived!".to_string(),
+                                                email_body,
+                                            )
+                                            .await;
+                                        info!(
+                                            "Email sent to user with id {id} for url {}",
+                                            payload.url
+                                        );
+                                        if let Err(err) = email_result {
+                                            error!(%err, "Error occurred sending email to user");
+                                        }
+                                    }
                                 }
                                 break;
                             } else {

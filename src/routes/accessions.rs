@@ -40,7 +40,7 @@ async fn create_accession(
     State(state): State<AppState>,
     // TODO: Later should add a role like researcher and validate user has
     // researcher or admin role
-    _claims: JWTClaims,
+    claims: JWTClaims,
     Json(payload): Json<CreateAccessionRequest>,
 ) -> Response {
     if let Err(err) = payload.validate() {
@@ -62,7 +62,7 @@ async fn create_accession(
         }
     };
     tokio::spawn(async move {
-        state.accessions_service.create_one(payload).await;
+        state.accessions_service.create_one(payload, claims).await;
     });
     (StatusCode::CREATED, "Started browsertrix crawl task!").into_response()
 }
@@ -166,7 +166,7 @@ mod tests {
     use crate::models::request::CreateAccessionRequest;
     use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
     use crate::test_tools::{
-        build_test_accessions_service, build_test_app, get_mock_jwt,
+        build_test_accessions_service, build_test_app, get_mock_jwt, get_mock_jwt_claims,
         mock_one_accession_with_metadata, mock_paginated_ar, mock_paginated_en,
     };
     use axum::{
@@ -182,16 +182,19 @@ mod tests {
     async fn run_one_crawl() {
         let accessions_service = build_test_accessions_service();
         accessions_service
-            .create_one(CreateAccessionRequest {
-                url: "".to_string(),
-                metadata_language: MetadataLanguage::English,
-                metadata_title: "".to_string(),
-                metadata_description: Some("".to_string()),
-                metadata_time: Default::default(),
-                browser_profile: None,
-                metadata_subjects: vec![1, 2, 3],
-                is_private: false,
-            })
+            .create_one(
+                CreateAccessionRequest {
+                    url: "".to_string(),
+                    metadata_language: MetadataLanguage::English,
+                    metadata_title: "".to_string(),
+                    metadata_description: Some("".to_string()),
+                    metadata_time: Default::default(),
+                    browser_profile: None,
+                    metadata_subjects: vec![1, 2, 3],
+                    is_private: false,
+                },
+                get_mock_jwt_claims(),
+            )
             .await;
     }
 
@@ -199,16 +202,19 @@ mod tests {
     async fn run_one_crawl_without_description() {
         let accessions_service = build_test_accessions_service();
         accessions_service
-            .create_one(CreateAccessionRequest {
-                url: "".to_string(),
-                metadata_language: MetadataLanguage::English,
-                metadata_title: "".to_string(),
-                metadata_subjects: vec![1, 2, 3],
-                metadata_description: None,
-                metadata_time: Default::default(),
-                browser_profile: None,
-                is_private: true,
-            })
+            .create_one(
+                CreateAccessionRequest {
+                    url: "".to_string(),
+                    metadata_language: MetadataLanguage::English,
+                    metadata_title: "".to_string(),
+                    metadata_subjects: vec![1, 2, 3],
+                    metadata_description: None,
+                    metadata_time: Default::default(),
+                    browser_profile: None,
+                    is_private: true,
+                },
+                get_mock_jwt_claims(),
+            )
             .await;
     }
     #[tokio::test]
