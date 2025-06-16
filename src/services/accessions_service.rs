@@ -183,7 +183,7 @@ impl AccessionsService {
                                         info!("Crawl result written to db successfully");
                                         let email_body = format!(
             "<a href='https://sudandigitalarchive.com/archive/{}?isPrivate={}&lang={}'>We have archived your url {}</a>",
-            id, payload.url, payload.is_private,payload.metadata_language
+            id, payload.is_private,payload.metadata_language, payload.url
         );
                                         let email_result = self
                                             .emails_repo
