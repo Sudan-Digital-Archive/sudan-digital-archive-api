@@ -263,13 +263,10 @@ impl AccessionsRepo for DBAccessionsRepo {
     ) -> Result<Option<AccessionWithMetadataModel>, DbErr> {
         let txn = self.db_session.begin().await?;
         let accession = Accession::find_by_id(id).one(&self.db_session).await?;
-
         match accession {
             Some(accession) => {
                 let mut accession_active: AccessionActiveModel = accession.clone().into();
-                let (dublin_metadata_en_id, dublin_metadata_ar_id) = match update_accession_request
-                    .metadata_language
-                {
+                match update_accession_request.metadata_language {
                     MetadataLanguage::English => {
                         let metadata = DublinMetadataEnActiveModel {
                             id: match accession.dublin_metadata_en {
@@ -298,7 +295,7 @@ impl AccessionsRepo for DBAccessionsRepo {
                         DublinMetadataSubjectsEn::insert_many(new_subject_links)
                             .exec(&txn)
                             .await?;
-                        (Some(metadata_id), None)
+                        accession_active.dublin_metadata_en = ActiveValue::Set(Some(metadata_id));
                     }
                     MetadataLanguage::Arabic => {
                         let metadata = DublinMetadataArActiveModel {
@@ -328,12 +325,9 @@ impl AccessionsRepo for DBAccessionsRepo {
                         DublinMetadataSubjectsAr::insert_many(new_subject_links)
                             .exec(&txn)
                             .await?;
-                        (None, Some(metadata_id))
+                        accession_active.dublin_metadata_ar = ActiveValue::Set(Some(metadata_id));
                     }
                 };
-
-                accession_active.dublin_metadata_en = ActiveValue::Set(dublin_metadata_en_id);
-                accession_active.dublin_metadata_ar = ActiveValue::Set(dublin_metadata_ar_id);
                 accession_active.dublin_metadata_date =
                     ActiveValue::Set(update_accession_request.metadata_time);
                 accession_active.is_private = ActiveValue::Set(update_accession_request.is_private);
