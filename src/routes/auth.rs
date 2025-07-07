@@ -51,7 +51,7 @@ async fn authorize(
     match auth_result {
         Ok(response) => response,
         Err(err) => {
-            let message = format!("Server error occurred: {}", err);
+            let message = format!("Server error occurred: {err}");
             error!(message);
             (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
         }

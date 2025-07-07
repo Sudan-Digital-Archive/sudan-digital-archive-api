@@ -48,9 +48,7 @@ impl AuthService {
 
     pub async fn send_login_email(self, session_id: Uuid, user_id: Uuid, user_email: String) {
         let email_body = format!(
-            "<a href='https://sudandigitalarchive.com/jwt-auth?sessionId={}&userId={}'>Click to login!</a>",
-            session_id, user_id
-        );
+            "<a href='https://sudandigitalarchive.com/jwt-auth?sessionId={session_id}&userId={user_id}'>Click to login!</a>"        );
         let result = self
             .emails_repo
             .send_email(
@@ -86,14 +84,11 @@ impl AuthService {
         let jwt = encode(&Header::default(), &claims, &JWT_KEYS.encoding)?;
         let max_age = expiry_time.and_utc().timestamp().to_string();
         let cookie_string = if self.jwt_cookie_domain == "localhost" {
-            format!(
-                "jwt={}; Path=/; SameSite=Strict; Secure; Max-Age={}",
-                jwt, max_age
-            )
+            format!("jwt={jwt}; Path=/; SameSite=Strict; Secure; Max-Age={max_age}")
         } else {
             format!(
-                "jwt={}; HttpOnly; Secure; Domain={}; Path=/; Max-Age={}; SameSite=Strict",
-                jwt, self.jwt_cookie_domain, max_age
+                "jwt={jwt}; HttpOnly; Secure; Domain={}; Path=/; Max-Age={max_age}; SameSite=Strict",
+                self.jwt_cookie_domain
             )
         };
         Ok(cookie_string)
@@ -108,25 +103,25 @@ impl AuthService {
             .clone()
             .get_session_expiry(payload.clone())
             .await
-            .map_err(|err| format!("Failed to get session expiry: {}", err))?;
+            .map_err(|err| format!("Failed to get session expiry: {err}"))?;
 
         match session_expiry_time_result {
             Some(sesh_exists) => {
                 let user_result = self
                     .get_user(payload.user_id)
                     .await
-                    .map_err(|err| format!("Failed to get user: {}", err))?;
+                    .map_err(|err| format!("Failed to get user: {err}"))?;
 
                 match user_result {
                     Some(user) => {
                         let cookie_string_result = self
                             .clone()
                             .build_auth_cookie_string(user.email, user.role, sesh_exists)
-                            .map_err(|err| format!("Failed to build cookie string: {}", err))?;
+                            .map_err(|err| format!("Failed to build cookie string: {err}"))?;
 
                         let mut headers = HeaderMap::new();
                         let header_value_result = HeaderValue::from_str(&cookie_string_result)
-                            .map_err(|err| format!("Failed to create cookie header: {}", err))?;
+                            .map_err(|err| format!("Failed to create cookie header: {err}"))?;
 
                         headers.insert(SET_COOKIE, header_value_result);
                         Ok((StatusCode::OK, headers, "Authentication successful").into_response())
@@ -151,7 +146,7 @@ impl AuthService {
             .clone()
             .log_user_in(payload.clone())
             .await
-            .map_err(|err| format!("Database error: {}", err))?;
+            .map_err(|err| format!("Database error: {err}"))?;
 
         match login_result {
             Some((session_id, user_id)) => {

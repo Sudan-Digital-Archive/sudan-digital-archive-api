@@ -46,8 +46,8 @@ pub fn build_app_config() -> AppConfig {
     let org_uuid = Uuid::parse_str(&org_id).expect("Could not parse browsertrix org id to uuid");
     let base_url = env::var("BROWSERTRIX_BROWSERTRIX_URL")
         .expect("Missing BROWSERTRIX_BROWSERTRIX_URL env var");
-    let login_url = format!("{}/auth/jwt/login", base_url);
-    let create_crawl_url = format!("{}/orgs/{}/crawlconfigs/", base_url, org_uuid);
+    let login_url = format!("{base_url}/auth/jwt/login");
+    let create_crawl_url = format!("{base_url}/orgs/{org_uuid}/crawlconfigs/");
     let browsertrix = BrowsertrixConfig {
         username,
         password,
