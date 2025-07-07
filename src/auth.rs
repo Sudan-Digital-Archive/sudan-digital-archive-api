@@ -26,7 +26,7 @@ pub static JWT_KEYS: Lazy<JWTKeys> = Lazy::new(|| {
         }
         Err(e) => {
             error!("Missing JWT_SECRET env var: {}", e);
-            panic!("Missing JWT_SECRET env var: {}", e);
+            panic!("Missing JWT_SECRET env var: {e}");
         }
     };
     let secret_bytes = secret.as_bytes();

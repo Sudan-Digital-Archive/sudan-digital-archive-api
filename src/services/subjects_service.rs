@@ -180,8 +180,7 @@ impl SubjectsService {
                     return (
                         StatusCode::BAD_REQUEST,
                         format!(
-                            "Subject with id {} is being referenced by another table",
-                            subject_id
+                            "Subject with id {subject_id} is being referenced by another table"
                         ),
                     )
                         .into_response();

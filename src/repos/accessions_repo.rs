@@ -170,9 +170,9 @@ impl AccessionsRepo for DBAccessionsRepo {
             seed_url: ActiveValue::Set(create_accession_request.url),
             is_private: ActiveValue::Set(create_accession_request.is_private),
         };
-        accession.clone().save(&txn).await?;
+        let saved_accession = accession.clone().save(&txn).await?;
         txn.commit().await?;
-        Ok(*accession.id.as_ref())
+        Ok(*saved_accession.id.as_ref())
     }
 
     async fn get_one(
