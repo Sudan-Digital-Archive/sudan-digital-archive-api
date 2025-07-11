@@ -20,12 +20,12 @@ pub enum BrowserProfile {
 }
 
 /// Display implementation for MetadataLanguage. Mostly exists
-/// for logging and debugging purposes.
+/// for string interpolation, logging and debugging.
 impl fmt::Display for MetadataLanguage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            MetadataLanguage::English => write!(f, "english"),
-            MetadataLanguage::Arabic => write!(f, "arabic"),
+            MetadataLanguage::English => write!(f, "en"),
+            MetadataLanguage::Arabic => write!(f, "ar"),
         }
     }
 }
