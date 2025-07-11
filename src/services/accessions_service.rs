@@ -181,17 +181,15 @@ impl AccessionsService {
                                     }
                                     Ok(id) => {
                                         info!("Crawl result written to db successfully");
+                                        let email_subject =
+                                            format!("Your URL {} has been archived!", payload.url);
                                         let email_body = format!(
-            "<a href='https://sudandigitalarchive.com/archive/{}?isPrivate={}&lang={}'>We have archived your url {}</a>",
-            id, payload.is_private,payload.metadata_language, payload.url
-        );
+                                            "We have archived your <a href='https://sudandigitalarchive.com/archive/{}?isPrivate={}&lang={}'>url</a>.",
+                                            id, payload.is_private, payload.metadata_language
+                                        );
                                         let email_result = self
                                             .emails_repo
-                                            .send_email(
-                                                user_email,
-                                                "Your URL has been archived!".to_string(),
-                                                email_body,
-                                            )
+                                            .send_email(user_email, email_subject, email_body)
                                             .await;
                                         info!(
                                             "Email sent to user with id {id} for url {}",
