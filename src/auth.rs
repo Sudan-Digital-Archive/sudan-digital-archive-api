@@ -38,10 +38,7 @@ pub static JWT_KEYS: Lazy<JWTKeys> = Lazy::new(|| {
 /// Validates that a user has at least researcher permissions.
 /// Returns true if the role is Admin or Researcher, false otherwise.
 pub fn validate_at_least_researcher(role: &Role) -> bool {
-    match role {
-        Role::Admin | Role::Researcher => true,
-        _ => false,
-    }
+    matches!(role, Role::Admin | Role::Researcher)
 }
 
 #[cfg(test)]
