@@ -4,6 +4,7 @@
 //! It uses in-memory repositories for testing to avoid I/O operations.
 
 use crate::app_factory::AppState;
+use crate::auth::validate_at_least_researcher;
 use crate::models::auth::JWTClaims;
 use crate::models::request::{
     AccessionPagination, AccessionPaginationWithPrivate, CreateAccessionRequest,
@@ -17,7 +18,6 @@ use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use axum_extra::extract::Query;
 use validator::Validate;
-
 /// Creates routes for accession-related endpoints under `/accessions`.
 pub fn get_accessions_routes() -> Router<AppState> {
     Router::new().nest(
@@ -38,11 +38,12 @@ pub fn get_accessions_routes() -> Router<AppState> {
 /// Returns a 201 CREATED status on success, or 400 BAD REQUEST if validation fails.
 async fn create_accession(
     State(state): State<AppState>,
-    // TODO: Later should add a role like researcher and validate user has
-    // researcher or admin role
     claims: JWTClaims,
     Json(payload): Json<CreateAccessionRequest>,
 ) -> Response {
+    if !validate_at_least_researcher(&claims.role) {
+        return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
+    }
     if let Err(err) = payload.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }
@@ -80,10 +81,11 @@ async fn get_one_accession(State(state): State<AppState>, Path(id): Path<i32>) -
 async fn get_one_private_accession(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-    // TODO: Later should add a role like researcher and validate user has
-    // researcher or admin role
-    _claims: JWTClaims,
+    claims: JWTClaims,
 ) -> Response {
+    if !validate_at_least_researcher(&claims.role) {
+        return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
+    }
     state.accessions_service.get_one(id, true).await
 }
 
@@ -114,10 +116,11 @@ async fn list_accessions(
 async fn list_accessions_private(
     State(state): State<AppState>,
     pagination: Query<AccessionPaginationWithPrivate>,
-    // TODO: Later should add a role like researcher and validate user has
-    // researcher or admin role
-    _claims: JWTClaims,
+    claims: JWTClaims,
 ) -> Response {
+    if !validate_at_least_researcher(&claims.role) {
+        return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
+    }
     if let Err(err) = pagination.0.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }
@@ -140,11 +143,12 @@ async fn delete_accession(
 async fn update_accession(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-    // TODO: Later should add a role like researcher and validate user has
-    // researcher or admin role
-    _claims: JWTClaims,
+    claims: JWTClaims,
     Json(payload): Json<UpdateAccessionRequest>,
 ) -> Response {
+    if !validate_at_least_researcher(&claims.role) {
+        return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
+    }
     let subjects_exist = state
         .subjects_service
         .clone()
