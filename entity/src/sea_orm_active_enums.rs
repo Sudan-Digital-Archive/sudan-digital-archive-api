@@ -20,4 +20,6 @@ pub enum CrawlStatus {
 pub enum Role {
     #[sea_orm(string_value = "admin")]
     Admin,
+    #[sea_orm(string_value = "researcher")]
+    Researcher,
 }
