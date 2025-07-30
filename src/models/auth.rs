@@ -48,10 +48,6 @@ where
     S: Send + Sync,
 {
     type Rejection = AuthError;
-    // TODO: This needs to work with cookies so we can set the JWT with a http only flag
-    // and then just get it from the requests
-    // see https://docs.rs/axum-extra/latest/axum_extra/extract/cookie/struct.CookieJar.html
-    // https://github.com/tokio-rs/axum/discussions/1771
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let cookie_jar = parts
             .extract::<CookieJar>()
