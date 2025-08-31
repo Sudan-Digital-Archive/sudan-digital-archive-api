@@ -13,11 +13,11 @@
 //!
 //! Note: Rate limiting is disabled in test mode.
 
+use crate::open_api_spec::ApiDoc;
 use crate::routes::accessions::get_accessions_routes;
 use crate::routes::auth::get_auth_routes;
-use crate::routes::subjects::get_subjects_routes;
-use crate::open_api_spec::ApiDoc;
 use crate::routes::health::healthcheck;
+use crate::routes::subjects::get_subjects_routes;
 use crate::services::accessions_service::AccessionsService;
 use crate::services::auth_service::AuthService;
 use crate::services::subjects_service::SubjectsService;
@@ -27,6 +27,7 @@ use axum::routing::get;
 use axum::Router;
 use http::header::CONTENT_TYPE;
 use http::{HeaderValue, Method};
+use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use tower::ServiceBuilder;
@@ -38,8 +39,8 @@ use tower_http::{
 };
 use tracing::info_span;
 use tracing_subscriber::util::SubscriberInitExt;
-use utoipa_redoc::{Redoc, Servable};
 use utoipa::OpenApi;
+use utoipa_redoc::{Redoc, Servable};
 
 /// Application state shared across routes
 #[derive(Clone)]
@@ -129,11 +130,10 @@ fn build_routes(api: utoipa::openapi::OpenApi) -> Router<AppState> {
     let subjects_routes = get_subjects_routes();
     let auth_routes = get_auth_routes();
     Router::new()
-        .merge(Redoc::with_url("/redoc", api))
+        .merge(Redoc::with_url_and_config("/redoc", api, || json!({ "hideLogo": true })))
         .nest("/api/v1", accessions_routes)
         .nest("/api/v1", subjects_routes)
         .nest("/api/v1", auth_routes)
         .nest("/health", Router::new().route("/", get(healthcheck)))
         .layer(middleware)
 }
-

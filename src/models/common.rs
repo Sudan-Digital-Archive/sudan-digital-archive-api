@@ -2,9 +2,10 @@
 
 use serde::Deserialize;
 use std::fmt;
+use utoipa::ToSchema;
 
 /// Supported languages for metadata content.
-#[derive(Debug, Default, Deserialize, Clone, Copy)]
+#[derive(Debug, Default, Deserialize, Clone, Copy, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum MetadataLanguage {
     #[default]
@@ -13,7 +14,7 @@ pub enum MetadataLanguage {
 }
 
 /// Supported browser profiles for hard to archive sites
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum BrowserProfile {
     Facebook,

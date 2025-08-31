@@ -1,8 +1,7 @@
-/// Healthcheck route for sassy uptime check reporting
 #[utoipa::path(
     get,
     path = "/health",
-    tag = "Health",
+    tag = "Healthcheck",
     responses(
         (status = 200, description = "Application is healthy", body = String)
     )

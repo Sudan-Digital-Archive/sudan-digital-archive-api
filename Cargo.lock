@@ -905,6 +905,7 @@ version = "0.1.0"
 dependencies = [
  "sea-orm",
  "serde",
+ "utoipa",
 ]
 
 [[package]]
@@ -3862,6 +3863,7 @@ dependencies = [
  "quote",
  "regex",
  "syn 2.0.104",
+ "uuid",
 ]
 
 [[package]]
