@@ -57,7 +57,7 @@ async fn main() {
         access_token: Arc::new(RwLock::new(String::new())),
         create_crawl_url: app_config.browsertrix.create_crawl_url,
     };
-    http_btrix_repo.initialize().await;
+    // http_btrix_repo.initialize().await;
     let accessions_service = AccessionsService {
         accessions_repo: Arc::new(accessions_repo),
         browsertrix_repo: Arc::new(http_btrix_repo),

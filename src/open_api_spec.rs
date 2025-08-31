@@ -5,7 +5,7 @@ use crate::models::request::{
 };
 use crate::models::response::{
     GetOneAccessionResponse, ListAccessionsResponse, ListSubjectsArResponse,
-    ListSubjectsEnResponse, SubjectResponse,
+    ListSubjectsEnResponse, SubjectResponse, GetOneAccessionResponseSchema
 };
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -47,7 +47,7 @@ impl Modify for SecurityAddon {
             AccessionPaginationWithPrivate,
             CreateAccessionRequest,
             UpdateAccessionRequest,
-            GetOneAccessionResponse,
+            GetOneAccessionResponseSchema,
             ListAccessionsResponse,
             LoginRequest,
             AuthorizeRequest,

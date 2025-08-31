@@ -4,6 +4,7 @@
 //! including authentication, crawl operations, and accession management.
 
 use ::entity::accessions_with_metadata::Model as AccessionsWithMetadataModel;
+use ::entity::accessions_with_metadata::AccessionsWithMetadataSchemaModel;
 use ::entity::dublin_metadata_subject_ar::Model as DublinMetadataSubjectArModel;
 use ::entity::dublin_metadata_subject_en::Model as DublinMetadataSubjectEnModel;
 use serde::{Deserialize, Serialize};
@@ -45,11 +46,18 @@ pub struct WaczItem {
 }
 
 /// Response for retrieving a single accession with its metadata.
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct GetOneAccessionResponse {
     pub accession: AccessionsWithMetadataModel,
     pub wacz_url: String,
 }
+
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+pub struct GetOneAccessionResponseSchema {
+    pub accession: AccessionsWithMetadataSchemaModel,
+    pub wacz_url: String,
+}
+
 
 /// Response for listing accessions with pagination.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, ToSchema)]

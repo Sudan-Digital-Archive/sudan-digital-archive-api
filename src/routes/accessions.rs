@@ -10,7 +10,7 @@ use crate::models::request::{
     AccessionPagination, AccessionPaginationWithPrivate, CreateAccessionRequest,
     UpdateAccessionRequest,
 };
-use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
+use crate::models::response::{GetOneAccessionResponseSchema, ListAccessionsResponse};
 use ::entity::sea_orm_active_enums::Role;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -93,7 +93,7 @@ async fn create_accession(
         ("accession_id" = i32, Path, description = "Accession ID")
     ),
     responses(
-        (status = 200, description = "OK", body = GetOneAccessionResponse),
+        (status = 200, description = "OK", body = GetOneAccessionResponseSchema),
         (status = 404, description = "Not found")
     )
 )]
@@ -109,7 +109,7 @@ async fn get_one_accession(State(state): State<AppState>, Path(id): Path<i32>) -
         ("accession_id" = i32, Path, description = "Accession ID")
     ),
     responses(
-        (status = 200, description = "OK", body = GetOneAccessionResponse),
+        (status = 200, description = "OK", body = GetOneAccessionResponseSchema),
         (status = 404, description = "Not found"),
         (status = 403, description = "Forbidden")
     ),
@@ -229,7 +229,7 @@ async fn delete_accession(
     ),
     request_body = UpdateAccessionRequest,
     responses(
-        (status = 200, description = "OK", body = GetOneAccessionResponse),
+        (status = 200, description = "OK", body = GetOneAccessionResponseSchema),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden"),
         (status = 404, description = "Not found")
