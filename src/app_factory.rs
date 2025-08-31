@@ -16,7 +16,7 @@
 use crate::routes::accessions::get_accessions_routes;
 use crate::routes::auth::get_auth_routes;
 use crate::routes::subjects::get_subjects_routes;
-
+use crate::open_api_spec::ApiDoc;
 use crate::routes::health::healthcheck;
 use crate::services::accessions_service::AccessionsService;
 use crate::services::auth_service::AuthService;
@@ -38,8 +38,8 @@ use tower_http::{
 };
 use tracing::info_span;
 use tracing_subscriber::util::SubscriberInitExt;
-use utoipa::OpenApi;
 use utoipa_redoc::{Redoc, Servable};
+use utoipa::OpenApi;
 
 /// Application state shared across routes
 #[derive(Clone)]
@@ -48,18 +48,6 @@ pub struct AppState {
     pub auth_service: AuthService,
     pub subjects_service: SubjectsService,
 }
-
-#[derive(OpenApi)]
-#[openapi(
-    paths(
-        crate::routes::health::healthcheck
-    ),
-    tags(
-        (name = "Healthcheck", description = "Health check endpoints"),
-        (name = "SDA Api", description = "Sudan Digital Archive API")
-    )
-)]
-struct ApiDoc;
 
 /// Creates and configures the main application router with middleware and routes.
 ///
