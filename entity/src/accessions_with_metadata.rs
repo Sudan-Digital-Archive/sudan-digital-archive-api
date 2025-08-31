@@ -3,7 +3,7 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
 #[sea_orm(table_name = "accessions_with_metadata")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -33,6 +33,9 @@ pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
 
+// TODO: Probably need to separate out db from response models
+// Write the response models into models; they just duplicate the db models for now
+// Change service code to serialize those not the db models
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct AccessionsWithMetadataSchemaModel {
     pub id: i32,
