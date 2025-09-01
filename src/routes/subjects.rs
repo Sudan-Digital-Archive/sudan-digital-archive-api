@@ -29,7 +29,6 @@ pub fn get_subjects_routes() -> Router<AppState> {
     )
 }
 
-
 #[utoipa::path(
     post,
     path = "/api/v1/metadata-subjects",
@@ -57,7 +56,6 @@ async fn create_subject(
     }
     state.subjects_service.create_one(payload).await
 }
-
 
 #[utoipa::path(
     get,
@@ -89,7 +87,6 @@ async fn list_subjects(
         )
         .await
 }
-
 
 #[utoipa::path(
     delete,

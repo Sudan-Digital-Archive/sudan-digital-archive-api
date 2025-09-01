@@ -130,7 +130,11 @@ fn build_routes(api: utoipa::openapi::OpenApi) -> Router<AppState> {
     let subjects_routes = get_subjects_routes();
     let auth_routes = get_auth_routes();
     Router::new()
-        .merge(Redoc::with_url_and_config("/redoc", api, || json!({ "hideLogo": true })))
+        .merge(Redoc::with_url_and_config(
+            "/redoc",
+            api,
+            || json!({ "hideLogo": true }),
+        ))
         .nest("/api/v1", accessions_routes)
         .nest("/api/v1", subjects_routes)
         .nest("/api/v1", auth_routes)

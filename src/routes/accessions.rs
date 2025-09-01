@@ -10,7 +10,7 @@ use crate::models::request::{
     AccessionPagination, AccessionPaginationWithPrivate, CreateAccessionRequest,
     UpdateAccessionRequest,
 };
-use crate::models::response::{GetOneAccessionResponseSchema, ListAccessionsResponse};
+use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use ::entity::sea_orm_active_enums::Role;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -84,7 +84,6 @@ async fn create_accession(
     (StatusCode::CREATED, "Started browsertrix crawl task!").into_response()
 }
 
-
 #[utoipa::path(
     get,
     path = "/api/v1/accessions/{accession_id}",
@@ -93,7 +92,7 @@ async fn create_accession(
         ("accession_id" = i32, Path, description = "Accession ID")
     ),
     responses(
-        (status = 200, description = "OK", body = GetOneAccessionResponseSchema),
+        (status = 200, description = "OK", body = GetOneAccessionResponse),
         (status = 404, description = "Not found")
     )
 )]
@@ -109,7 +108,7 @@ async fn get_one_accession(State(state): State<AppState>, Path(id): Path<i32>) -
         ("accession_id" = i32, Path, description = "Accession ID")
     ),
     responses(
-        (status = 200, description = "OK", body = GetOneAccessionResponseSchema),
+        (status = 200, description = "OK", body = GetOneAccessionResponse),
         (status = 404, description = "Not found"),
         (status = 403, description = "Forbidden")
     ),
@@ -127,7 +126,6 @@ async fn get_one_private_accession(
     }
     state.accessions_service.get_one(id, true).await
 }
-
 
 #[utoipa::path(
     get,
@@ -229,7 +227,7 @@ async fn delete_accession(
     ),
     request_body = UpdateAccessionRequest,
     responses(
-        (status = 200, description = "OK", body = GetOneAccessionResponseSchema),
+        (status = 200, description = "OK", body = GetOneAccessionResponse),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden"),
         (status = 404, description = "Not found")
@@ -410,7 +408,7 @@ mod tests {
         let actual: GetOneAccessionResponse = serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_one_accession_with_metadata();
         let expected = GetOneAccessionResponse {
-            accession: mocked_resp,
+            accession: mocked_resp.into(),
             wacz_url: "my url".to_owned(),
         };
         assert_eq!(actual, expected)
@@ -432,9 +430,9 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let actual: GetOneAccessionResponse = serde_json::from_slice(&body).unwrap();
-        let mocked_resp = mock_one_accession_with_metadata();
+        let mocked_query = mock_one_accession_with_metadata();
         let expected = GetOneAccessionResponse {
-            accession: mocked_resp,
+            accession: mocked_query.into(),
             wacz_url: "my url".to_owned(),
         };
         assert_eq!(actual, expected)
@@ -458,7 +456,7 @@ mod tests {
         let actual: GetOneAccessionResponse = serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_one_accession_with_metadata();
         let expected = GetOneAccessionResponse {
-            accession: mocked_resp,
+            accession: mocked_resp.into(),
             wacz_url: "my url".to_owned(),
         };
         assert_eq!(actual, expected)
@@ -646,7 +644,7 @@ mod tests {
         let actual: GetOneAccessionResponse = serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_one_accession_with_metadata();
         let expected = GetOneAccessionResponse {
-            accession: mocked_resp,
+            accession: mocked_resp.into(),
             wacz_url: "my url".to_owned(),
         };
         assert_eq!(actual, expected)
