@@ -51,7 +51,8 @@ impl AccessionsService {
             }
             Ok(rows) => {
                 let resp = ListAccessionsResponse {
-                    items: rows.0,
+                    items: rows.0.into_iter().map(Into::into).collect(),
+
                     num_pages: rows.1,
                     page: params.page,
                     per_page: params.per_page,
@@ -92,7 +93,7 @@ impl AccessionsService {
                 {
                     Ok(wacz_url) => {
                         let resp = GetOneAccessionResponse {
-                            accession,
+                            accession: accession.into(),
                             wacz_url,
                         };
                         Json(resp).into_response()

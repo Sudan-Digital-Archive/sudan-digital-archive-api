@@ -2,6 +2,7 @@ mod app_factory;
 mod auth;
 mod config;
 mod models;
+mod open_api_spec;
 mod repos;
 mod routes;
 mod services;

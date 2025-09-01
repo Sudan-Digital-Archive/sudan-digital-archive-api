@@ -25,6 +25,17 @@ pub fn get_auth_routes() -> Router<AppState> {
     )
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth",
+    tag = "Auth",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "OK"),
+        (status = 400, description = "Bad request"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>) -> Response {
     if let Err(err) = payload.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
@@ -42,6 +53,17 @@ async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>)
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/authorize",
+    tag = "Auth",
+    request_body = AuthorizeRequest,
+    responses(
+        (status = 200, description = "OK"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 async fn authorize(
     State(state): State<AppState>,
     Json(payload): Json<AuthorizeRequest>,
@@ -58,6 +80,18 @@ async fn authorize(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth",
+    tag = "Auth",
+    responses(
+        (status = 200, description = "OK", body = String),
+        (status = 401, description = "Unauthorized")
+    ),
+    security(
+        ("jwt_cookie_auth" = [])
+    )
+)]
 async fn verify(State(_state): State<AppState>, claims: JWTClaims) -> Response {
     let user_data = format!("Verifying your JWT...\nYour data:\n{claims}");
     (StatusCode::OK, user_data).into_response()

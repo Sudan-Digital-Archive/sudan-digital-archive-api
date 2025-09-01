@@ -84,7 +84,7 @@ impl SubjectsService {
                 {
                     Ok(rows) => {
                         let list_subjects_resp = ListSubjectsArResponse {
-                            items: rows.0,
+                            items: rows.0.into_iter().map(Into::into).collect(),
                             num_pages: rows.1,
                             page,
                             per_page,
@@ -106,7 +106,7 @@ impl SubjectsService {
                 {
                     Ok(rows) => {
                         let list_subjects_resp = ListSubjectsEnResponse {
-                            items: rows.0,
+                            items: rows.0.into_iter().map(Into::into).collect(),
                             num_pages: rows.1,
                             page,
                             per_page,

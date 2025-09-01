@@ -13,11 +13,11 @@
 //!
 //! Note: Rate limiting is disabled in test mode.
 
+use crate::open_api_spec::ApiDoc;
 use crate::routes::accessions::get_accessions_routes;
 use crate::routes::auth::get_auth_routes;
-use crate::routes::subjects::get_subjects_routes;
-
 use crate::routes::health::healthcheck;
+use crate::routes::subjects::get_subjects_routes;
 use crate::services::accessions_service::AccessionsService;
 use crate::services::auth_service::AuthService;
 use crate::services::subjects_service::SubjectsService;
@@ -27,6 +27,7 @@ use axum::routing::get;
 use axum::Router;
 use http::header::CONTENT_TYPE;
 use http::{HeaderValue, Method};
+use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use tower::ServiceBuilder;
@@ -38,6 +39,8 @@ use tower_http::{
 };
 use tracing::info_span;
 use tracing_subscriber::util::SubscriberInitExt;
+use utoipa::OpenApi;
+use utoipa_redoc::{Redoc, Servable};
 
 /// Application state shared across routes
 #[derive(Clone)]
@@ -81,7 +84,7 @@ pub fn create_app(app_state: AppState, cors_origins: Vec<HeaderValue>, test: boo
         .allow_origin(cors_origins)
         .allow_headers([CONTENT_TYPE])
         .allow_credentials(true);
-    let all_routes: Router<AppState> = build_routes();
+    let all_routes: Router<AppState> = build_routes(ApiDoc::openapi());
     let base_routes = all_routes.layer(cors);
     // rate limiting breaks tests *sigh* #security #pita
     if test {
@@ -104,7 +107,7 @@ pub fn create_app(app_state: AppState, cors_origins: Vec<HeaderValue>, test: boo
 /// - JSON content type validation
 /// - Health check endpoint
 /// - API routes
-fn build_routes() -> Router<AppState> {
+fn build_routes(api: utoipa::openapi::OpenApi) -> Router<AppState> {
     let middleware = ServiceBuilder::new()
         .layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
@@ -127,6 +130,11 @@ fn build_routes() -> Router<AppState> {
     let subjects_routes = get_subjects_routes();
     let auth_routes = get_auth_routes();
     Router::new()
+        .merge(Redoc::with_url_and_config(
+            "/redoc",
+            api,
+            || json!({ "hideLogo": true }),
+        ))
         .nest("/api/v1", accessions_routes)
         .nest("/api/v1", subjects_routes)
         .nest("/api/v1", auth_routes)

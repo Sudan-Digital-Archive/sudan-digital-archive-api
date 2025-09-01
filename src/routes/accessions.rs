@@ -10,6 +10,7 @@ use crate::models::request::{
     AccessionPagination, AccessionPaginationWithPrivate, CreateAccessionRequest,
     UpdateAccessionRequest,
 };
+use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use ::entity::sea_orm_active_enums::Role;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -18,6 +19,7 @@ use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use axum_extra::extract::Query;
 use validator::Validate;
+
 /// Creates routes for accession-related endpoints under `/accessions`.
 pub fn get_accessions_routes() -> Router<AppState> {
     Router::new().nest(
@@ -33,9 +35,20 @@ pub fn get_accessions_routes() -> Router<AppState> {
     )
 }
 
-/// Creates a new accession and initiates a web crawl task.
-///
-/// Returns a 201 CREATED status on success, or 400 BAD REQUEST if validation fails.
+#[utoipa::path(
+    post,
+    path = "/api/v1/accessions",
+    tag = "Accessions",
+    request_body = CreateAccessionRequest,
+    responses(
+        (status = 201, description = "Started browsertrix crawl task!"),
+        (status = 400, description = "Bad request"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("jwt_cookie_auth" = [])
+    )
+)]
 async fn create_accession(
     State(state): State<AppState>,
     claims: JWTClaims,
@@ -71,13 +84,38 @@ async fn create_accession(
     (StatusCode::CREATED, "Started browsertrix crawl task!").into_response()
 }
 
-/// Retrieves a single accession by its ID.
-///
-/// Returns the accession details if found, or appropriate error response if not found.
+#[utoipa::path(
+    get,
+    path = "/api/v1/accessions/{accession_id}",
+    tag = "Accessions",
+    params(
+        ("accession_id" = i32, Path, description = "Accession ID")
+    ),
+    responses(
+        (status = 200, description = "OK", body = GetOneAccessionResponse),
+        (status = 404, description = "Not found")
+    )
+)]
 async fn get_one_accession(State(state): State<AppState>, Path(id): Path<i32>) -> Response {
     state.accessions_service.get_one(id, false).await
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/accessions/private/{accession_id}",
+    tag = "Accessions",
+    params(
+        ("accession_id" = i32, Path, description = "Accession ID")
+    ),
+    responses(
+        (status = 200, description = "OK", body = GetOneAccessionResponse),
+        (status = 404, description = "Not found"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("jwt_cookie_auth" = [])
+    )
+)]
 async fn get_one_private_accession(
     State(state): State<AppState>,
     Path(id): Path<i32>,
@@ -89,10 +127,18 @@ async fn get_one_private_accession(
     state.accessions_service.get_one(id, true).await
 }
 
-/// Lists accessions with pagination and filtering support.
-///
-/// Supports filtering by language, date range, and search terms.
-/// Returns 400 BAD REQUEST if pagination parameters are invalid.
+#[utoipa::path(
+    get,
+    path = "/api/v1/accessions",
+    tag = "Accessions",
+    params(
+        AccessionPagination
+    ),
+    responses(
+        (status = 200, description = "OK", body = ListAccessionsResponse),
+        (status = 400, description = "Bad request")
+    )
+)]
 async fn list_accessions(
     State(state): State<AppState>,
     pagination: Query<AccessionPagination>,
@@ -113,6 +159,22 @@ async fn list_accessions(
     state.accessions_service.list(list_params).await
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/accessions/private",
+    tag = "Accessions",
+    params(
+        AccessionPaginationWithPrivate
+    ),
+    responses(
+        (status = 200, description = "OK", body = ListAccessionsResponse),
+        (status = 400, description = "Bad request"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("jwt_cookie_auth" = [])
+    )
+)]
 async fn list_accessions_private(
     State(state): State<AppState>,
     pagination: Query<AccessionPaginationWithPrivate>,
@@ -128,6 +190,22 @@ async fn list_accessions_private(
     state.accessions_service.list(pagination.0).await
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/accessions/{accession_id}",
+    tag = "Accessions",
+    params(
+        ("accession_id" = i32, Path, description = "Accession ID")
+    ),
+    responses(
+        (status = 200, description = "Accession deleted"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Not found")
+    ),
+    security(
+        ("jwt_cookie_auth" = [])
+    )
+)]
 async fn delete_accession(
     State(state): State<AppState>,
     Path(id): Path<i32>,
@@ -140,6 +218,24 @@ async fn delete_accession(
     state.accessions_service.delete_one(id).await
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/v1/accessions/{accession_id}",
+    tag = "Accessions",
+    params(
+        ("accession_id" = i32, Path, description = "Accession ID")
+    ),
+    request_body = UpdateAccessionRequest,
+    responses(
+        (status = 200, description = "OK", body = GetOneAccessionResponse),
+        (status = 400, description = "Bad request"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Not found")
+    ),
+    security(
+        ("jwt_cookie_auth" = [])
+    )
+)]
 async fn update_accession(
     State(state): State<AppState>,
     Path(id): Path<i32>,
@@ -312,7 +408,7 @@ mod tests {
         let actual: GetOneAccessionResponse = serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_one_accession_with_metadata();
         let expected = GetOneAccessionResponse {
-            accession: mocked_resp,
+            accession: mocked_resp.into(),
             wacz_url: "my url".to_owned(),
         };
         assert_eq!(actual, expected)
@@ -334,9 +430,9 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let actual: GetOneAccessionResponse = serde_json::from_slice(&body).unwrap();
-        let mocked_resp = mock_one_accession_with_metadata();
+        let mocked_query = mock_one_accession_with_metadata();
         let expected = GetOneAccessionResponse {
-            accession: mocked_resp,
+            accession: mocked_query.into(),
             wacz_url: "my url".to_owned(),
         };
         assert_eq!(actual, expected)
@@ -360,7 +456,7 @@ mod tests {
         let actual: GetOneAccessionResponse = serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_one_accession_with_metadata();
         let expected = GetOneAccessionResponse {
-            accession: mocked_resp,
+            accession: mocked_resp.into(),
             wacz_url: "my url".to_owned(),
         };
         assert_eq!(actual, expected)
@@ -548,7 +644,7 @@ mod tests {
         let actual: GetOneAccessionResponse = serde_json::from_slice(&body).unwrap();
         let mocked_resp = mock_one_accession_with_metadata();
         let expected = GetOneAccessionResponse {
-            accession: mocked_resp,
+            accession: mocked_resp.into(),
             wacz_url: "my url".to_owned(),
         };
         assert_eq!(actual, expected)

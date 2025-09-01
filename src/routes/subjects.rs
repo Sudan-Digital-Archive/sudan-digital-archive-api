@@ -9,6 +9,7 @@ use crate::app_factory::AppState;
 use crate::auth::validate_at_least_researcher;
 use crate::models::auth::JWTClaims;
 use crate::models::request::{CreateSubjectRequest, DeleteSubjectRequest, SubjectPagination};
+use crate::models::response::{ListSubjectsArResponse, ListSubjectsEnResponse, SubjectResponse};
 use ::entity::sea_orm_active_enums::Role;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -28,9 +29,20 @@ pub fn get_subjects_routes() -> Router<AppState> {
     )
 }
 
-/// Creates a new metadata subject.
-///
-/// Returns a 201 CREATED status on success, or 400 BAD REQUEST if validation fails.
+#[utoipa::path(
+    post,
+    path = "/api/v1/metadata-subjects",
+    tag = "Subjects",
+    request_body = CreateSubjectRequest,
+    responses(
+        (status = 201, description = "Created", body = SubjectResponse),
+        (status = 400, description = "Bad request"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("jwt_cookie_auth" = [])
+    )
+)]
 async fn create_subject(
     State(state): State<AppState>,
     claims: JWTClaims,
@@ -45,10 +57,19 @@ async fn create_subject(
     state.subjects_service.create_one(payload).await
 }
 
-/// Lists metadata subjects with pagination and filtering support.
-///
-/// Supports filtering by language and search query.
-/// Returns 400 BAD REQUEST if pagination parameters are invalid.
+#[utoipa::path(
+    get,
+    path = "/api/v1/metadata-subjects",
+    tag = "Subjects",
+    params(
+        SubjectPagination
+    ),
+    responses(
+        (status = 200, description = "OK", body = ListSubjectsEnResponse, content_type = "application/json"),
+        (status = 200, description = "OK", body = ListSubjectsArResponse, content_type = "application/json"),
+        (status = 400, description = "Bad request")
+    )
+)]
 async fn list_subjects(
     State(state): State<AppState>,
     pagination: Query<SubjectPagination>,
@@ -67,6 +88,24 @@ async fn list_subjects(
         .await
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/metadata-subjects/{subject_id}",
+    tag = "Subjects",
+    params(
+        ("subject_id" = i32, Path, description = "Subject ID")
+    ),
+    request_body = DeleteSubjectRequest,
+    responses(
+        (status = 200, description = "Subject deleted"),
+        (status = 400, description = "Bad request"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Not found")
+    ),
+    security(
+        ("jwt_cookie_auth" = [])
+    )
+)]
 async fn delete_subject(
     State(state): State<AppState>,
     Path(id): Path<i32>,

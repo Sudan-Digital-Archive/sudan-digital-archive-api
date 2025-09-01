@@ -6,11 +6,12 @@
 use crate::models::common::{BrowserProfile, MetadataLanguage};
 use chrono::NaiveDateTime;
 use serde::Deserialize;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use validator::Validate;
 
 /// Request for creating a new accession with metadata.
-#[derive(Debug, Clone, Validate, Deserialize)]
+#[derive(Debug, Clone, Validate, Deserialize, ToSchema)]
 pub struct CreateAccessionRequest {
     #[validate(url)]
     pub url: String,
@@ -27,7 +28,7 @@ pub struct CreateAccessionRequest {
 }
 
 /// Request for initiating a new Browsertrix crawl.
-#[derive(Debug, Validate, Deserialize)]
+#[derive(Debug, Validate, Deserialize, ToSchema)]
 pub struct CreateCrawlRequest {
     #[validate(url)]
     pub url: String,
@@ -35,7 +36,7 @@ pub struct CreateCrawlRequest {
 }
 
 /// Pagination and filtering parameters for listing accessions.
-#[derive(Debug, Clone, Deserialize, Validate)]
+#[derive(Debug, Clone, Deserialize, Validate, IntoParams, ToSchema)]
 pub struct AccessionPagination {
     pub page: u64,
     #[validate(range(min = 1, max = 200))]
@@ -49,7 +50,7 @@ pub struct AccessionPagination {
 }
 
 /// Pagination and filtering parameters for listing accessions, including private ones.
-#[derive(Debug, Clone, Deserialize, Validate)]
+#[derive(Debug, Clone, Deserialize, Validate, IntoParams, ToSchema)]
 pub struct AccessionPaginationWithPrivate {
     pub page: u64,
     #[validate(range(min = 1, max = 200))]
@@ -64,7 +65,7 @@ pub struct AccessionPaginationWithPrivate {
 }
 
 /// Request for creating a new subject category.
-#[derive(Debug, Clone, Validate, Deserialize)]
+#[derive(Debug, Clone, Validate, Deserialize, ToSchema)]
 pub struct CreateSubjectRequest {
     #[validate(length(min = 1, max = 100))]
     pub metadata_subject: String,
@@ -72,7 +73,7 @@ pub struct CreateSubjectRequest {
 }
 
 /// Pagination and filtering parameters for listing subjects.
-#[derive(Debug, Validate, Deserialize)]
+#[derive(Debug, Validate, Deserialize, IntoParams, ToSchema)]
 pub struct SubjectPagination {
     pub page: u64,
     #[validate(range(min = 1, max = 200))]
@@ -83,19 +84,19 @@ pub struct SubjectPagination {
 }
 
 /// Request for creating a new subject category.
-#[derive(Debug, Clone, Validate, Deserialize)]
+#[derive(Debug, Clone, Validate, Deserialize, ToSchema)]
 pub struct LoginRequest {
     #[validate(length(min = 1, max = 100))]
     pub email: String,
 }
 
-#[derive(Debug, Clone, Validate, Deserialize)]
+#[derive(Debug, Clone, Validate, Deserialize, ToSchema)]
 pub struct AuthorizeRequest {
     pub session_id: Uuid,
     pub user_id: Uuid,
 }
 
-#[derive(Debug, Clone, Validate, Deserialize)]
+#[derive(Debug, Clone, Validate, Deserialize, ToSchema)]
 pub struct UpdateAccessionRequest {
     pub metadata_language: MetadataLanguage,
     #[validate(length(min = 1, max = 200))]
@@ -109,7 +110,7 @@ pub struct UpdateAccessionRequest {
 }
 
 /// Request for deleting a subject category.
-#[derive(Debug, Clone, Validate, Deserialize)]
+#[derive(Debug, Clone, Validate, Deserialize, ToSchema)]
 pub struct DeleteSubjectRequest {
     pub lang: MetadataLanguage,
 }
