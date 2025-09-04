@@ -133,7 +133,7 @@ impl AuthService {
                             let header_value_result = HeaderValue::from_str(cookie_string)
                                 .map_err(|err| format!("Failed to create cookie header: {err}"))?;
 
-                            headers.insert(SET_COOKIE, header_value_result);
+                            headers.append(SET_COOKIE, header_value_result);
                         }
                         Ok((StatusCode::OK, headers, "Authentication successful").into_response())
                     }
