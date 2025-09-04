@@ -70,12 +70,12 @@ impl AuthService {
         self.auth_repo.get_session_expiry(authorize_request).await
     }
 
-    pub fn build_auth_cookie_string(
+    pub fn build_auth_cookie_strings(
         self,
         user_email: String,
         role: Role,
         expiry_time: NaiveDateTime,
-    ) -> Result<String, Error> {
+    ) -> Result<[String; 2], Error> {
         let claims = JWTClaims {
             sub: user_email,
             exp: expiry_time.and_utc().timestamp() as usize,
@@ -83,13 +83,23 @@ impl AuthService {
         };
         let jwt = encode(&Header::default(), &claims, &JWT_KEYS.encoding)?;
         let max_age = expiry_time.and_utc().timestamp().to_string();
+        // need this cookie that is not http only to just read the jwt on the client side
         let cookie_string = if self.jwt_cookie_domain == "localhost" {
-            format!("jwt={jwt}; Path=/; SameSite=Strict; Secure; Max-Age={max_age}")
+            let logged_in_cookie =
+                format!("logged_in=true; Path=/; SameSite=Strict; Secure; Max-Age={max_age}");
+            let auth_cookie =
+                format!("jwt={jwt}; Path=/; SameSite=Strict; Secure; Max-Age={max_age}");
+            [auth_cookie, logged_in_cookie]
         } else {
-            format!(
+            let logged_in_cookie = format!(
+                "logged_in=true; Domain={}; Path=/; SameSite=Strict; Secure; Max-Age={max_age}",
+                self.jwt_cookie_domain
+            );
+            let auth_cookie = format!(
                 "jwt={jwt}; HttpOnly; Secure; Domain={}; Path=/; Max-Age={max_age}; SameSite=Strict",
                 self.jwt_cookie_domain
-            )
+            );
+            [auth_cookie, logged_in_cookie]
         };
         Ok(cookie_string)
     }
@@ -114,16 +124,17 @@ impl AuthService {
 
                 match user_result {
                     Some(user) => {
-                        let cookie_string_result = self
+                        let cookie_strings_results = self
                             .clone()
-                            .build_auth_cookie_string(user.email, user.role, sesh_exists)
+                            .build_auth_cookie_strings(user.email, user.role, sesh_exists)
                             .map_err(|err| format!("Failed to build cookie string: {err}"))?;
-
                         let mut headers = HeaderMap::new();
-                        let header_value_result = HeaderValue::from_str(&cookie_string_result)
-                            .map_err(|err| format!("Failed to create cookie header: {err}"))?;
+                        for cookie_string in cookie_strings_results.iter() {
+                            let header_value_result = HeaderValue::from_str(cookie_string)
+                                .map_err(|err| format!("Failed to create cookie header: {err}"))?;
 
-                        headers.insert(SET_COOKIE, header_value_result);
+                            headers.insert(SET_COOKIE, header_value_result);
+                        }
                         Ok((StatusCode::OK, headers, "Authentication successful").into_response())
                     }
                     None => {
