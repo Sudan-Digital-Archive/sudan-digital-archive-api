@@ -1,11 +1,11 @@
 //! Common types and enums used across the API.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use utoipa::ToSchema;
 
 /// Supported languages for metadata content.
-#[derive(Debug, Default, Deserialize, Clone, Copy, ToSchema)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone, Copy, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum MetadataLanguage {
     #[default]

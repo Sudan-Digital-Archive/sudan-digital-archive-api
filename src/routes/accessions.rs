@@ -507,6 +507,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn list_accessions_no_query_params() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/accessions")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let actual: ListAccessionsResponse = serde_json::from_slice(&body).unwrap();
+        let mocked_resp = mock_paginated_en();
+        let expected = mocked_resp;
+        assert_eq!(actual.num_pages, expected.1);
+        assert_eq!(actual.items.len(), expected.0.len());
+    }
+
+    #[tokio::test]
     async fn list_accessions_private_no_auth() {
         let app = build_test_app();
         let response = app
@@ -528,7 +550,7 @@ mod tests {
         let response = app
             .oneshot(
                 Request::builder()
-                    .uri("/api/v1/accessions?page=0&per_page=1&lang=english")
+                    .uri("/api/v1/accessions/private?page=0&per_page=1&lang=english")
                     .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
                     .body(Body::empty())
                     .unwrap(),
@@ -544,6 +566,30 @@ mod tests {
         assert_eq!(actual.num_pages, expected.1);
         assert_eq!(actual.items.len(), expected.0.len());
     }
+
+    #[tokio::test]
+    async fn list_accessions_private_with_auth_no_query_params() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/accessions/private?page=0&per_page=1&lang=english")
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let actual: ListAccessionsResponse = serde_json::from_slice(&body).unwrap();
+        let mocked_resp = mock_paginated_en();
+        let expected = mocked_resp;
+        assert_eq!(actual.num_pages, expected.1);
+        assert_eq!(actual.items.len(), expected.0.len());
+    }
+
     #[tokio::test]
     async fn delete_one_accession_no_auth() {
         let app = build_test_app();

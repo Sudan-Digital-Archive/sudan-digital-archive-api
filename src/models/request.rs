@@ -37,6 +37,7 @@ pub struct CreateCrawlRequest {
 
 /// Pagination and filtering parameters for listing accessions.
 #[derive(Debug, Clone, Deserialize, Validate, IntoParams, ToSchema)]
+#[serde(default)]
 pub struct AccessionPagination {
     pub page: u64,
     #[validate(range(min = 1, max = 200))]
@@ -49,8 +50,23 @@ pub struct AccessionPagination {
     pub date_to: Option<NaiveDateTime>,
 }
 
+impl Default for AccessionPagination {
+    fn default() -> Self {
+        Self {
+            page: 0,
+            per_page: 20,
+            lang: MetadataLanguage::English,
+            metadata_subjects: None,
+            query_term: None,
+            date_from: None,
+            date_to: None,
+        }
+    }
+}
+
 /// Pagination and filtering parameters for listing accessions, including private ones.
 #[derive(Debug, Clone, Deserialize, Validate, IntoParams, ToSchema)]
+#[serde(default)]
 pub struct AccessionPaginationWithPrivate {
     pub page: u64,
     #[validate(range(min = 1, max = 200))]
@@ -62,6 +78,21 @@ pub struct AccessionPaginationWithPrivate {
     pub date_from: Option<NaiveDateTime>,
     pub date_to: Option<NaiveDateTime>,
     pub is_private: bool,
+}
+
+impl Default for AccessionPaginationWithPrivate {
+    fn default() -> Self {
+        Self {
+            page: 0,
+            per_page: 20,
+            lang: MetadataLanguage::English,
+            metadata_subjects: None,
+            query_term: None,
+            date_from: None,
+            date_to: None,
+            is_private: false,
+        }
+    }
 }
 
 /// Request for creating a new subject category.
