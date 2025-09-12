@@ -5,10 +5,17 @@
 
 use crate::models::common::{BrowserProfile, MetadataLanguage};
 use chrono::NaiveDateTime;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use validator::Validate;
+
+/// Struct for metadata subjects filtering
+#[derive(Debug, Clone, Validate, Deserialize, Serialize, ToSchema)]
+pub struct MetadataSubjects {
+    pub metadata_subjects: Vec<i32>,
+    pub metadata_subjects_inclusive_filter: bool,
+}
 
 /// Request for creating a new accession with metadata.
 #[derive(Debug, Clone, Validate, Deserialize, ToSchema)]
@@ -43,7 +50,7 @@ pub struct AccessionPagination {
     #[validate(range(min = 1, max = 200))]
     pub per_page: u64,
     pub lang: MetadataLanguage,
-    pub metadata_subjects: Option<Vec<i32>>,
+    pub metadata_subjects: Option<MetadataSubjects>,
     #[validate(length(min = 1, max = 500))]
     pub query_term: Option<String>,
     pub date_from: Option<NaiveDateTime>,
@@ -72,7 +79,7 @@ pub struct AccessionPaginationWithPrivate {
     #[validate(range(min = 1, max = 200))]
     pub per_page: u64,
     pub lang: MetadataLanguage,
-    pub metadata_subjects: Option<Vec<i32>>,
+    pub metadata_subjects: Option<MetadataSubjects>,
     #[validate(length(min = 1, max = 500))]
     pub query_term: Option<String>,
     pub date_from: Option<NaiveDateTime>,
