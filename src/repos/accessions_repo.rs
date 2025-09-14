@@ -7,7 +7,7 @@ use crate::models::common::MetadataLanguage;
 use crate::models::request::{
     AccessionPaginationWithPrivate, CreateAccessionRequest, UpdateAccessionRequest,
 };
-use crate::repos::filter_builder::{build_filter_expression, FilterParams};
+use crate::repos::filter_builder::{build_filter_expression, FilterParams, MetadataSubjects};
 use async_trait::async_trait;
 use chrono::Utc;
 use entity::accession::ActiveModel as AccessionActiveModel;
@@ -192,9 +192,19 @@ impl AccessionsRepo for DBAccessionsRepo {
         &self,
         params: AccessionPaginationWithPrivate,
     ) -> Result<(Vec<AccessionWithMetadataModel>, u64), DbErr> {
+        let metadata_subjects = if params.metadata_subjects.is_empty() {
+            None
+        } else {
+            Some(MetadataSubjects {
+                metadata_subjects: params.metadata_subjects,
+                metadata_subjects_inclusive_filter: params
+                    .metadata_subjects_inclusive_filter
+                    .unwrap_or(true),
+            })
+        };
         let filter_params = FilterParams {
             metadata_language: params.lang,
-            metadata_subjects: params.metadata_subjects,
+            metadata_subjects,
             query_term: params.query_term,
             date_from: params.date_from,
             date_to: params.date_to,

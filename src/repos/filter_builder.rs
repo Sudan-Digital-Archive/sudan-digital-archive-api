@@ -5,7 +5,6 @@
 //! enhancements like full-text search using ts_vector indices and additional metadata fields.
 
 use crate::models::common::MetadataLanguage;
-use crate::models::request::MetadataSubjects;
 use chrono::NaiveDateTime;
 use entity::accessions_with_metadata;
 use sea_orm::prelude::Expr;
@@ -22,6 +21,14 @@ pub struct FilterParams {
     pub date_from: Option<NaiveDateTime>,
     pub date_to: Option<NaiveDateTime>,
     pub is_private: bool,
+}
+
+/// Defines the structure for metadata subjects filtering.
+/// Easier to build match cases later of this struct than the raw format they come in.
+#[derive(Debug, Clone)]
+pub struct MetadataSubjects {
+    pub metadata_subjects: Vec<i32>,
+    pub metadata_subjects_inclusive_filter: bool,
 }
 
 fn add_array_operators_to_subjects(
