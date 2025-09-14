@@ -43,7 +43,8 @@ pub struct AccessionPagination {
     #[validate(range(min = 1, max = 200))]
     pub per_page: u64,
     pub lang: MetadataLanguage,
-    pub metadata_subjects: Option<Vec<i32>>,
+    pub metadata_subjects: Vec<i32>,
+    pub metadata_subjects_inclusive_filter: Option<bool>,
     #[validate(length(min = 1, max = 500))]
     pub query_term: Option<String>,
     pub date_from: Option<NaiveDateTime>,
@@ -56,7 +57,8 @@ impl Default for AccessionPagination {
             page: 0,
             per_page: 20,
             lang: MetadataLanguage::English,
-            metadata_subjects: None,
+            metadata_subjects: [].to_vec(),
+            metadata_subjects_inclusive_filter: None,
             query_term: None,
             date_from: None,
             date_to: None,
@@ -72,7 +74,8 @@ pub struct AccessionPaginationWithPrivate {
     #[validate(range(min = 1, max = 200))]
     pub per_page: u64,
     pub lang: MetadataLanguage,
-    pub metadata_subjects: Option<Vec<i32>>,
+    pub metadata_subjects: Vec<i32>,
+    pub metadata_subjects_inclusive_filter: Option<bool>,
     #[validate(length(min = 1, max = 500))]
     pub query_term: Option<String>,
     pub date_from: Option<NaiveDateTime>,
@@ -86,7 +89,8 @@ impl Default for AccessionPaginationWithPrivate {
             page: 0,
             per_page: 20,
             lang: MetadataLanguage::English,
-            metadata_subjects: None,
+            metadata_subjects: [].to_vec(),
+            metadata_subjects_inclusive_filter: None,
             query_term: None,
             date_from: None,
             date_to: None,

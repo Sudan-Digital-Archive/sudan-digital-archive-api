@@ -16,13 +16,32 @@ use sea_query::extension::postgres::PgBinOper;
 #[derive(Debug, Clone, Default)]
 pub struct FilterParams {
     pub metadata_language: MetadataLanguage,
-    pub metadata_subjects: Option<Vec<i32>>,
+    pub metadata_subjects: Option<MetadataSubjects>,
     pub query_term: Option<String>,
     pub date_from: Option<NaiveDateTime>,
     pub date_to: Option<NaiveDateTime>,
     pub is_private: bool,
 }
 
+/// Defines the structure for metadata subjects filtering.
+/// Easier to build match cases later of this struct than the raw format they come in.
+#[derive(Debug, Clone)]
+pub struct MetadataSubjects {
+    pub metadata_subjects: Vec<i32>,
+    pub metadata_subjects_inclusive_filter: bool,
+}
+
+fn add_array_operators_to_subjects(
+    expr: SimpleExpr,
+    subjects_column: Expr,
+    metadata_subjects: MetadataSubjects,
+) -> SimpleExpr {
+    if metadata_subjects.metadata_subjects_inclusive_filter {
+        expr.and(subjects_column.binary(PgBinOper::Overlap, metadata_subjects.metadata_subjects))
+    } else {
+        expr.and(subjects_column.binary(PgBinOper::Contains, metadata_subjects.metadata_subjects))
+    }
+}
 /// Builds a dynamic filter expression for searching metadata across the archive.
 ///
 /// # Arguments
@@ -57,82 +76,91 @@ pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
         params.date_to,
         params.metadata_subjects,
     ) {
-        (Some(term), Some(from), Some(to), Some(subjects)) => {
+        (Some(term), Some(from), Some(to), Some(metadata_subjects)) => {
             let query_string = format!("%{}%", term.to_lowercase());
-            Some(
-                Func::lower(title)
-                    .like(&query_string)
-                    .or(Func::lower(description).like(&query_string))
-                    .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
-                    .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
-                    .and(lang_filter.eq(true))
-                    .and(subjects_column.binary(PgBinOper::Overlap, subjects))
-                    .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
-            )
+            let mut expression = Func::lower(title)
+                .like(&query_string)
+                .or(Func::lower(description).like(&query_string))
+                .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
+                .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
+                .and(lang_filter.eq(true))
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private));
+            expression =
+                add_array_operators_to_subjects(expression, subjects_column, metadata_subjects);
+            Some(expression)
         }
-        (Some(term), Some(from), None, Some(subjects)) => {
+        (Some(term), Some(from), None, Some(metadata_subjects)) => {
             let query_string = format!("%{}%", term.to_lowercase());
-            Some(
-                Func::lower(title)
-                    .like(&query_string)
-                    .or(Func::lower(description).like(&query_string))
-                    .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
-                    .and(lang_filter.eq(true))
-                    .and(subjects_column.binary(PgBinOper::Overlap, subjects))
-                    .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
-            )
+            let mut expression = Func::lower(title)
+                .like(&query_string)
+                .or(Func::lower(description).like(&query_string))
+                .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
+                .and(lang_filter.eq(true))
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private));
+            expression =
+                add_array_operators_to_subjects(expression, subjects_column, metadata_subjects);
+
+            Some(expression)
         }
-        (Some(term), None, Some(to), Some(subjects)) => {
+        (Some(term), None, Some(to), Some(metadata_subjects)) => {
             let query_string = format!("%{}%", term.to_lowercase());
-            Some(
-                Func::lower(title)
-                    .like(&query_string)
-                    .or(Func::lower(description).like(&query_string))
-                    .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
-                    .and(lang_filter.eq(true))
-                    .and(subjects_column.binary(PgBinOper::Overlap, subjects))
-                    .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
-            )
+            let mut expression = Func::lower(title)
+                .like(&query_string)
+                .or(Func::lower(description).like(&query_string))
+                .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
+                .and(lang_filter.eq(true))
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private));
+            expression =
+                add_array_operators_to_subjects(expression, subjects_column, metadata_subjects);
+            Some(expression)
         }
-        (Some(term), None, None, Some(subjects)) => {
+        (Some(term), None, None, Some(metadata_subjects)) => {
             let query_string = format!("%{}%", term.to_lowercase());
-            Some(
-                Func::lower(title)
-                    .like(&query_string)
-                    .or(Func::lower(description).like(&query_string))
-                    .and(lang_filter.eq(true))
-                    .and(subjects_column.binary(PgBinOper::Overlap, subjects))
-                    .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
-            )
+            let mut expression = Func::lower(title)
+                .like(&query_string)
+                .or(Func::lower(description).like(&query_string))
+                .and(lang_filter.eq(true))
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private));
+            expression =
+                add_array_operators_to_subjects(expression, subjects_column, metadata_subjects);
+            Some(expression)
         }
-        (None, Some(from), Some(to), Some(subjects)) => Some(
-            accessions_with_metadata::Column::DublinMetadataDate
+        (None, Some(from), Some(to), Some(metadata_subjects)) => {
+            let mut expression = accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from)
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
                 .and(lang_filter.eq(true))
-                .and(subjects_column.binary(PgBinOper::Overlap, subjects))
-                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
-        ),
-        (None, Some(from), None, Some(subjects)) => Some(
-            accessions_with_metadata::Column::DublinMetadataDate
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private));
+            expression =
+                add_array_operators_to_subjects(expression, subjects_column, metadata_subjects);
+            Some(expression)
+        }
+        (None, Some(from), None, Some(metadata_subjects)) => {
+            let mut expression = accessions_with_metadata::Column::DublinMetadataDate
                 .gte(from)
                 .and(lang_filter.eq(true))
-                .and(subjects_column.binary(PgBinOper::Overlap, subjects))
-                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
-        ),
-        (None, None, Some(to), Some(subjects)) => Some(
-            accessions_with_metadata::Column::DublinMetadataDate
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private));
+            expression =
+                add_array_operators_to_subjects(expression, subjects_column, metadata_subjects);
+            Some(expression)
+        }
+        (None, None, Some(to), Some(metadata_subjects)) => {
+            let mut expression = accessions_with_metadata::Column::DublinMetadataDate
                 .lte(to)
                 .and(lang_filter.eq(true))
-                .and(subjects_column.binary(PgBinOper::Overlap, subjects))
-                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
-        ),
-        (None, None, None, Some(subjects)) => Some(
-            lang_filter
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private));
+            expression =
+                add_array_operators_to_subjects(expression, subjects_column, metadata_subjects);
+            Some(expression)
+        }
+        (None, None, None, Some(metadata_subjects)) => {
+            let mut expression = lang_filter
                 .eq(true)
-                .and(subjects_column.binary(PgBinOper::Overlap, subjects))
-                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
-        ),
+                .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private));
+            expression =
+                add_array_operators_to_subjects(expression, subjects_column, metadata_subjects);
+            Some(expression)
+        }
         (Some(term), Some(from), Some(to), None) => {
             let query_string = format!("%{}%", term.to_lowercase());
             Some(
@@ -460,7 +488,10 @@ mod tests {
         let subjects = vec![1, 2, 3];
         let params = FilterParams {
             metadata_language: MetadataLanguage::English,
-            metadata_subjects: Some(subjects.clone()),
+            metadata_subjects: Some(MetadataSubjects {
+                metadata_subjects: subjects.clone(),
+                metadata_subjects_inclusive_filter: true,
+            }),
             query_term: None,
             date_from: None,
             date_to: None,
@@ -472,8 +503,35 @@ mod tests {
         let expected = Some(
             Expr::col(accessions_with_metadata::Column::HasEnglishMetadata)
                 .eq(true)
-                .and(subjects_column.binary(PgBinOper::Overlap, subjects))
-                .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false))
+                .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
+        );
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_build_filter_metadata_subjects_exclusive() {
+        let subjects = vec![1, 2, 3];
+        let params = FilterParams {
+            metadata_language: MetadataLanguage::English,
+            metadata_subjects: Some(MetadataSubjects {
+                metadata_subjects: subjects.clone(),
+                metadata_subjects_inclusive_filter: false,
+            }),
+            query_term: None,
+            date_from: None,
+            date_to: None,
+            is_private: false,
+        };
+        let actual = build_filter_expression(params);
+
+        let subjects_column = Expr::col(accessions_with_metadata::Column::SubjectsEnIds);
+        let expected = Some(
+            Expr::col(accessions_with_metadata::Column::HasEnglishMetadata)
+                .eq(true)
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false))
+                .and(subjects_column.binary(PgBinOper::Contains, subjects)),
         );
 
         assert_eq!(actual, expected);
@@ -484,7 +542,10 @@ mod tests {
         let subjects = vec![1, 2, 3];
         let params = FilterParams {
             metadata_language: MetadataLanguage::English,
-            metadata_subjects: Some(subjects.clone()),
+            metadata_subjects: Some(MetadataSubjects {
+                metadata_subjects: subjects.clone(),
+                metadata_subjects_inclusive_filter: true,
+            }),
             query_term: Some("test".to_string()),
             date_from: None,
             date_to: None,
@@ -503,8 +564,8 @@ mod tests {
                 .like(&query_string)
                 .or(Func::lower(description).like(&query_string))
                 .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
-                .and(subjects_column.binary(PgBinOper::Overlap, subjects))
-                .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false))
+                .and(subjects_column.binary(PgBinOper::Overlap, subjects)),
         );
 
         assert_eq!(actual, expected);

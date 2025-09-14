@@ -9,13 +9,23 @@ use axum::http::{
     StatusCode,
 };
 use axum::response::{IntoResponse, Response};
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 use jsonwebtoken::errors::Error;
 use jsonwebtoken::{encode, Header};
 use sea_orm::DbErr;
 use std::sync::Arc;
 use tracing::{error, info};
 use uuid::Uuid;
+
+fn calculate_max_age(expiry_time: NaiveDateTime) -> i64 {
+    let now = Utc::now().naive_utc();
+    let duration = expiry_time.signed_duration_since(now);
+    if duration.num_seconds() > 0 {
+        duration.num_seconds()
+    } else {
+        0
+    }
+}
 
 #[derive(Clone)]
 pub struct AuthService {
@@ -82,7 +92,7 @@ impl AuthService {
             role,
         };
         let jwt = encode(&Header::default(), &claims, &JWT_KEYS.encoding)?;
-        let max_age = expiry_time.and_utc().timestamp().to_string();
+        let max_age = calculate_max_age(expiry_time);
         // need this cookie that is not http only to just read the jwt on the client side
         let cookie_string = if self.jwt_cookie_domain == "localhost" {
             let logged_in_cookie =
@@ -180,5 +190,34 @@ impl AuthService {
                 Ok((StatusCode::NOT_FOUND, message).into_response())
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Duration;
+
+    #[test]
+    fn test_calculate_max_age_future() {
+        let now = Utc::now().naive_utc();
+        let expiry = now + Duration::seconds(3600);
+        let max_age = calculate_max_age(expiry);
+        assert!(max_age > 3598 && max_age <= 3600);
+    }
+
+    #[test]
+    fn test_calculate_max_age_past() {
+        let now = Utc::now().naive_utc();
+        let expiry = now - Duration::seconds(3600);
+        let max_age = calculate_max_age(expiry);
+        assert_eq!(max_age, 0);
+    }
+
+    #[test]
+    fn test_calculate_max_age_now() {
+        let now = Utc::now().naive_utc();
+        let max_age = calculate_max_age(now);
+        assert_eq!(max_age, 0);
     }
 }
