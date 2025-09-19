@@ -19,7 +19,10 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, fmt
+
+      - name: Check formatting
+        run: cargo fmt -- --check
 
       - name: Cache dependencies
         uses: actions/cache@v3
