@@ -9,7 +9,7 @@ use chrono::NaiveDateTime;
 use entity::accessions_with_metadata;
 use sea_orm::prelude::Expr;
 use sea_orm::sea_query::{ExprTrait, Func, SimpleExpr};
-use sea_orm::{sea_query, ColumnTrait};
+use sea_orm::{sea_query, ColumnTrait, Value};
 use sea_query::extension::postgres::PgBinOper;
 
 /// Defines the structure for filter parameters.
@@ -77,10 +77,21 @@ pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
         params.metadata_subjects,
     ) {
         (Some(term), Some(from), Some(to), Some(metadata_subjects)) => {
-            let query_string = format!("%{}%", term.to_lowercase());
-            let mut expression = Func::lower(title)
-                .like(&query_string)
-                .or(Func::lower(description).like(&query_string))
+            let (full_text_col, ts_lang) = match params.metadata_language {
+                MetadataLanguage::English => (
+                    accessions_with_metadata::Column::FullTextEn,
+                    "english",
+                ),
+                MetadataLanguage::Arabic => (accessions_with_metadata::Column::FullTextAr, "arabic"),
+            };
+            let mut expression = Expr::col(full_text_col)
+                .binary(
+                    PgBinOper::Matches,
+                    Expr::expr(Func::cust(sea_query::Alias::new("plainto_tsquery")).args([
+                        SimpleExpr::Value(Value::from("english")),
+                        SimpleExpr::Value(Value::from(term)),
+                    ])),
+                )
                 .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
                 .and(lang_filter.eq(true))
