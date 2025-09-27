@@ -18,6 +18,10 @@ pub struct Model {
     pub job_run_id: String,
     pub seed_url: String,
     pub is_private: bool,
+    // #[sea_orm(column_type = "Text", custom = "tsvector")]
+    // pub full_text_en: Option<String>,
+    // #[sea_orm(column_type = "Text", custom = "tsvector")]
+    // pub full_text_ar: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

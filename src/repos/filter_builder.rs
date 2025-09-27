@@ -84,13 +84,11 @@ pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
                 ),
                 MetadataLanguage::Arabic => (accessions_with_metadata::Column::FullTextAr, "arabic"),
             };
+            let full_text_values = ["english", &term];
             let mut expression = Expr::col(full_text_col)
                 .binary(
                     PgBinOper::Matches,
-                    Expr::expr(Func::cust(sea_query::Alias::new("plainto_tsquery")).args([
-                        SimpleExpr::Value(Value::from("english")),
-                        SimpleExpr::Value(Value::from(term)),
-                    ])),
+                   Expr::cust_with_values("plainto_tsquery('english', $2)", full_text_values)
                 )
                 .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
