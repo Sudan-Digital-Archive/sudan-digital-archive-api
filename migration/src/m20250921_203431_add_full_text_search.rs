@@ -139,11 +139,19 @@ impl MigrationTrait for Migration {
 
         // Drop the indexes first
         manager
-            .drop_index(Index::drop().name("idx_gin_accession_full_text_en").to_owned())
+            .drop_index(
+                Index::drop()
+                    .name("idx_gin_accession_full_text_en")
+                    .to_owned(),
+            )
             .await?;
-        
+
         manager
-            .drop_index(Index::drop().name("idx_gin_accession_full_text_ar").to_owned())
+            .drop_index(
+                Index::drop()
+                    .name("idx_gin_accession_full_text_ar")
+                    .to_owned(),
+            )
             .await?;
 
         // Drop the full-text columns from accession table

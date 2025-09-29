@@ -25,10 +25,6 @@ pub struct Model {
     pub subjects_ar_ids: Option<Vec<i32>>,
     pub has_english_metadata: bool,
     pub has_arabic_metadata: bool,
-    #[sea_orm(column_type = "Text", custom = "tsvector")]
-    pub full_text_en: Option<String>,
-    #[sea_orm(column_type = "Text", custom = "tsvector")]
-    pub full_text_ar: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
