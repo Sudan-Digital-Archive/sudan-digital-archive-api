@@ -104,7 +104,7 @@ pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
             let mut expression = Expr::cust(full_text_col_name)
                 .binary(
                     PgBinOper::Matches,
-                    Expr::cust_with_values(&format!("plainto_tsquery('{}', $1)", ts_lang), [&term]),
+                    Expr::cust_with_values(format!("plainto_tsquery('{ts_lang}', $1)"), [&term]),
                 )
                 .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
@@ -118,7 +118,7 @@ pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
             let mut expression = Expr::cust(full_text_col_name)
                 .binary(
                     PgBinOper::Matches,
-                    Expr::cust_with_values(&format!("plainto_tsquery('{}', $1)", ts_lang), [&term]),
+                    Expr::cust_with_values(format!("plainto_tsquery('{ts_lang}', $1)"), [&term]),
                 )
                 .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
                 .and(lang_filter.eq(true))
@@ -132,7 +132,7 @@ pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
             let mut expression = Expr::cust(full_text_col_name)
                 .binary(
                     PgBinOper::Matches,
-                    Expr::cust_with_values(&format!("plainto_tsquery('{}', $1)", ts_lang), [&term]),
+                    Expr::cust_with_values(format!("plainto_tsquery('{ts_lang}', $1)"), [&term]),
                 )
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
                 .and(lang_filter.eq(true))
@@ -145,7 +145,7 @@ pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
             let mut expression = Expr::cust(full_text_col_name)
                 .binary(
                     PgBinOper::Matches,
-                    Expr::cust_with_values(&format!("plainto_tsquery('{}', $1)", ts_lang), [&term]),
+                    Expr::cust_with_values(format!("plainto_tsquery('{ts_lang}', $1)"), [&term]),
                 )
                 .and(lang_filter.eq(true))
                 .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private));
@@ -193,7 +193,7 @@ pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
             Expr::cust(full_text_col_name)
                 .binary(
                     PgBinOper::Matches,
-                    Expr::cust_with_values(&format!("plainto_tsquery('{}', $1)", ts_lang), [&term]),
+                    Expr::cust_with_values(format!("plainto_tsquery('{ts_lang}', $1)"), [&term]),
                 )
                 .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
@@ -204,7 +204,7 @@ pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
             Expr::cust(full_text_col_name)
                 .binary(
                     PgBinOper::Matches,
-                    Expr::cust_with_values(&format!("plainto_tsquery('{}', $1)", ts_lang), [&term]),
+                    Expr::cust_with_values(format!("plainto_tsquery('{ts_lang}', $1)"), [&term]),
                 )
                 .and(accessions_with_metadata::Column::DublinMetadataDate.gte(from))
                 .and(lang_filter.eq(true))
@@ -214,7 +214,7 @@ pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
             Expr::cust(full_text_col_name)
                 .binary(
                     PgBinOper::Matches,
-                    Expr::cust_with_values(&format!("plainto_tsquery('{}', $1)", ts_lang), [&term]),
+                    Expr::cust_with_values(format!("plainto_tsquery('{ts_lang}', $1)"), [&term]),
                 )
                 .and(accessions_with_metadata::Column::DublinMetadataDate.lte(to))
                 .and(lang_filter.eq(true))
@@ -224,7 +224,7 @@ pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
             Expr::cust(full_text_col_name)
                 .binary(
                     PgBinOper::Matches,
-                    Expr::cust_with_values(&format!("plainto_tsquery('{}', $1)", ts_lang), [&term]),
+                    Expr::cust_with_values(format!("plainto_tsquery('{ts_lang}', $1)"), [&term]),
                 )
                 .and(lang_filter.eq(true))
                 .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
@@ -316,7 +316,7 @@ mod tests {
             Expr::cust("full_text_en")
                 .binary(
                     PgBinOper::Matches,
-                    Expr::cust_with_values(&format!("plainto_tsquery('{}', $1)", ts_lang), [&term]),
+                    Expr::cust_with_values(format!("plainto_tsquery('{ts_lang}', $1)"), [&term]),
                 )
                 .and(Expr::col(accessions_with_metadata::Column::HasEnglishMetadata).eq(true))
                 .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
@@ -341,7 +341,7 @@ mod tests {
             Expr::cust("full_text_ar")
                 .binary(
                     PgBinOper::Matches,
-                    Expr::cust_with_values(&format!("plainto_tsquery('{}', $1)", ts_lang), [&term]),
+                    Expr::cust_with_values(format!("plainto_tsquery('{ts_lang}', $1)"), [&term]),
                 )
                 .and(Expr::col(accessions_with_metadata::Column::HasArabicMetadata).eq(true))
                 .and(accessions_with_metadata::Column::IsPrivate.eq(false)),
