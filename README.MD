@@ -1,3 +1,24 @@
+# To Dos
+
+- https://docs.digitalocean.com/products/spaces/how-to/use-aws-sdks/
+- There is a delete crawl endpoint https://app.browsertrix.com/api/docs#/ but not really
+  worth it since crawl time unlikely to exceed storage. However make a to do that 
+  describes this
+- Then just download & upload file - there is a download wacz endpoint in browsertrix. Need to keep an eye on memory for that...
+  2GB in the file system https://docs.digitalocean.com/products/app-platform/details/limits/; 10GiB of memory.
+  Probably fine to do this in memory up to 5GB. Mabye worth implementing a repo just for async tasks so these can get moved somewhere sensible later.
+  [Examples](https://docs.aws.amazon.com/sdk-for-rust/latest/dg/rust_s3_code_examples.html)
+- Then add the spaces object id to database
+- Then remove the enrich with browsertrix stuff instead just get a temporary authenticated url from s3; pre-sign for 1h
+- Read up on unauthenticated requests stuff - just set
+  [these](https://www.digitalocean.com/security/security-best-practices-guide-spaces) security things and serve over CDN
+- Make sure to turn on digital ocean cdn for serving the archive file too, think that will be cheaper
+- Document max crawl size in browsertrix; I think it's 1gb atm which should be fine? Unlikely to hit that atm, can probably tweak settings
+  if we ever get there later. Just log this well and how much data you are streaming each time.
+- Then gonna need to do a one off script to txfer all the older records into spaces. That is going to need an API key + a put endpoint
+  that supports editing the wacz url if you are admin only. Sigh, can do that later.
+- Also tighten up the rate limiting.
+
 # Overview
 
 This is the API for the Sudan Digital Archive.

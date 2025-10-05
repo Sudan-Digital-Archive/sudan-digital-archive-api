@@ -18,6 +18,7 @@ http-body-util = "0.1.2"
 sea-orm = {version = "1.1.13", features=["macros", "runtime-tokio-native-tls", "sqlx-postgres"]}
 async-trait = "0.1.83"
 serde_json = "1.0.134"
+bytes = "1.5.0"
 validator = { version = "0.19.0", features = ["derive"] }
 serde = { version = "1.0.216", features = ["derive"] }
 reqwest = { version = "0.12.22", features=["json"] }
