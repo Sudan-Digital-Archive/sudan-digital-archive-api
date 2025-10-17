@@ -169,6 +169,8 @@ impl AccessionsRepo for DBAccessionsRepo {
             job_run_id: ActiveValue::Set(job_run_id),
             seed_url: ActiveValue::Set(create_accession_request.url),
             is_private: ActiveValue::Set(create_accession_request.is_private),
+            file_type: ActiveValue::Set(create_accession_request.file_type),
+            s3_filename: ActiveValue::Set(create_accession_request.s3_filename),
         };
         let saved_accession = accession.clone().save(&txn).await?;
         txn.commit().await?;

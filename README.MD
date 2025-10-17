@@ -6,6 +6,8 @@
 - Upload to s3 bucket
 - Get s3 file id
 - Write that into accession record
+- Read from s3 not btrix
+- Put async tokio tasks into their own file somewhere so we can handle them more robustly later if we need
 
 ## Changes
 

@@ -19,10 +19,10 @@ use crate::repos::subjects_repo::SubjectsRepo;
 use crate::services::accessions_service::AccessionsService;
 use crate::services::auth_service::AuthService;
 use crate::services::subjects_service::SubjectsService;
-use bytes::Bytes;
 use ::entity::sea_orm_active_enums::Role;
 use async_trait::async_trait;
 use axum::Router;
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use entity::accessions_with_metadata::Model as AccessionsWithMetadataModel;
 use entity::dublin_metadata_subject_ar::Model as DublinMetadataSubjectArModel;
@@ -263,7 +263,11 @@ impl S3Repo for InMemoryS3Repo {
         Ok(format!("mock-etag-{}", key))
     }
 
-    async fn get_presigned_url(&self, object_key: &str, expires_in: u64) -> Result<String, S3Error> {
+    async fn get_presigned_url(
+        &self,
+        object_key: &str,
+        expires_in: u64,
+    ) -> Result<String, S3Error> {
         // Return a deterministic mock URL
         Ok(format!(
             "https://mock-s3.test/{}/{}?expires={}",

@@ -4,13 +4,13 @@
 //! creating and managing web crawls, and retrieving WACZ (Web Archive Collection Zipped)
 //! files from completed crawl operations.
 
-use bytes::Bytes;
 use crate::config::BrowsertrixCrawlConfig;
 use crate::models::request::CreateCrawlRequest;
 use crate::models::response::{
     AuthResponse, CreateCrawlResponse, GetCrawlResponse, GetWaczUrlResponse,
 };
 use async_trait::async_trait;
+use bytes::Bytes;
 use reqwest::{Client, Error, RequestBuilder, Response, StatusCode};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -85,7 +85,7 @@ pub trait BrowsertrixRepo: Send + Sync {
     ///
     /// # Arguments
     /// * `crawl_id` - The ID of the completed crawl
-    async fn download_wacz(&self, crawl_id: &str) -> Result<bytes::Bytes, Error>;
+    async fn download_wacz(&self, crawl_id: &str) -> Result<Bytes, Error>;
 }
 
 #[async_trait]
@@ -181,7 +181,7 @@ impl BrowsertrixRepo for HTTPBrowsertrixRepo {
         Ok(get_crawl_resp_json.last_crawl_state)
     }
 
-    async fn download_wacz(&self, crawl_id: &str) -> Result<bytes::Bytes, Error> {
+    async fn download_wacz(&self, crawl_id: &str) -> Result<Bytes, Error> {
         let download_url = format!(
             "{}/api/orgs/{}/crawls/{crawl_id}/download?prefer_single_wacz=true",
             self.base_url, self.org_id
@@ -191,4 +191,3 @@ impl BrowsertrixRepo for HTTPBrowsertrixRepo {
         resp.bytes().await
     }
 }
-
