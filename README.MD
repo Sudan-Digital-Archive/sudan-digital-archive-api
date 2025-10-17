@@ -1,5 +1,22 @@
 # To Dos
 
+## Flow
+
+- Download from browsertrix
+- Upload to s3 bucket
+- Get s3 file id
+- Write that into accession record
+
+## Changes
+
+- Update accessions db table with a new migration
+- Add new field to accessions entity
+- Update write one repo call to require new s3 object
+- In show record, get presigned url from s3, else fallback to browsertrix
+- Add backlog tickets to delete data from btrix, and backfill 
+  the s3 filenames for older records
+## Notes
+
 - https://docs.digitalocean.com/products/spaces/how-to/use-aws-sdks/
 - There is a delete crawl endpoint https://app.browsertrix.com/api/docs#/ but not really
   worth it since crawl time unlikely to exceed storage. However make a to do that 

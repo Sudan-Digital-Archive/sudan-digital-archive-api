@@ -166,6 +166,7 @@ impl AccessionsService {
                                     metadata_subjects: payload.metadata_subjects,
                                     is_private: payload.is_private,
                                 };
+                                // TODO: Add to digital oceans spaces bucket
                                 let write_result = self
                                     .accessions_repo
                                     .write_one(
