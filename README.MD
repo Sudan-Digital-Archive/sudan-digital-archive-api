@@ -7,16 +7,15 @@
 - Get s3 file id
 - Write that into accession record
 - Read from s3 not btrix
-- Put async tokio tasks into their own file somewhere so we can handle them more robustly later if we need
+- Write tests
 
 ## Changes
 
-- Update accessions db table with a new migration
-- Add new field to accessions entity
-- Update write one repo call to require new s3 object
-- In show record, get presigned url from s3, else fallback to browsertrix
+- Create s3 storage in DO and init client w/access keys
 - Add backlog tickets to delete data from btrix, and backfill 
   the s3 filenames for older records
+
+
 ## Notes
 
 - https://docs.digitalocean.com/products/spaces/how-to/use-aws-sdks/

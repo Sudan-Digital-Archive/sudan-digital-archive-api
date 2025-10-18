@@ -47,7 +47,7 @@ impl fmt::Display for S3Error {
 #[async_trait]
 pub trait S3Repo: Send + Sync {
     /// Creates a new instance of the S3 repository
-    async fn new(region: &str, bucket: String) -> Result<Self, S3Error>
+    async fn new(region: &str, bucket: String, endpoint_url: &str) -> Result<Self, S3Error>
     where
         Self: Sized;
 
@@ -97,9 +97,10 @@ pub struct DigitalOceanSpacesRepo {
 
 #[async_trait]
 impl S3Repo for DigitalOceanSpacesRepo {
-    async fn new(region: &str, bucket: String) -> Result<Self, S3Error> {
+    async fn new(region: &str, bucket: String, endpoint_url: &str) -> Result<Self, S3Error> {
         let region = Region::new(region.to_string());
-        let config = Config::builder().region(region).build();
+        // Credentials are in AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars
+        let config = Config::builder().region(region).endpoint_url(endpoint_url).build();
         let client = Client::from_conf(config);
 
         Ok(Self { client, bucket })
