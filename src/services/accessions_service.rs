@@ -15,7 +15,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use entity::sea_orm_active_enums::CrawlStatus;
-use entity::sea_orm_active_enums::FileType;
+use entity::sea_orm_active_enums::MetadataFormat;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -85,9 +85,9 @@ impl AccessionsService {
                     let accession_for_enrich = accession.clone();
                     match (
                         accession_for_enrich.s3_filename,
-                        accession_for_enrich.file_type,
+                        accession_for_enrich.dublin_metadata_format,
                     ) {
-                        (Some(s3_filename), FileType::Wacz) => {
+                        (Some(s3_filename), MetadataFormat::Wacz) => {
                             match self.s3_repo.get_presigned_url(&s3_filename, 3600).await {
                                 Ok(presigned_url) => {
                                     let resp = GetOneAccessionResponse {
@@ -227,7 +227,7 @@ impl AccessionsService {
                                     metadata_time: payload.metadata_time,
                                     metadata_subjects: payload.metadata_subjects,
                                     is_private: payload.is_private,
-                                    file_type: FileType::Wacz,
+                                    metadata_format: MetadataFormat::Wacz,
                                     s3_filename: Some(unique_filename.clone()),
                                 };
                                 let write_result = self

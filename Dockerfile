@@ -1,4 +1,4 @@
-FROM rust:1.88.0-slim-bullseye AS builder
+FROM rust:1.90.0-slim-bullseye AS builder
 
 WORKDIR /opt
 RUN apt-get update && \
@@ -7,7 +7,6 @@ RUN apt-get update && \
 COPY Cargo.toml Cargo.lock ./
 COPY src src/
 COPY entity entity/
-COPY migration migration/
 RUN cargo build --release
 
 FROM debian:bullseye-slim

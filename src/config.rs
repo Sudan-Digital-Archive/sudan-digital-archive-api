@@ -30,6 +30,11 @@ pub struct AppConfig {
     pub jwt_cookie_domain: String,
     pub postmark_api_base: String,
     pub postmark_api_key: String,
+    pub digital_ocean_spaces_endpoint_url: String,
+    pub digital_ocean_spaces_bucket: String,
+    pub digital_ocean_spaces_region: String,
+    pub digital_ocean_spaces_access_key: String,
+    pub digital_ocean_spaces_secret_key: String,
 }
 
 /// Builds application configuration from environment variables
@@ -71,6 +76,16 @@ pub fn build_app_config() -> AppConfig {
         .expect("Missing JWT_EXPIRY_HOURS env var")
         .parse()
         .expect("JWT_EXPIRY_HOURS should be a number");
+    let digital_ocean_spaces_endpoint_url =
+        env::var("DO_SPACES_ENDPOINT_URL").expect("Missing DO_SPACES_ENDPOINT_URL env var");
+    let digital_ocean_spaces_bucket =
+        env::var("DO_SPACES_BUCKET").expect("Missing DO_SPACES_BUCKET env var");
+    let digital_ocean_spaces_region =
+        env::var("DO_SPACES_REGION").expect("Missing DO_SPACES_REGION env var");
+    let digital_ocean_spaces_access_key =
+        env::var("DO_SPACES_ACCESS_KEY").expect("Missing DO_SPACES_ACCESS_KEY env var");
+    let digital_ocean_spaces_secret_key =
+        env::var("DO_SPACES_SECRET_KEY").expect("Missing DO_SPACES_SECRET_KEY env var");
     AppConfig {
         archive_sender_email,
         browsertrix,
@@ -81,6 +96,11 @@ pub fn build_app_config() -> AppConfig {
         jwt_cookie_domain,
         postmark_api_base,
         postmark_api_key,
+        digital_ocean_spaces_endpoint_url,
+        digital_ocean_spaces_bucket,
+        digital_ocean_spaces_region,
+        digital_ocean_spaces_access_key,
+        digital_ocean_spaces_secret_key,
     }
 }
 

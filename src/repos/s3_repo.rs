@@ -47,7 +47,13 @@ impl fmt::Display for S3Error {
 #[async_trait]
 pub trait S3Repo: Send + Sync {
     /// Creates a new instance of the S3 repository
-    async fn new(region: &str, bucket: String, endpoint_url: &str) -> Result<Self, S3Error>
+    async fn new(
+        region: &str,
+        bucket: String,
+        endpoint_url: &str,
+        access_key: &str,
+        secret_key: &str,
+    ) -> Result<Self, S3Error>
     where
         Self: Sized;
 
@@ -97,10 +103,27 @@ pub struct DigitalOceanSpacesRepo {
 
 #[async_trait]
 impl S3Repo for DigitalOceanSpacesRepo {
-    async fn new(region: &str, bucket: String, endpoint_url: &str) -> Result<Self, S3Error> {
+    async fn new(
+        region: &str,
+        bucket: String,
+        endpoint_url: &str,
+        access_key: &str,
+        secret_key: &str,
+    ) -> Result<Self, S3Error> {
         let region = Region::new(region.to_string());
-        // Credentials are in AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars
-        let config = Config::builder().region(region).endpoint_url(endpoint_url).build();
+
+        if access_key.is_empty() || secret_key.is_empty() {
+            return Err(S3Error::new("DO Spaces credentials cannot be empty"));
+        }
+
+        std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
+        std::env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
+
+        let config = Config::builder()
+            .region(region)
+            .endpoint_url(endpoint_url)
+            .behavior_version_latest()
+            .build();
         let client = Client::from_conf(config);
 
         Ok(Self { client, bucket })

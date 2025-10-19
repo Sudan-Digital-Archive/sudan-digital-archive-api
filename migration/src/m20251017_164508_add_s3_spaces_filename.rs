@@ -5,8 +5,8 @@ use sea_orm_migration::prelude::*;
 pub struct Migration;
 
 #[derive(DeriveIden)]
-enum FileType {
-    #[sea_orm(iden = "file_type")]
+enum MetadataFormat {
+    #[sea_orm(iden = "dublin_metadata_format")]
     Enum,
     #[sea_orm(iden = "wacz")]
     Wacz,
@@ -15,7 +15,7 @@ enum FileType {
 #[derive(DeriveIden)]
 enum Accession {
     Table,
-    FileType,
+    MetadataFormat,
     S3Filename,
 }
 
@@ -27,8 +27,8 @@ impl MigrationTrait for Migration {
         manager
             .create_type(
                 Type::create()
-                    .as_enum(FileType::Enum)
-                    .values([FileType::Wacz])
+                    .as_enum(MetadataFormat::Enum)
+                    .values([MetadataFormat::Wacz])
                     .to_owned(),
             )
             .await?;
@@ -38,8 +38,8 @@ impl MigrationTrait for Migration {
                 Table::alter()
                     .table(Accession::Table)
                     .add_column(
-                        ColumnDef::new(Accession::FileType)
-                            .custom(FileType::Enum)
+                        ColumnDef::new(Accession::MetadataFormat)
+                            .custom(MetadataFormat::Enum)
                             .not_null()
                             .default("wacz"),
                     )
@@ -63,7 +63,7 @@ impl MigrationTrait for Migration {
                 a.seed_url,
                 a.dublin_metadata_date,
                 a.file_type,
-                a.s3_filename,
+                a.dublin_metadata_format,
                 dme.title AS title_en,
                 dme.description AS description_en,
                 dma.title AS title_ar,
@@ -192,14 +192,14 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Accession::Table)
-                    .drop_column(Accession::FileType)
-                    .drop_column(Accession::S3Filename)
+                    .drop_column(Accession::MetadataFormat)
+                    .drop_column(Accession::MetadataFormat)
                     .to_owned(),
             )
             .await?;
 
         manager
-            .drop_type(Type::drop().name(FileType::Enum).to_owned())
+            .drop_type(Type::drop().name(MetadataFormat::Enum).to_owned())
             .await?;
 
         Ok(())

@@ -59,9 +59,15 @@ async fn main() {
         create_crawl_url: app_config.browsertrix.create_crawl_url,
     };
     http_btrix_repo.initialize().await;
-    let digital_ocean_spaces_repo = DigitalOceanSpacesRepo::new("some-region", "some-bucket".to_string(), "some-endpoint")
-        .await
-        .expect("Could not create DigitalOcean Spaces repo");
+    let digital_ocean_spaces_repo = DigitalOceanSpacesRepo::new(
+        &app_config.digital_ocean_spaces_region,
+        app_config.digital_ocean_spaces_bucket,
+        &app_config.digital_ocean_spaces_endpoint_url,
+        &app_config.digital_ocean_spaces_access_key,
+        &app_config.digital_ocean_spaces_secret_key,
+    )
+    .await
+    .expect("Could not create DigitalOcean Spaces repo");
     let accessions_service = AccessionsService {
         accessions_repo: Arc::new(accessions_repo),
         browsertrix_repo: Arc::new(http_btrix_repo),
