@@ -205,7 +205,6 @@ impl AccessionsService {
                                 };
 
                                 let unique_filename = format!("{}.wacz", Uuid::new_v4());
-
                                 if let Err(err) = self
                                     .s3_repo
                                     .upload_from_bytes(

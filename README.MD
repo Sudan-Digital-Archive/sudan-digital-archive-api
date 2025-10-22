@@ -1,17 +1,11 @@
 # To Dos
 
-## Flow
-
-- Download from browsertrix
-- Upload to s3 bucket
-- Get s3 file id
-- Write that into accession record
-- Read from s3 not btrix
+- Write script for btrix/s3 upload
+- Test E2e
 - Write tests
 
 ## Changes
 
-- Create s3 storage in DO and init client w/access keys
 - Add backlog tickets to delete data from btrix, and backfill 
   the s3 filenames for older records
 

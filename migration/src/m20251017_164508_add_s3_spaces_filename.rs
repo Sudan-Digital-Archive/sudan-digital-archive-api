@@ -15,7 +15,7 @@ enum MetadataFormat {
 #[derive(DeriveIden)]
 enum Accession {
     Table,
-    MetadataFormat,
+    DublinMetadataFormat,
     S3Filename,
 }
 
@@ -38,7 +38,7 @@ impl MigrationTrait for Migration {
                 Table::alter()
                     .table(Accession::Table)
                     .add_column(
-                        ColumnDef::new(Accession::MetadataFormat)
+                        ColumnDef::new(Accession::DublinMetadataFormat)
                             .custom(MetadataFormat::Enum)
                             .not_null()
                             .default("wacz"),
@@ -62,8 +62,8 @@ impl MigrationTrait for Migration {
                 a.job_run_id,
                 a.seed_url,
                 a.dublin_metadata_date,
-                a.file_type,
                 a.dublin_metadata_format,
+                a.s3_filename,
                 dme.title AS title_en,
                 dme.description AS description_en,
                 dma.title AS title_ar,
@@ -192,8 +192,8 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Accession::Table)
-                    .drop_column(Accession::MetadataFormat)
-                    .drop_column(Accession::MetadataFormat)
+                    .drop_column(Accession::DublinMetadataFormat)
+                    .drop_column(Accession::S3Filename)
                     .to_owned(),
             )
             .await?;

@@ -25,6 +25,7 @@ pub enum CrawlStatus {
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "metadata_format")]
 pub enum MetadataFormat {
     #[sea_orm(string_value = "wacz")]
+    #[serde(rename = "wacz")]
     Wacz,
 }
 #[derive(
