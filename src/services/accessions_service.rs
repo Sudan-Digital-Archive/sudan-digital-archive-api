@@ -194,7 +194,7 @@ impl AccessionsService {
 
                                 let wacz_bytes = match self
                                     .browsertrix_repo
-                                    .download_wacz(&resp.id.to_string())
+                                    .download_wacz(&resp.run_now_job)
                                     .await
                                 {
                                     Ok(bytes) => bytes,

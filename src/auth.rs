@@ -22,7 +22,6 @@ pub static JWT_KEYS: Lazy<JWTKeys> = Lazy::new(|| {
     info!("Initializing JWT_KEYS...");
     let secret = match env::var("JWT_SECRET") {
         Ok(val) => {
-            info!("JWT_SECRET found: {}", val);
             val
         }
         Err(e) => {
@@ -31,7 +30,6 @@ pub static JWT_KEYS: Lazy<JWTKeys> = Lazy::new(|| {
         }
     };
     let secret_bytes = secret.as_bytes();
-    info!("JWT_SECRET as bytes: {:?}", secret_bytes);
     JWTKeys::new(secret_bytes)
 });
 

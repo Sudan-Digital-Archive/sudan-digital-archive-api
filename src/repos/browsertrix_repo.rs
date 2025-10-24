@@ -15,7 +15,7 @@ use reqwest::{Client, Error, RequestBuilder, Response, StatusCode};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::{error, info};
 use uuid::Uuid;
 
 /// HTTP-based implementation of the BrowsertrixRepo trait.
@@ -180,14 +180,26 @@ impl BrowsertrixRepo for HTTPBrowsertrixRepo {
         let get_crawl_resp_json: GetCrawlResponse = get_crawl_resp.json().await?;
         Ok(get_crawl_resp_json.last_crawl_state)
     }
-
+    // pretty sure this is failing due to mixed up ids crawl id should be different id value to what they have
+    // there is a race condition when called from create one; it's not created yet
+    // so need to retry a few times based off n 404 codes with async sleep
     async fn download_wacz(&self, crawl_id: &str) -> Result<Bytes, Error> {
         let download_url = format!(
             "{}/api/orgs/{}/crawls/{crawl_id}/download?prefer_single_wacz=true",
             self.base_url, self.org_id
         );
+        info!("Downloading WACZ file from {download_url}");
         let req = self.client.get(download_url.clone());
         let resp = self.make_request(req).await?;
-        resp.bytes().await
+        if resp.status().is_success(){
+        let content_length = resp.content_length().unwrap_or(0);
+        info!("WACZ file size: {:.2} MB", content_length as f64 / 1_048_576.0);
+        let bytes = resp.bytes().await?;
+        info!("Successfully downloaded WACZ file of {} bytes", bytes.len());
+        Ok(bytes)
+        } else {
+            error!("Failed to download WACZ file, HTTP status: {} Body: {}", resp.status(), resp.text().await?);
+            Ok(Bytes::from("fuck"))
+        }
     }
 }
