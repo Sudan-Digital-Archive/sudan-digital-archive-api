@@ -8,7 +8,7 @@ use chrono::NaiveDateTime;
 use entity::accessions_with_metadata::Model as AccessionsWithMetadataModel;
 use entity::dublin_metadata_subject_ar::Model as DublinMetadataSubjectArModel;
 use entity::dublin_metadata_subject_en::Model as DublinMetadataSubjectEnModel;
-use entity::sea_orm_active_enums::MetadataFormat;
+use entity::sea_orm_active_enums::DublinMetadataFormat;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -24,7 +24,7 @@ pub struct AccessionsWithMetadataResponse {
     pub job_run_id: String,
     pub seed_url: String,
     pub dublin_metadata_date: NaiveDateTime,
-    pub dublin_metadata_format: MetadataFormat,
+    pub dublin_metadata_format: DublinMetadataFormat,
     pub title_en: Option<String>,
     pub description_en: Option<String>,
     pub subjects_en: Option<Vec<String>>,

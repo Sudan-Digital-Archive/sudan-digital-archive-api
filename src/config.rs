@@ -32,7 +32,6 @@ pub struct AppConfig {
     pub postmark_api_key: String,
     pub digital_ocean_spaces_endpoint_url: String,
     pub digital_ocean_spaces_bucket: String,
-    pub digital_ocean_spaces_region: String,
     pub digital_ocean_spaces_access_key: String,
     pub digital_ocean_spaces_secret_key: String,
 }
@@ -80,8 +79,6 @@ pub fn build_app_config() -> AppConfig {
         env::var("DO_SPACES_ENDPOINT_URL").expect("Missing DO_SPACES_ENDPOINT_URL env var");
     let digital_ocean_spaces_bucket =
         env::var("DO_SPACES_BUCKET").expect("Missing DO_SPACES_BUCKET env var");
-    let digital_ocean_spaces_region =
-        env::var("DO_SPACES_REGION").expect("Missing DO_SPACES_REGION env var");
     let digital_ocean_spaces_access_key =
         env::var("DO_SPACES_ACCESS_KEY").expect("Missing DO_SPACES_ACCESS_KEY env var");
     let digital_ocean_spaces_secret_key =
@@ -98,7 +95,6 @@ pub fn build_app_config() -> AppConfig {
         postmark_api_key,
         digital_ocean_spaces_endpoint_url,
         digital_ocean_spaces_bucket,
-        digital_ocean_spaces_region,
         digital_ocean_spaces_access_key,
         digital_ocean_spaces_secret_key,
     }

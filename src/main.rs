@@ -60,7 +60,6 @@ async fn main() {
     };
     http_btrix_repo.initialize().await;
     let digital_ocean_spaces_repo = DigitalOceanSpacesRepo::new(
-        &app_config.digital_ocean_spaces_region,
         app_config.digital_ocean_spaces_bucket,
         &app_config.digital_ocean_spaces_endpoint_url,
         &app_config.digital_ocean_spaces_access_key,

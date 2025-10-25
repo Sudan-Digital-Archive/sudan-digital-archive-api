@@ -5,7 +5,7 @@
 
 use crate::models::common::{BrowserProfile, MetadataLanguage};
 use chrono::NaiveDateTime;
-use entity::sea_orm_active_enums::MetadataFormat;
+use entity::sea_orm_active_enums::DublinMetadataFormat;
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -26,7 +26,7 @@ pub struct CreateAccessionRequest {
     #[validate(length(min = 1, max = 200))]
     pub metadata_subjects: Vec<i32>,
     pub is_private: bool,
-    pub metadata_format: MetadataFormat,
+    pub metadata_format: DublinMetadataFormat,
     pub s3_filename: Option<String>,
 }
 

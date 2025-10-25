@@ -14,8 +14,7 @@ use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use entity::sea_orm_active_enums::CrawlStatus;
-use entity::sea_orm_active_enums::MetadataFormat;
+use entity::sea_orm_active_enums::{CrawlStatus, DublinMetadataFormat};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -87,7 +86,7 @@ impl AccessionsService {
                         accession_for_enrich.s3_filename,
                         accession_for_enrich.dublin_metadata_format,
                     ) {
-                        (Some(s3_filename), MetadataFormat::Wacz) => {
+                        (Some(s3_filename), DublinMetadataFormat::Wacz) => {
                             match self.s3_repo.get_presigned_url(&s3_filename, 3600).await {
                                 Ok(presigned_url) => {
                                     let resp = GetOneAccessionResponse {
@@ -217,6 +216,7 @@ impl AccessionsService {
                                     error!(%err, "Error occurred uploading WACZ file to S3, aborting accession creation");
                                     return;
                                 };
+                                info!("WACZ file uploaded to S3 with filename {}", unique_filename);
                                 let create_accessions_request = CreateAccessionRequest {
                                     url: payload.url.clone(),
                                     browser_profile: payload.browser_profile,
@@ -226,7 +226,7 @@ impl AccessionsService {
                                     metadata_time: payload.metadata_time,
                                     metadata_subjects: payload.metadata_subjects,
                                     is_private: payload.is_private,
-                                    metadata_format: MetadataFormat::Wacz,
+                                    metadata_format: DublinMetadataFormat::Wacz,
                                     s3_filename: Some(unique_filename.clone()),
                                 };
                                 let write_result = self

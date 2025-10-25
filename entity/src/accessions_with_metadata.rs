@@ -1,4 +1,4 @@
-use super::sea_orm_active_enums::{CrawlStatus, MetadataFormat};
+use super::sea_orm_active_enums::{CrawlStatus, DublinMetadataFormat};
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +15,7 @@ pub struct Model {
     pub job_run_id: String,
     pub seed_url: String,
     pub dublin_metadata_date: DateTime,
-    pub dublin_metadata_format: MetadataFormat,
+    pub dublin_metadata_format: DublinMetadataFormat,
     pub s3_filename: Option<String>,
     pub title_en: Option<String>,
     pub description_en: Option<String>,

@@ -21,9 +21,7 @@ impl JWTKeys {
 pub static JWT_KEYS: Lazy<JWTKeys> = Lazy::new(|| {
     info!("Initializing JWT_KEYS...");
     let secret = match env::var("JWT_SECRET") {
-        Ok(val) => {
-            val
-        }
+        Ok(val) => val,
         Err(e) => {
             error!("Missing JWT_SECRET env var: {}", e);
             panic!("Missing JWT_SECRET env var: {e}");

@@ -1,20 +1,17 @@
 use async_trait::async_trait;
-use aws_sdk_s3::{
-    Client, Config
-};
-use aws_sdk_s3::operation::put_object::PutObjectError;
+use aws_sdk_s3::error::ProvideErrorMetadata;
 use aws_sdk_s3::operation::get_object::GetObjectError;
-use aws_types::region::Region;
+use aws_sdk_s3::operation::put_object::PutObjectError;
+use aws_sdk_s3::Client;
+use aws_config;
 use bytes::Bytes;
 use std::error::Error;
-use aws_sdk_s3::error::ProvideErrorMetadata;
 
 /// Repository trait for S3-compatible storage operations
 #[async_trait]
 pub trait S3Repo: Send + Sync {
     /// Creates a new instance of the S3 repository
     async fn new(
-        region: &str,
         bucket: String,
         endpoint_url: &str,
         access_key: &str,
@@ -57,8 +54,11 @@ pub trait S3Repo: Send + Sync {
     /// * The presigned URL generation fails
     /// * The expiration time is invalid
     /// * The object doesn't exist
-    async fn get_presigned_url(&self, object_key: &str, expires_in: u64)
-        -> Result<String, Box<dyn Error>>;
+    async fn get_presigned_url(
+        &self,
+        object_key: &str,
+        expires_in: u64,
+    ) -> Result<String, Box<dyn Error>>;
 }
 
 /// Implementation for DigitalOcean Spaces (S3-compatible storage)
@@ -71,14 +71,11 @@ pub struct DigitalOceanSpacesRepo {
 #[async_trait]
 impl S3Repo for DigitalOceanSpacesRepo {
     async fn new(
-        region: &str,
         bucket: String,
         endpoint_url: &str,
         access_key: &str,
         secret_key: &str,
     ) -> Result<Self, Box<dyn Error>> {
-        let region = Region::new(region.to_string());
-
         if access_key.is_empty() || secret_key.is_empty() {
             return Err("DO Spaces credentials cannot be empty".into());
         }
@@ -86,13 +83,13 @@ impl S3Repo for DigitalOceanSpacesRepo {
         std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
         std::env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
 
-        let config = Config::builder()
-            .region(region)
+        let s3_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
             .endpoint_url(endpoint_url)
-            .behavior_version_latest()
-            .build();
-        let client = Client::from_conf(config);
-
+            .region("us-east-1")
+            .load()
+            .await;
+            
+        let client = Client::new(&s3_config);
         Ok(Self { client, bucket })
     }
 
@@ -113,12 +110,10 @@ impl S3Repo for DigitalOceanSpacesRepo {
             .await;
 
         match result {
-            Ok(output) => {
-                output
-                    .e_tag()
-                    .map(|tag| tag.replace('\"', ""))
-                    .ok_or_else(|| "Missing ETag in response".into())
-            }
+            Ok(output) => output
+                .e_tag()
+                .map(|tag| tag.replace('\"', ""))
+                .ok_or_else(|| "Missing ETag in response".into()),
             Err(err) => match err.into_service_error() {
                 PutObjectError::EncryptionTypeMismatch(e) => {
                     Err(format!("Object was created with different encryption: {:?}", e).into())
@@ -132,8 +127,8 @@ impl S3Repo for DigitalOceanSpacesRepo {
                 PutObjectError::TooManyParts(e) => {
                     Err(format!("Too many parts (max 10000): {:?}", e).into())
                 }
-                err => Err(format!("Upload failed: {:#?}", err.code()).into())
-            }
+                err => Err(format!("Upload failed: {:#?}", err.code()).into()),
+            },
         }
     }
 
@@ -144,7 +139,6 @@ impl S3Repo for DigitalOceanSpacesRepo {
     ) -> Result<String, Box<dyn Error>> {
         let expires_in = std::time::Duration::from_secs(expires_in);
 
-        // First check if the object exists
         match self
             .client
             .get_object()
@@ -159,7 +153,11 @@ impl S3Repo for DigitalOceanSpacesRepo {
                     return Err(format!("Object not found: {}", object_key).into());
                 }
                 GetObjectError::InvalidObjectState(e) => {
-                    return Err(format!("Object is archived and needs to be restored first: {:?}", e).into());
+                    return Err(format!(
+                        "Object is archived and needs to be restored first: {:?}",
+                        e
+                    )
+                    .into());
                 }
                 err => return Err(format!("Service error: {}", err).into()),
             },
@@ -172,7 +170,7 @@ impl S3Repo for DigitalOceanSpacesRepo {
             .key(object_key)
             .presigned(
                 aws_sdk_s3::presigning::PresigningConfig::expires_in(expires_in)
-                    .map_err(|e| format!("Failed to create presigning config: {}", e))?
+                    .map_err(|e| format!("Failed to create presigning config: {}", e))?,
             )
             .await
             .map_err(|e| format!("Failed to generate presigned URL: {}", e))?;

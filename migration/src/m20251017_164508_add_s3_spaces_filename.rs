@@ -5,7 +5,7 @@ use sea_orm_migration::prelude::*;
 pub struct Migration;
 
 #[derive(DeriveIden)]
-enum MetadataFormat {
+enum DublinMetadataFormat {
     #[sea_orm(iden = "dublin_metadata_format")]
     Enum,
     #[sea_orm(iden = "wacz")]
@@ -27,8 +27,8 @@ impl MigrationTrait for Migration {
         manager
             .create_type(
                 Type::create()
-                    .as_enum(MetadataFormat::Enum)
-                    .values([MetadataFormat::Wacz])
+                    .as_enum(DublinMetadataFormat::Enum)
+                    .values([DublinMetadataFormat::Wacz])
                     .to_owned(),
             )
             .await?;
@@ -39,7 +39,7 @@ impl MigrationTrait for Migration {
                     .table(Accession::Table)
                     .add_column(
                         ColumnDef::new(Accession::DublinMetadataFormat)
-                            .custom(MetadataFormat::Enum)
+                            .custom(DublinMetadataFormat::Enum)
                             .not_null()
                             .default("wacz"),
                     )
@@ -199,7 +199,7 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
-            .drop_type(Type::drop().name(MetadataFormat::Enum).to_owned())
+            .drop_type(Type::drop().name(DublinMetadataFormat::Enum).to_owned())
             .await?;
 
         Ok(())

@@ -185,21 +185,13 @@ impl BrowsertrixRepo for HTTPBrowsertrixRepo {
     // so need to retry a few times based off n 404 codes with async sleep
     async fn download_wacz(&self, crawl_id: &str) -> Result<Bytes, Error> {
         let download_url = format!(
-            "{}/api/orgs/{}/crawls/{crawl_id}/download?prefer_single_wacz=true",
+            "{}/orgs/{}/crawls/{crawl_id}/download?prefer_single_wacz=true",
             self.base_url, self.org_id
         );
-        info!("Downloading WACZ file from {download_url}");
         let req = self.client.get(download_url.clone());
         let resp = self.make_request(req).await?;
-        if resp.status().is_success(){
-        let content_length = resp.content_length().unwrap_or(0);
-        info!("WACZ file size: {:.2} MB", content_length as f64 / 1_048_576.0);
         let bytes = resp.bytes().await?;
         info!("Successfully downloaded WACZ file of {} bytes", bytes.len());
         Ok(bytes)
-        } else {
-            error!("Failed to download WACZ file, HTTP status: {} Body: {}", resp.status(), resp.text().await?);
-            Ok(Bytes::from("fuck"))
-        }
     }
 }
