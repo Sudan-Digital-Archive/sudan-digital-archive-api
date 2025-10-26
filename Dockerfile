@@ -7,6 +7,9 @@ RUN apt-get update && \
 COPY Cargo.toml Cargo.lock ./
 COPY src src/
 COPY entity entity/
+# don't really need these at build time but including since otherwise
+# build fails since cargo workspace looks for them
+COPY migration migration/
 RUN cargo build --release
 
 FROM debian:bullseye-slim
