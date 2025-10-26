@@ -277,6 +277,7 @@ mod tests {
         body::Body,
         http::{Request, StatusCode},
     };
+    use entity::sea_orm_active_enums::DublinMetadataFormat;
     use http_body_util::BodyExt;
     use pretty_assertions::assert_eq;
     use serde_json::json;
@@ -296,6 +297,8 @@ mod tests {
                     browser_profile: None,
                     metadata_subjects: vec![1, 2, 3],
                     is_private: false,
+                    metadata_format: DublinMetadataFormat::Wacz,
+                    s3_filename: Some("test-file.wacz".to_string()),
                 },
                 "archiver@gmail.com".to_string(),
             )
@@ -316,6 +319,8 @@ mod tests {
                     metadata_time: Default::default(),
                     browser_profile: None,
                     is_private: true,
+                    metadata_format: DublinMetadataFormat::Wacz,
+                    s3_filename: Some("test-file-2.wacz".to_string()),
                 },
                 "emailsare4eva@aol.com".to_string(),
             )
@@ -341,7 +346,9 @@ mod tests {
     "metadata_time": "2024-11-01T23:32:00",
     "browser_profile": null,
     "metadata_subjects": [1],
-    "is_private": false
+    "is_private": false,
+    "metadata_format": "wacz",
+    "s3_filename": "guardian-article.wacz"
 })).unwrap(),
                     ))
                     .unwrap(),
@@ -376,7 +383,9 @@ mod tests {
                             "metadata_time": "2024-11-01T23:32:00",
                             "browser_profile": "facebook",
                             "metadata_subjects": [1],
-                            "is_private": true
+                            "is_private": true,
+                            "metadata_format": "wacz",
+                            "s3_filename": "facebook-story.wacz"
                         }))
                         .unwrap(),
                     ))

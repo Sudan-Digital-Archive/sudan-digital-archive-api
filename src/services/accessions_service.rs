@@ -9,15 +9,17 @@ use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use crate::repos::accessions_repo::AccessionsRepo;
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
 use crate::repos::emails_repo::EmailsRepo;
+use crate::repos::s3_repo::S3Repo;
 use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use entity::sea_orm_active_enums::CrawlStatus;
+use entity::sea_orm_active_enums::{CrawlStatus, DublinMetadataFormat};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info};
+use uuid::Uuid;
 
 /// Service for managing archival accessions and their associated web crawls.
 /// Uses dynamic traits for dependency injection
@@ -26,6 +28,7 @@ pub struct AccessionsService {
     pub accessions_repo: Arc<dyn AccessionsRepo>,
     pub browsertrix_repo: Arc<dyn BrowsertrixRepo>,
     pub emails_repo: Arc<dyn EmailsRepo>,
+    pub s3_repo: Arc<dyn S3Repo>,
 }
 
 impl AccessionsService {
@@ -76,7 +79,38 @@ impl AccessionsService {
                 error!(%query_result, "Error occurred retrieving accession");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
             }
-            Ok(query_result) => self.enrich_one_with_browsertrix(query_result).await,
+            Ok(query_result) => {
+                if let Some(accession) = query_result {
+                    let accession_for_enrich = accession.clone();
+                    match (
+                        accession_for_enrich.s3_filename,
+                        accession_for_enrich.dublin_metadata_format,
+                    ) {
+                        (Some(s3_filename), DublinMetadataFormat::Wacz) => {
+                            match self.s3_repo.get_presigned_url(&s3_filename, 3600).await {
+                                Ok(presigned_url) => {
+                                    let resp = GetOneAccessionResponse {
+                                        accession: accession.into(),
+                                        wacz_url: presigned_url,
+                                    };
+                                    Json(resp).into_response()
+                                }
+                                Err(err) => {
+                                    error!(%err, "Error occurred generating presigned url");
+                                    (
+                                        StatusCode::INTERNAL_SERVER_ERROR,
+                                        "Could not retrieving wacz url from s3 storage",
+                                    )
+                                        .into_response()
+                                }
+                            }
+                        }
+                        _ => self.enrich_one_with_browsertrix(Some(accession)).await,
+                    }
+                } else {
+                    (StatusCode::NOT_FOUND, "No such record").into_response()
+                }
+            }
         }
     }
 
@@ -156,6 +190,33 @@ impl AccessionsService {
                                 let trimmed_description = payload
                                     .metadata_description
                                     .map(|description| description.trim().to_string());
+
+                                let wacz_bytes = match self
+                                    .browsertrix_repo
+                                    .download_wacz(&resp.run_now_job)
+                                    .await
+                                {
+                                    Ok(bytes) => bytes,
+                                    Err(err) => {
+                                        error!(%err, "Error occurred downloading WACZ file, aborting accession creation");
+                                        return;
+                                    }
+                                };
+
+                                let unique_filename = format!("{}.wacz", Uuid::new_v4());
+                                if let Err(err) = self
+                                    .s3_repo
+                                    .upload_from_bytes(
+                                        &unique_filename,
+                                        wacz_bytes,
+                                        "application/wacz",
+                                    )
+                                    .await
+                                {
+                                    error!(%err, "Error occurred uploading WACZ file to S3, aborting accession creation");
+                                    return;
+                                };
+                                info!("WACZ file uploaded to S3 with filename {}", unique_filename);
                                 let create_accessions_request = CreateAccessionRequest {
                                     url: payload.url.clone(),
                                     browser_profile: payload.browser_profile,
@@ -165,6 +226,8 @@ impl AccessionsService {
                                     metadata_time: payload.metadata_time,
                                     metadata_subjects: payload.metadata_subjects,
                                     is_private: payload.is_private,
+                                    metadata_format: DublinMetadataFormat::Wacz,
+                                    s3_filename: Some(unique_filename.clone()),
                                 };
                                 let write_result = self
                                     .accessions_repo

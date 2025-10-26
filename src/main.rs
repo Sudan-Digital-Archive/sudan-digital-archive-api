@@ -15,6 +15,7 @@ use crate::repos::accessions_repo::DBAccessionsRepo;
 use crate::repos::auth_repo::DBAuthRepo;
 use crate::repos::browsertrix_repo::{BrowsertrixRepo, HTTPBrowsertrixRepo};
 use crate::repos::emails_repo::PostmarkEmailsRepo;
+use crate::repos::s3_repo::{DigitalOceanSpacesRepo, S3Repo};
 use crate::repos::subjects_repo::DBSubjectsRepo;
 use crate::services::accessions_service::AccessionsService;
 use crate::services::auth_service::AuthService;
@@ -58,10 +59,19 @@ async fn main() {
         create_crawl_url: app_config.browsertrix.create_crawl_url,
     };
     http_btrix_repo.initialize().await;
+    let digital_ocean_spaces_repo = DigitalOceanSpacesRepo::new(
+        app_config.digital_ocean_spaces_bucket,
+        &app_config.digital_ocean_spaces_endpoint_url,
+        &app_config.digital_ocean_spaces_access_key,
+        &app_config.digital_ocean_spaces_secret_key,
+    )
+    .await
+    .expect("Could not create DigitalOcean Spaces repo");
     let accessions_service = AccessionsService {
         accessions_repo: Arc::new(accessions_repo),
         browsertrix_repo: Arc::new(http_btrix_repo),
         emails_repo: Arc::new(emails_repo.clone()),
+        s3_repo: Arc::new(digital_ocean_spaces_repo),
     };
     let auth_service = AuthService {
         auth_repo: Arc::new(auth_repo),

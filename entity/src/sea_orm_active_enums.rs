@@ -18,6 +18,20 @@ pub enum CrawlStatus {
     #[sea_orm(string_value = "pending")]
     Pending,
 }
+
+#[derive(
+    Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema,
+)]
+#[sea_orm(
+    rs_type = "String",
+    db_type = "Enum",
+    enum_name = "dublin_metadata_format"
+)]
+pub enum DublinMetadataFormat {
+    #[sea_orm(string_value = "wacz")]
+    #[serde(rename = "wacz")]
+    Wacz,
+}
 #[derive(
     Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema,
 )]
