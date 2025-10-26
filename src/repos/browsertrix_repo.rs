@@ -180,9 +180,7 @@ impl BrowsertrixRepo for HTTPBrowsertrixRepo {
         let get_crawl_resp_json: GetCrawlResponse = get_crawl_resp.json().await?;
         Ok(get_crawl_resp_json.last_crawl_state)
     }
-    // pretty sure this is failing due to mixed up ids crawl id should be different id value to what they have
-    // there is a race condition when called from create one; it's not created yet
-    // so need to retry a few times based off n 404 codes with async sleep
+
     async fn download_wacz(&self, crawl_id: &str) -> Result<Bytes, Error> {
         let download_url = format!(
             "{}/orgs/{}/crawls/{crawl_id}/download?prefer_single_wacz=true",
