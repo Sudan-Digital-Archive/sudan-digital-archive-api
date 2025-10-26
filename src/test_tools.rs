@@ -14,12 +14,12 @@ use crate::repos::accessions_repo::AccessionsRepo;
 use crate::repos::auth_repo::AuthRepo;
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
 use crate::repos::emails_repo::EmailsRepo;
-use crate::repos::s3_repo::{S3Error, S3Repo};
+use crate::repos::s3_repo::S3Repo;
 use crate::repos::subjects_repo::SubjectsRepo;
 use crate::services::accessions_service::AccessionsService;
 use crate::services::auth_service::AuthService;
 use crate::services::subjects_service::SubjectsService;
-use ::entity::sea_orm_active_enums::Role;
+use ::entity::sea_orm_active_enums::{DublinMetadataFormat, Role};
 use async_trait::async_trait;
 use axum::Router;
 use bytes::Bytes;
@@ -31,9 +31,9 @@ use entity::sea_orm_active_enums::CrawlStatus;
 use jsonwebtoken::{encode, Header};
 use reqwest::{Error, RequestBuilder, Response};
 use sea_orm::DbErr;
+use std::error::Error as StdError;
 use std::sync::Arc;
 use uuid::Uuid;
-
 /// In-memory implementation of AccessionsRepo for testing.
 /// Returns predefined mock data instead of interacting with a database.
 #[derive(Clone, Debug, Default)]
@@ -204,9 +204,9 @@ impl BrowsertrixRepo for InMemoryBrowsertrixRepo {
         Ok("my url".to_owned())
     }
     /// Returns fixed bytes for WACZ file content.
-    async fn download_wacz(&self, crawl_id: &str) -> Result<bytes::Bytes, Error> {
+    async fn download_wacz(&self, _crawl_id: &str) -> Result<bytes::Bytes, Error> {
         // Return empty bytes for testing
-        Ok(bytes::Bytes::from_static(b"test wacz content"))
+        Ok(bytes::Bytes::from_static(b"{}"))
     }
     /// Returns a mock response for any request.
     async fn make_request(&self, _req: RequestBuilder) -> Result<Response, Error> {
@@ -244,12 +244,18 @@ impl BrowsertrixRepo for InMemoryBrowsertrixRepo {
 /// Mock implementation for testing
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryS3Repo {
+    #[allow(dead_code)]
     pub bucket: String,
 }
 
 #[async_trait]
 impl S3Repo for InMemoryS3Repo {
-    async fn new(_region: &str, bucket: String) -> Result<Self, S3Error> {
+    async fn new(
+        bucket: String,
+        _endpoint_url: &str,
+        _access_key: &str,
+        _secret_key: &str,
+    ) -> Result<Self, Box<dyn StdError>> {
         Ok(Self { bucket })
     }
 
@@ -258,21 +264,17 @@ impl S3Repo for InMemoryS3Repo {
         key: &str,
         _bytes: Bytes,
         _content_type: &str,
-    ) -> Result<String, S3Error> {
+    ) -> Result<String, Box<dyn std::error::Error>> {
         // Return a deterministic mock ETag based on the key
         Ok(format!("mock-etag-{}", key))
     }
 
     async fn get_presigned_url(
         &self,
-        object_key: &str,
-        expires_in: u64,
-    ) -> Result<String, S3Error> {
-        // Return a deterministic mock URL
-        Ok(format!(
-            "https://mock-s3.test/{}/{}?expires={}",
-            self.bucket, object_key, expires_in
-        ))
+        _object_key: &str,
+        _expires_in: u64,
+    ) -> Result<String, Box<dyn StdError>> {
+        Ok("my url".to_string())
     }
 }
 /// Builds a test accessions service with in-memory repositories.
@@ -281,10 +283,14 @@ pub fn build_test_accessions_service() -> AccessionsService {
     let accessions_repo = Arc::new(InMemoryAccessionsRepo::default());
     let browsertrix_repo = Arc::new(InMemoryBrowsertrixRepo {});
     let emails_repo = Arc::new(InMemoryEmailsRepo::default());
+    let s3_repo = Arc::new(InMemoryS3Repo {
+        bucket: "test-bucket".to_string(),
+    });
     AccessionsService {
         accessions_repo,
         browsertrix_repo,
         emails_repo,
+        s3_repo,
     }
 }
 
@@ -351,6 +357,8 @@ pub fn mock_one_accession_with_metadata() -> AccessionsWithMetadataModel {
         subjects_en_ids: Some(vec![1]),
         subjects_ar_ids: Some(vec![3]),
         is_private: true,
+        dublin_metadata_format: DublinMetadataFormat::Wacz,
+        s3_filename: Some("some_file.wacz".to_string()),
     }
 }
 

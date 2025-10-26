@@ -1,13 +1,13 @@
 use async_trait::async_trait;
+use aws_config;
 use aws_sdk_s3::error::ProvideErrorMetadata;
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::put_object::PutObjectError;
+use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::Client;
-use aws_config;
 use bytes::Bytes;
 use std::error::Error;
-
-/// Repository trait for S3-compatible storage operations
+// Repository trait for S3-compatible storage operations
 #[async_trait]
 pub trait S3Repo: Send + Sync {
     /// Creates a new instance of the S3 repository
@@ -88,7 +88,7 @@ impl S3Repo for DigitalOceanSpacesRepo {
             .region("us-east-1")
             .load()
             .await;
-            
+
         let client = Client::new(&s3_config);
         Ok(Self { client, bucket })
     }
@@ -116,16 +116,14 @@ impl S3Repo for DigitalOceanSpacesRepo {
                 .ok_or_else(|| "Missing ETag in response".into()),
             Err(err) => match err.into_service_error() {
                 PutObjectError::EncryptionTypeMismatch(e) => {
-                    Err(format!("Object was created with different encryption: {:?}", e).into())
+                    Err(format!("Object was created with different encryption: {e:?}").into())
                 }
-                PutObjectError::InvalidRequest(e) => {
-                    Err(format!("Invalid request: {:?}", e).into())
-                }
+                PutObjectError::InvalidRequest(e) => Err(format!("Invalid request: {e:?}").into()),
                 PutObjectError::InvalidWriteOffset(e) => {
-                    Err(format!("Invalid write offset: {:?}", e).into())
+                    Err(format!("Invalid write offset: {e:?}").into())
                 }
                 PutObjectError::TooManyParts(e) => {
-                    Err(format!("Too many parts (max 10000): {:?}", e).into())
+                    Err(format!("Too many parts (max 10000): {e:?}").into())
                 }
                 err => Err(format!("Upload failed: {:#?}", err.code()).into()),
             },
@@ -150,16 +148,15 @@ impl S3Repo for DigitalOceanSpacesRepo {
             Ok(_) => (),
             Err(err) => match err.into_service_error() {
                 GetObjectError::NoSuchKey(_) => {
-                    return Err(format!("Object not found: {}", object_key).into());
+                    return Err(format!("Object not found: {object_key}").into());
                 }
                 GetObjectError::InvalidObjectState(e) => {
                     return Err(format!(
-                        "Object is archived and needs to be restored first: {:?}",
-                        e
+                        "Object is archived and needs to be restored first: {e:?}"
                     )
                     .into());
                 }
-                err => return Err(format!("Service error: {}", err).into()),
+                err => return Err(format!("Service error: {err}").into()),
             },
         };
 
@@ -169,11 +166,11 @@ impl S3Repo for DigitalOceanSpacesRepo {
             .bucket(&self.bucket)
             .key(object_key)
             .presigned(
-                aws_sdk_s3::presigning::PresigningConfig::expires_in(expires_in)
-                    .map_err(|e| format!("Failed to create presigning config: {}", e))?,
+                PresigningConfig::expires_in(expires_in)
+                    .map_err(|e| format!("Failed to create presigning config: {e}"))?,
             )
             .await
-            .map_err(|e| format!("Failed to generate presigned URL: {}", e))?;
+            .map_err(|e| format!("Failed to generate presigned URL: {e}"))?;
 
         Ok(presigned_request.uri().to_string())
     }
