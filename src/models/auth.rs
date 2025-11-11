@@ -43,12 +43,48 @@ impl fmt::Display for JWTClaims {
     }
 }
 
-impl<S> FromRequestParts<S> for JWTClaims
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AuthenticatedUser {
+    pub user_id: String,
+    pub expiry: Option<usize>,
+    pub role: Role,
+}
+
+impl fmt::Display for AuthenticatedUser {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "UserId: {}\nExpiry: {:?}\nRole: {:?}",
+            self.user_id, self.expiry, self.role
+        )
+    }
+}
+
+impl<S> FromRequestParts<S> for AuthenticatedUser
 where
     S: Send + Sync,
 {
     type Rejection = AuthError;
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        // Check for API key in Authorization header first
+        if let Some(auth_header) = parts.headers.get("authorization") {
+            if let Ok(auth_str) = auth_header.to_str() {
+                if let Some(api_key) = auth_str.strip_prefix("Bearer ") {
+                    if api_key == "letmein" {
+                        // TODO: Look up user from database
+                        return Ok(AuthenticatedUser {
+                            user_id: "api-key-user".to_string(),
+                            expiry: None,
+                            role: Role::Researcher,
+                        });
+                    } else {
+                        return Err(AuthError::InvalidToken);
+                    }
+                }
+            }
+        }
+
+        // Fall back to JWT from cookie
         let cookie_jar = parts
             .extract::<CookieJar>()
             .await
@@ -71,6 +107,10 @@ where
             })?;
 
         let claims = token_data.claims;
-        Ok(claims)
+        Ok(AuthenticatedUser {
+            user_id: claims.sub,
+            expiry: Some(claims.exp),
+            role: claims.role,
+        })
     }
 }

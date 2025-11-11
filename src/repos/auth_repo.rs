@@ -1,13 +1,18 @@
 use crate::models::request::AuthorizeRequest;
+use ::entity::api_key::ActiveModel as ApiKeyActiveModel;
+use ::entity::api_key::Entity as ApiKey;
 use ::entity::archive_user::Entity as ArchiveUser;
 use ::entity::archive_user::Model as ArchiveUserModel;
 use ::entity::session::ActiveModel as SessionActiveModel;
 use ::entity::session::Entity as Session;
 use async_trait::async_trait;
+use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use chrono::{Duration, NaiveDateTime, Utc};
-use entity::{archive_user, session};
+use entity::{api_key, archive_user, session};
+use rand::Rng;
 use sea_orm::{ActiveModelTrait, ActiveValue};
 use sea_orm::{ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter};
+use sha2::{Digest, Sha256};
 use tracing::{error, info};
 use uuid::Uuid;
 #[derive(Debug, Clone, Default)]
@@ -26,6 +31,8 @@ pub trait AuthRepo: Send + Sync {
         authorize_request: AuthorizeRequest,
     ) -> Result<Option<NaiveDateTime>, DbErr>;
     async fn get_one(&self, user_id: Uuid) -> Result<Option<ArchiveUserModel>, DbErr>;
+    async fn create_api_key_for_user(&self, user_id: Uuid) -> Result<String, DbErr>;
+    async fn verify_api_key(&self, api_key: String) -> Result<Option<String>, DbErr>;
 }
 
 #[async_trait]
@@ -92,6 +99,80 @@ impl AuthRepo for DBAuthRepo {
             .await?;
         match user {
             Some(user) => Ok(Some(user)),
+            None => Ok(None),
+        }
+    }
+
+    async fn create_api_key_for_user(&self, user_id: Uuid) -> Result<String, DbErr> {
+        // Generate a cryptographically secure random 32-byte secret
+        let mut secret_bytes = [0u8; 32];
+        {
+            let mut rng = rand::thread_rng();
+            rng.fill(&mut secret_bytes);
+        }
+
+        // Hash the secret using SHA256
+        let mut hasher = Sha256::new();
+        hasher.update(&secret_bytes);
+        let key_hash = hasher.finalize();
+        let key_hash_hex = format!("{:x}", key_hash);
+
+        // Create the API key record in the database
+        let api_key_id = Uuid::new_v4();
+        let now = Utc::now();
+        let expires_at = now + Duration::days(90);
+
+        let api_key = ApiKeyActiveModel {
+            id: ActiveValue::Set(api_key_id),
+            user_id: ActiveValue::Set(user_id),
+            key_hash: ActiveValue::Set(key_hash_hex),
+            created_at: ActiveValue::Set(now.naive_utc()),
+            expires_at: ActiveValue::Set(expires_at.naive_utc()),
+            is_revoked: ActiveValue::Set(false),
+        };
+
+        api_key.insert(&self.db_session).await?;
+
+        // URL-safe encode the secret and return it to the user
+        let encoded_secret = URL_SAFE.encode(&secret_bytes);
+        Ok(encoded_secret)
+    }
+
+    async fn verify_api_key(&self, api_key: String) -> Result<Option<String>, DbErr> {
+        // Decode the URL-safe encoded API key back to bytes
+        let secret_bytes = match URL_SAFE.decode(&api_key) {
+            Ok(bytes) => bytes,
+            Err(_) => return Ok(None),
+        };
+
+        // Hash the decoded secret using SHA256
+        let mut hasher = Sha256::new();
+        hasher.update(&secret_bytes);
+        let key_hash = hasher.finalize();
+        let key_hash_hex = format!("{:x}", key_hash);
+
+        // Look up the key hash in the database
+        let api_key_record = ApiKey::find()
+            .filter(api_key::Column::KeyHash.eq(key_hash_hex))
+            .filter(api_key::Column::IsRevoked.eq(false))
+            .filter(api_key::Column::ExpiresAt.gt(Utc::now().naive_utc()))
+            .one(&self.db_session)
+            .await?;
+
+        match api_key_record {
+            Some(key_record) => {
+                // Get the user email associated with this API key
+                let user = ArchiveUser::find()
+                    .filter(archive_user::Column::Id.eq(key_record.user_id))
+                    .filter(archive_user::Column::IsActive.eq(true))
+                    .one(&self.db_session)
+                    .await?;
+
+                match user {
+                    Some(user) => Ok(Some(user.email)),
+                    None => Ok(None),
+                }
+            }
             None => Ok(None),
         }
     }

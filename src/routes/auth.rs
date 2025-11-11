@@ -5,7 +5,7 @@
 //! The module uses an authentication service to handle the authentication logic.
 
 use crate::app_factory::AppState;
-use crate::models::auth::JWTClaims;
+use crate::models::auth::AuthenticatedUser;
 use crate::models::request::{AuthorizeRequest, LoginRequest};
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -92,7 +92,7 @@ async fn authorize(
         ("jwt_cookie_auth" = [])
     )
 )]
-async fn verify(State(_state): State<AppState>, claims: JWTClaims) -> Response {
-    let user_data = format!("Verifying your JWT...\nYour data:\n{claims}");
+async fn verify(State(_state): State<AppState>, authenticated_user: AuthenticatedUser) -> Response {
+    let user_data = format!("Verifying your JWT...\nYour data:\n{authenticated_user}");
     (StatusCode::OK, user_data).into_response()
 }

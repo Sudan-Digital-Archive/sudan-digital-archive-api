@@ -7,7 +7,7 @@
 
 use crate::app_factory::AppState;
 use crate::auth::validate_at_least_researcher;
-use crate::models::auth::JWTClaims;
+use crate::models::auth::AuthenticatedUser;
 use crate::models::request::{CreateSubjectRequest, DeleteSubjectRequest, SubjectPagination};
 use crate::models::response::{ListSubjectsArResponse, ListSubjectsEnResponse, SubjectResponse};
 use ::entity::sea_orm_active_enums::Role;
@@ -45,10 +45,10 @@ pub fn get_subjects_routes() -> Router<AppState> {
 )]
 async fn create_subject(
     State(state): State<AppState>,
-    claims: JWTClaims,
+    authenticated_user: AuthenticatedUser,
     Json(payload): Json<CreateSubjectRequest>,
 ) -> Response {
-    if !validate_at_least_researcher(&claims.role) {
+    if !validate_at_least_researcher(&authenticated_user.role) {
         return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
     }
     if let Err(err) = payload.validate() {
@@ -109,10 +109,10 @@ async fn list_subjects(
 async fn delete_subject(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-    claims: JWTClaims,
+    authenticated_user: AuthenticatedUser,
     Json(payload): Json<DeleteSubjectRequest>,
 ) -> Response {
-    if claims.role != Role::Admin {
+    if authenticated_user.role != Role::Admin {
         return (StatusCode::FORBIDDEN, "Insufficient permissions").into_response();
     }
     if let Err(err) = payload.validate() {
