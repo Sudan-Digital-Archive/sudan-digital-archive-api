@@ -1,3 +1,4 @@
+use crate::app_factory::AppState;
 use crate::auth::JWT_KEYS;
 use ::entity::sea_orm_active_enums::Role;
 use axum::response::{IntoResponse, Response};
@@ -60,25 +61,35 @@ impl fmt::Display for AuthenticatedUser {
     }
 }
 
-impl<S> FromRequestParts<S> for AuthenticatedUser
-where
-    S: Send + Sync,
-{
+impl FromRequestParts<AppState> for AuthenticatedUser {
     type Rejection = AuthError;
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
         // Check for API key in Authorization header first
         if let Some(auth_header) = parts.headers.get("authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
                 if let Some(api_key) = auth_str.strip_prefix("Bearer ") {
-                    if api_key == "letmein" {
-                        // TODO: Look up user from database
-                        return Ok(AuthenticatedUser {
-                            user_id: "api-key-user".to_string(),
-                            expiry: None,
-                            role: Role::Researcher,
-                        });
-                    } else {
-                        return Err(AuthError::InvalidToken);
+                    // Verify the API key with the auth service
+                    let verify_result =
+                        state.auth_service.verify_api_key(api_key.to_string()).await;
+
+                    match verify_result {
+                        Ok(Some(user_info)) => {
+                            let auth_service = state.auth_service.clone();
+                            tokio::spawn(async move {
+                                auth_service.delete_expired_api_keys().await;
+                            });
+                            return Ok(AuthenticatedUser {
+                                user_id: user_info.email,
+                                expiry: None,
+                                role: user_info.role,
+                            });
+                        }
+                        _ => {
+                            return Err(AuthError::InvalidToken);
+                        }
                     }
                 }
             }

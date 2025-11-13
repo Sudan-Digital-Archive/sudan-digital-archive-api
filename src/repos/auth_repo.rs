@@ -3,6 +3,7 @@ use ::entity::api_key::ActiveModel as ApiKeyActiveModel;
 use ::entity::api_key::Entity as ApiKey;
 use ::entity::archive_user::Entity as ArchiveUser;
 use ::entity::archive_user::Model as ArchiveUserModel;
+use ::entity::sea_orm_active_enums::Role;
 use ::entity::session::ActiveModel as SessionActiveModel;
 use ::entity::session::Entity as Session;
 use async_trait::async_trait;
@@ -12,9 +13,17 @@ use entity::{api_key, archive_user, session};
 use rand::Rng;
 use sea_orm::{ActiveModelTrait, ActiveValue};
 use sea_orm::{ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tracing::{error, info};
 use uuid::Uuid;
+
+/// Response containing user email and role from API key verification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiKeyUserInfo {
+    pub email: String,
+    pub role: Role,
+}
 #[derive(Debug, Clone, Default)]
 pub struct DBAuthRepo {
     pub db_session: DatabaseConnection,
@@ -32,7 +41,8 @@ pub trait AuthRepo: Send + Sync {
     ) -> Result<Option<NaiveDateTime>, DbErr>;
     async fn get_one(&self, user_id: Uuid) -> Result<Option<ArchiveUserModel>, DbErr>;
     async fn create_api_key_for_user(&self, user_id: Uuid) -> Result<String, DbErr>;
-    async fn verify_api_key(&self, api_key: String) -> Result<Option<String>, DbErr>;
+    async fn verify_api_key(&self, api_key: String) -> Result<Option<ApiKeyUserInfo>, DbErr>;
+    async fn delete_expired_api_keys(&self);
 }
 
 #[async_trait]
@@ -138,7 +148,7 @@ impl AuthRepo for DBAuthRepo {
         Ok(encoded_secret)
     }
 
-    async fn verify_api_key(&self, api_key: String) -> Result<Option<String>, DbErr> {
+    async fn verify_api_key(&self, api_key: String) -> Result<Option<ApiKeyUserInfo>, DbErr> {
         // Decode the URL-safe encoded API key back to bytes
         let secret_bytes = match URL_SAFE.decode(&api_key) {
             Ok(bytes) => bytes,
@@ -161,7 +171,7 @@ impl AuthRepo for DBAuthRepo {
 
         match api_key_record {
             Some(key_record) => {
-                // Get the user email associated with this API key
+                // Get the user associated with this API key, including their role
                 let user = ArchiveUser::find()
                     .filter(archive_user::Column::Id.eq(key_record.user_id))
                     .filter(archive_user::Column::IsActive.eq(true))
@@ -169,11 +179,31 @@ impl AuthRepo for DBAuthRepo {
                     .await?;
 
                 match user {
-                    Some(user) => Ok(Some(user.email)),
+                    Some(user) => Ok(Some(ApiKeyUserInfo {
+                        email: user.email,
+                        role: user.role,
+                    })),
                     None => Ok(None),
                 }
             }
             None => Ok(None),
+        }
+    }
+
+    async fn delete_expired_api_keys(&self) {
+        let now = Utc::now().naive_utc();
+        let delete_result = ApiKey::delete_many()
+            .filter(api_key::Column::ExpiresAt.lte(now))
+            .exec(&self.db_session)
+            .await;
+
+        match delete_result {
+            Ok(_) => {
+                info!("Successfully deleted expired API keys.");
+            }
+            Err(err) => {
+                error!(%err, "Error deleting expired API keys");
+            }
         }
     }
 }

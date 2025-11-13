@@ -1,8 +1,8 @@
 # TODO
 
-- Expire old api keys in separate thread somewhere
 - Add docstrings to the auth repo
 - Add a list users endpoint sigh might as well add a create user endpoint too while we're at it and a get user one
+- Have another go at swagger ui docs?
 
 # Overview
 
