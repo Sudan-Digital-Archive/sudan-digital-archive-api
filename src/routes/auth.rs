@@ -14,7 +14,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use ::entity::sea_orm_active_enums::Role;
-use tracing::error;
+use tracing::{error, info};
 use uuid::Uuid;
 use validator::Validate;
 
@@ -130,12 +130,19 @@ async fn create_api_key(
 
     match api_key_result {
         Ok(api_key_secret) => {
+            info!(
+                "API key created by admin {} for user {}",
+                authenticated_user.user_id, user_id
+            );
             let response = CreateApiKeyResponse { api_key_secret };
             (StatusCode::CREATED, Json(response)).into_response()
         }
         Err(err) => {
+            error!(
+                "Failed to create API key by admin {} for user {}: {}",
+                authenticated_user.user_id, user_id, err
+            );
             let message = format!("Failed to create API key: {err}");
-            error!(message);
             (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
         }
     }
