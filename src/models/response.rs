@@ -168,3 +168,9 @@ pub struct ListSubjectsEnResponse {
     pub page: u64,
     pub per_page: u64,
 }
+
+/// Response containing the created API key secret.
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateApiKeyResponse {
+    pub api_key_secret: String,
+}

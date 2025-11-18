@@ -7,12 +7,15 @@
 use crate::app_factory::AppState;
 use crate::models::auth::AuthenticatedUser;
 use crate::models::request::{AuthorizeRequest, LoginRequest};
-use axum::extract::State;
+use crate::models::response::CreateApiKeyResponse;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use ::entity::sea_orm_active_enums::Role;
 use tracing::error;
+use uuid::Uuid;
 use validator::Validate;
 
 pub fn get_auth_routes() -> Router<AppState> {
@@ -21,7 +24,8 @@ pub fn get_auth_routes() -> Router<AppState> {
         Router::new()
             .route("/", post(login))
             .route("/authorize", post(authorize))
-            .route("/", get(verify)),
+            .route("/", get(verify))
+            .route("/:user_id/api-key", post(create_api_key)),
     )
 }
 
@@ -95,4 +99,44 @@ async fn authorize(
 async fn verify(State(_state): State<AppState>, authenticated_user: AuthenticatedUser) -> Response {
     let user_data = format!("Verifying your JWT...\nYour data:\n{authenticated_user}");
     (StatusCode::OK, user_data).into_response()
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/{user_id}/api-key",
+    tag = "Auth",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID")
+    ),
+    responses(
+        (status = 201, description = "API key created", body = CreateApiKeyResponse),
+        (status = 403, description = "Forbidden"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("jwt_cookie_auth" = [])
+    )
+)]
+async fn create_api_key(
+    State(state): State<AppState>,
+    Path(user_id): Path<Uuid>,
+    authenticated_user: AuthenticatedUser,
+) -> Response {
+    if authenticated_user.role != Role::Admin {
+        return (StatusCode::FORBIDDEN, "Only admins can create API keys").into_response();
+    }
+
+    let api_key_result = state.auth_service.create_api_key(user_id).await;
+
+    match api_key_result {
+        Ok(api_key_secret) => {
+            let response = CreateApiKeyResponse { api_key_secret };
+            (StatusCode::CREATED, Json(response)).into_response()
+        }
+        Err(err) => {
+            let message = format!("Failed to create API key: {err}");
+            error!(message);
+            (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
+        }
+    }
 }

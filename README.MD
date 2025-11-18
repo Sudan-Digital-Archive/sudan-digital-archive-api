@@ -1,8 +1,7 @@
 # TODO
 
-- Add docstrings to the auth repo
-- Add a list users endpoint sigh might as well add a create user endpoint too while we're at it and a get user one
-- Have another go at swagger ui docs?
+- Test api keys actually work e2e
+- Tidy up tests and clippy etc.
 
 # Overview
 
