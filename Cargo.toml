@@ -38,6 +38,7 @@ utoipa-axum = "0.2.0"
 sha2 = "0.10.8"
 base64 = "0.22.0"
 rand = "0.8.5"
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 
 [dev-dependencies]
 mime = "0.3.17"

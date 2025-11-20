@@ -44,9 +44,6 @@ pub fn get_accessions_routes() -> Router<AppState> {
         (status = 201, description = "Started browsertrix crawl task!"),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn create_accession(
@@ -104,16 +101,10 @@ async fn get_one_accession(State(state): State<AppState>, Path(id): Path<i32>) -
     get,
     path = "/api/v1/accessions/private/{accession_id}",
     tag = "Accessions",
-    params(
-        ("accession_id" = i32, Path, description = "Accession ID")
-    ),
     responses(
         (status = 200, description = "OK", body = GetOneAccessionResponse),
         (status = 404, description = "Not found"),
         (status = 403, description = "Forbidden")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn get_one_private_accession(
@@ -164,16 +155,10 @@ async fn list_accessions(
     get,
     path = "/api/v1/accessions/private",
     tag = "Accessions",
-    params(
-        AccessionPaginationWithPrivate
-    ),
     responses(
         (status = 200, description = "OK", body = ListAccessionsResponse),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn list_accessions_private(
@@ -195,16 +180,10 @@ async fn list_accessions_private(
     delete,
     path = "/api/v1/accessions/{accession_id}",
     tag = "Accessions",
-    params(
-        ("accession_id" = i32, Path, description = "Accession ID")
-    ),
     responses(
         (status = 200, description = "Accession deleted"),
         (status = 403, description = "Forbidden"),
         (status = 404, description = "Not found")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn delete_accession(
@@ -223,18 +202,12 @@ async fn delete_accession(
     put,
     path = "/api/v1/accessions/{accession_id}",
     tag = "Accessions",
-    params(
-        ("accession_id" = i32, Path, description = "Accession ID")
-    ),
     request_body = UpdateAccessionRequest,
     responses(
         (status = 200, description = "OK", body = GetOneAccessionResponse),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden"),
         (status = 404, description = "Not found")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn update_accession(

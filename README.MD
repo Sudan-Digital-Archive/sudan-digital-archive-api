@@ -1,7 +1,7 @@
 # TODO
 
-- Test api keys actually work e2e
 - Tidy up tests and clippy etc.
+- Remove LLM comments
 
 # Overview
 

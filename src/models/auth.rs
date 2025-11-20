@@ -68,28 +68,21 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
         // Check for API key in Authorization header first
-        if let Some(auth_header) = parts.headers.get("authorization") {
-            if let Ok(auth_str) = auth_header.to_str() {
-                if let Some(api_key) = auth_str.strip_prefix("Bearer ") {
-                    // Verify the API key with the auth service
-                    let verify_result =
-                        state.auth_service.verify_api_key(api_key.to_string()).await;
+        if let Some(auth_header) = parts.headers.get("X-Api-Key") {
+            if let Ok(api_key) = auth_header.to_str() {
+                // Verify the API key with the auth service
+                let verify_result = state.auth_service.verify_api_key(api_key.to_string()).await;
 
-                    match verify_result {
-                        Ok(Some(user_info)) => {
-                            let auth_service = state.auth_service.clone();
-                            tokio::spawn(async move {
-                                auth_service.delete_expired_api_keys().await;
-                            });
-                            return Ok(AuthenticatedUser {
-                                user_id: user_info.email,
-                                expiry: None,
-                                role: user_info.role,
-                            });
-                        }
-                        _ => {
-                            return Err(AuthError::InvalidToken);
-                        }
+                match verify_result {
+                    Ok(Some(user_info)) => {
+                        return Ok(AuthenticatedUser {
+                            user_id: user_info.email,
+                            expiry: None,
+                            role: user_info.role,
+                        });
+                    }
+                    _ => {
+                        return Err(AuthError::InvalidToken);
                     }
                 }
             }

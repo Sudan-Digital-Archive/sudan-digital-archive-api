@@ -38,9 +38,6 @@ pub fn get_subjects_routes() -> Router<AppState> {
         (status = 201, description = "Created", body = SubjectResponse),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn create_subject(
@@ -92,18 +89,12 @@ async fn list_subjects(
     delete,
     path = "/api/v1/metadata-subjects/{subject_id}",
     tag = "Subjects",
-    params(
-        ("subject_id" = i32, Path, description = "Subject ID")
-    ),
     request_body = DeleteSubjectRequest,
     responses(
         (status = 200, description = "Subject deleted"),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden"),
         (status = 404, description = "Not found")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn delete_subject(

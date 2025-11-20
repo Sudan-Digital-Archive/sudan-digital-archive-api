@@ -8,12 +8,12 @@ use crate::app_factory::AppState;
 use crate::models::auth::AuthenticatedUser;
 use crate::models::request::{AuthorizeRequest, LoginRequest};
 use crate::models::response::CreateApiKeyResponse;
+use ::entity::sea_orm_active_enums::Role;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use ::entity::sea_orm_active_enums::Role;
 use tracing::{error, info};
 use uuid::Uuid;
 use validator::Validate;
@@ -25,7 +25,7 @@ pub fn get_auth_routes() -> Router<AppState> {
             .route("/", post(login))
             .route("/authorize", post(authorize))
             .route("/", get(verify))
-            .route("/:user_id/api-key", post(create_api_key)),
+            .route("/{:user_id}/api-key", post(create_api_key)),
     )
 }
 
@@ -91,9 +91,6 @@ async fn authorize(
     responses(
         (status = 200, description = "OK", body = String),
         (status = 401, description = "Unauthorized")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn verify(State(_state): State<AppState>, authenticated_user: AuthenticatedUser) -> Response {
@@ -105,16 +102,10 @@ async fn verify(State(_state): State<AppState>, authenticated_user: Authenticate
     post,
     path = "/api/v1/auth/{user_id}/api-key",
     tag = "Auth",
-    params(
-        ("user_id" = Uuid, Path, description = "User ID")
-    ),
     responses(
         (status = 201, description = "API key created", body = CreateApiKeyResponse),
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Internal server error")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn create_api_key(
@@ -134,6 +125,10 @@ async fn create_api_key(
                 "API key created by admin {} for user {}",
                 authenticated_user.user_id, user_id
             );
+            let auth_service = state.auth_service.clone();
+            tokio::spawn(async move {
+                auth_service.delete_expired_api_keys().await;
+            });
             let response = CreateApiKeyResponse { api_key_secret };
             (StatusCode::CREATED, Json(response)).into_response()
         }

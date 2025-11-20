@@ -4,7 +4,7 @@ use crate::models::request::{
     UpdateAccessionRequest,
 };
 use crate::models::response::{
-    GetOneAccessionResponse, ListAccessionsResponse, ListSubjectsArResponse,
+    CreateApiKeyResponse, GetOneAccessionResponse, ListAccessionsResponse, ListSubjectsArResponse,
     ListSubjectsEnResponse, SubjectResponse,
 };
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
@@ -18,7 +18,11 @@ impl Modify for SecurityAddon {
         components.add_security_scheme(
             "jwt_cookie_auth",
             SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("jwt"))),
-        )
+        );
+        components.add_security_scheme(
+            "api_key_auth",
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Api-Key"))),
+        );
     }
 }
 
@@ -37,6 +41,7 @@ impl Modify for SecurityAddon {
         crate::routes::auth::login,
         crate::routes::auth::authorize,
         crate::routes::auth::verify,
+        crate::routes::auth::create_api_key,
         crate::routes::subjects::create_subject,
         crate::routes::subjects::list_subjects,
         crate::routes::subjects::delete_subject
@@ -51,6 +56,7 @@ impl Modify for SecurityAddon {
             ListAccessionsResponse,
             LoginRequest,
             AuthorizeRequest,
+            CreateApiKeyResponse,
             CreateSubjectRequest,
             DeleteSubjectRequest,
             SubjectPagination,
