@@ -1,7 +1,8 @@
 # TODO
 
-- Tidy up tests and clippy etc.
-- Remove LLM comments
+- Run migrations in prod db
+- Deploy
+
 
 # Overview
 

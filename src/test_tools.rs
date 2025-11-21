@@ -192,6 +192,10 @@ impl AuthRepo for InMemoryAuthRepo {
             role: Role::Admin,
         }))
     }
+
+    async fn delete_expired_api_keys(&self) {
+        // No-op for tests
+    }
 }
 
 /// In-memory implementation of BrowsertrixRepo for testing.

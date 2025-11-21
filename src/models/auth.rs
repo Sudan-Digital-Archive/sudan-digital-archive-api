@@ -67,10 +67,8 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        // Check for API key in Authorization header first
         if let Some(auth_header) = parts.headers.get("X-Api-Key") {
             if let Ok(api_key) = auth_header.to_str() {
-                // Verify the API key with the auth service
                 let verify_result = state.auth_service.verify_api_key(api_key.to_string()).await;
 
                 match verify_result {
@@ -88,7 +86,6 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             }
         }
 
-        // Fall back to JWT from cookie
         let cookie_jar = parts
             .extract::<CookieJar>()
             .await

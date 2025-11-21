@@ -253,20 +253,17 @@ impl AuthRepo for DBAuthRepo {
     /// # Returns
     /// Returns the base64-URL encoded API key secret that should be provided to the user.
     async fn create_api_key_for_user(&self, user_id: Uuid) -> Result<String, DbErr> {
-        // Generate a cryptographically secure random 32-byte secret
         let mut secret_bytes = [0u8; 32];
         {
             let mut rng = rand::thread_rng();
             rng.fill(&mut secret_bytes);
         }
 
-        // Hash the secret using SHA256
         let mut hasher = Sha256::new();
-        hasher.update(&secret_bytes);
+        hasher.update(secret_bytes);
         let key_hash = hasher.finalize();
-        let key_hash_hex = format!("{:x}", key_hash);
+        let key_hash_hex = format!("{key_hash:x}");
 
-        // Create the API key record in the database
         let api_key_id = Uuid::new_v4();
         let now = Utc::now();
         let expires_at = now + Duration::days(90);
@@ -282,8 +279,7 @@ impl AuthRepo for DBAuthRepo {
 
         api_key.insert(&self.db_session).await?;
 
-        // URL-safe encode the secret and return it to the user
-        let encoded_secret = URL_SAFE.encode(&secret_bytes);
+        let encoded_secret = URL_SAFE.encode(secret_bytes);
         Ok(encoded_secret)
     }
 
@@ -299,19 +295,15 @@ impl AuthRepo for DBAuthRepo {
     /// Returns user information (email and role) if the key is valid, or `None` if the key
     /// is invalid, malformed, revoked, or expired.
     async fn verify_api_key(&self, api_key: String) -> Result<Option<ApiKeyUserInfo>, DbErr> {
-        // Decode the URL-safe encoded API key back to bytes
         let secret_bytes = match URL_SAFE.decode(&api_key) {
             Ok(bytes) => bytes,
             Err(_) => return Ok(None),
         };
 
-        // Hash the decoded secret using SHA256
         let mut hasher = Sha256::new();
-        hasher.update(&secret_bytes);
+        hasher.update(secret_bytes);
         let key_hash = hasher.finalize();
-        let key_hash_hex = format!("{:x}", key_hash);
-
-        // Look up the key hash in the database
+        let key_hash_hex = format!("{key_hash:x}");
         let api_key_record = ApiKey::find()
             .filter(api_key::Column::KeyHash.eq(key_hash_hex))
             .filter(api_key::Column::IsRevoked.eq(false))
@@ -321,7 +313,6 @@ impl AuthRepo for DBAuthRepo {
 
         match api_key_record {
             Some(key_record) => {
-                // Get the user associated with this API key, including their role
                 let user = ArchiveUser::find()
                     .filter(archive_user::Column::Id.eq(key_record.user_id))
                     .filter(archive_user::Column::IsActive.eq(true))
