@@ -1,9 +1,3 @@
-# TODO
-
-- Run migrations in prod db
-- Deploy
-
-
 # Overview
 
 This is the API for the Sudan Digital Archive.
