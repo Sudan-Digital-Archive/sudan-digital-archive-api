@@ -41,7 +41,7 @@ use tracing::info_span;
 use tracing_subscriber::util::SubscriberInitExt;
 use utoipa::OpenApi;
 use utoipa_redoc::{Redoc, Servable};
-
+use utoipa_swagger_ui::SwaggerUi;
 /// Application state shared across routes
 #[derive(Clone)]
 pub struct AppState {
@@ -130,6 +130,7 @@ fn build_routes(api: utoipa::openapi::OpenApi) -> Router<AppState> {
     let subjects_routes = get_subjects_routes();
     let auth_routes = get_auth_routes();
     Router::new()
+        .merge(SwaggerUi::new("/docs").url("/docs/openapi.json", api.clone()))
         .merge(Redoc::with_url_and_config(
             "/redoc",
             api,

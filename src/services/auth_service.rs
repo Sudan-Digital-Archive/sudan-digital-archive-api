@@ -1,7 +1,10 @@
 use crate::auth::JWT_KEYS;
 use crate::models::auth::JWTClaims;
 use crate::models::request::{AuthorizeRequest, LoginRequest};
-use crate::repos::{auth_repo::AuthRepo, emails_repo::EmailsRepo};
+use crate::repos::{
+    auth_repo::{ApiKeyUserInfo, AuthRepo},
+    emails_repo::EmailsRepo,
+};
 use ::entity::archive_user::Model as ArchiveUserModel;
 use ::entity::sea_orm_active_enums::Role;
 use axum::http::{
@@ -190,6 +193,18 @@ impl AuthService {
                 Ok((StatusCode::NOT_FOUND, message).into_response())
             }
         }
+    }
+
+    pub async fn create_api_key(&self, user_id: Uuid) -> Result<String, DbErr> {
+        self.auth_repo.create_api_key_for_user(user_id).await
+    }
+
+    pub async fn verify_api_key(&self, api_key: String) -> Result<Option<ApiKeyUserInfo>, DbErr> {
+        self.auth_repo.verify_api_key(api_key).await
+    }
+
+    pub async fn delete_expired_api_keys(self) {
+        self.auth_repo.delete_expired_api_keys().await
     }
 }
 

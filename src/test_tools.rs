@@ -11,7 +11,7 @@ use crate::models::request::{
 };
 use crate::models::response::CreateCrawlResponse;
 use crate::repos::accessions_repo::AccessionsRepo;
-use crate::repos::auth_repo::AuthRepo;
+use crate::repos::auth_repo::{ApiKeyUserInfo, AuthRepo};
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
 use crate::repos::emails_repo::EmailsRepo;
 use crate::repos::s3_repo::S3Repo;
@@ -180,6 +180,21 @@ impl AuthRepo for InMemoryAuthRepo {
             role: entity::sea_orm_active_enums::Role::Admin,
             is_active: true,
         }))
+    }
+
+    async fn create_api_key_for_user(&self, _user_id: Uuid) -> Result<String, DbErr> {
+        Ok("mock_api_key_secret".to_string())
+    }
+
+    async fn verify_api_key(&self, _api_key: String) -> Result<Option<ApiKeyUserInfo>, DbErr> {
+        Ok(Some(ApiKeyUserInfo {
+            email: "test@example.com".to_string(),
+            role: Role::Admin,
+        }))
+    }
+
+    async fn delete_expired_api_keys(&self) {
+        // No-op for tests
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::app_factory::AppState;
 use crate::auth::JWT_KEYS;
 use ::entity::sea_orm_active_enums::Role;
 use axum::response::{IntoResponse, Response};
@@ -43,12 +44,48 @@ impl fmt::Display for JWTClaims {
     }
 }
 
-impl<S> FromRequestParts<S> for JWTClaims
-where
-    S: Send + Sync,
-{
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AuthenticatedUser {
+    pub user_id: String,
+    pub expiry: Option<usize>,
+    pub role: Role,
+}
+
+impl fmt::Display for AuthenticatedUser {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "UserId: {}\nExpiry: {:?}\nRole: {:?}",
+            self.user_id, self.expiry, self.role
+        )
+    }
+}
+
+impl FromRequestParts<AppState> for AuthenticatedUser {
     type Rejection = AuthError;
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        if let Some(auth_header) = parts.headers.get("X-Api-Key") {
+            if let Ok(api_key) = auth_header.to_str() {
+                let verify_result = state.auth_service.verify_api_key(api_key.to_string()).await;
+
+                match verify_result {
+                    Ok(Some(user_info)) => {
+                        return Ok(AuthenticatedUser {
+                            user_id: user_info.email,
+                            expiry: None,
+                            role: user_info.role,
+                        });
+                    }
+                    _ => {
+                        return Err(AuthError::InvalidToken);
+                    }
+                }
+            }
+        }
+
         let cookie_jar = parts
             .extract::<CookieJar>()
             .await
@@ -71,6 +108,10 @@ where
             })?;
 
         let claims = token_data.claims;
-        Ok(claims)
+        Ok(AuthenticatedUser {
+            user_id: claims.sub,
+            expiry: Some(claims.exp),
+            role: claims.role,
+        })
     }
 }

@@ -1,5 +1,6 @@
 pub mod accession;
 pub mod accessions_with_metadata;
+pub mod api_key;
 pub mod archive_user;
 pub mod dublin_metadata_ar;
 pub mod dublin_metadata_ar_subjects;

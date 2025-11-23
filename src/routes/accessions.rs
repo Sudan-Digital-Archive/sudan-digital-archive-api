@@ -5,7 +5,7 @@
 
 use crate::app_factory::AppState;
 use crate::auth::validate_at_least_researcher;
-use crate::models::auth::JWTClaims;
+use crate::models::auth::AuthenticatedUser;
 use crate::models::request::{
     AccessionPagination, AccessionPaginationWithPrivate, CreateAccessionRequest,
     UpdateAccessionRequest,
@@ -44,17 +44,14 @@ pub fn get_accessions_routes() -> Router<AppState> {
         (status = 201, description = "Started browsertrix crawl task!"),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn create_accession(
     State(state): State<AppState>,
-    claims: JWTClaims,
+    authenticated_user: AuthenticatedUser,
     Json(payload): Json<CreateAccessionRequest>,
 ) -> Response {
-    if !validate_at_least_researcher(&claims.role) {
+    if !validate_at_least_researcher(&authenticated_user.role) {
         return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
     }
     if let Err(err) = payload.validate() {
@@ -78,7 +75,7 @@ async fn create_accession(
     tokio::spawn(async move {
         state
             .accessions_service
-            .create_one(payload, claims.sub)
+            .create_one(payload, authenticated_user.user_id)
             .await;
     });
     (StatusCode::CREATED, "Started browsertrix crawl task!").into_response()
@@ -104,24 +101,18 @@ async fn get_one_accession(State(state): State<AppState>, Path(id): Path<i32>) -
     get,
     path = "/api/v1/accessions/private/{accession_id}",
     tag = "Accessions",
-    params(
-        ("accession_id" = i32, Path, description = "Accession ID")
-    ),
     responses(
         (status = 200, description = "OK", body = GetOneAccessionResponse),
         (status = 404, description = "Not found"),
         (status = 403, description = "Forbidden")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn get_one_private_accession(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-    claims: JWTClaims,
+    authenticated_user: AuthenticatedUser,
 ) -> Response {
-    if !validate_at_least_researcher(&claims.role) {
+    if !validate_at_least_researcher(&authenticated_user.role) {
         return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
     }
     state.accessions_service.get_one(id, true).await
@@ -164,24 +155,18 @@ async fn list_accessions(
     get,
     path = "/api/v1/accessions/private",
     tag = "Accessions",
-    params(
-        AccessionPaginationWithPrivate
-    ),
     responses(
         (status = 200, description = "OK", body = ListAccessionsResponse),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn list_accessions_private(
     State(state): State<AppState>,
     pagination: Query<AccessionPaginationWithPrivate>,
-    claims: JWTClaims,
+    authenticated_user: AuthenticatedUser,
 ) -> Response {
-    if !validate_at_least_researcher(&claims.role) {
+    if !validate_at_least_researcher(&authenticated_user.role) {
         return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
     }
     if let Err(err) = pagination.0.validate() {
@@ -195,24 +180,18 @@ async fn list_accessions_private(
     delete,
     path = "/api/v1/accessions/{accession_id}",
     tag = "Accessions",
-    params(
-        ("accession_id" = i32, Path, description = "Accession ID")
-    ),
     responses(
         (status = 200, description = "Accession deleted"),
         (status = 403, description = "Forbidden"),
         (status = 404, description = "Not found")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn delete_accession(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-    claims: JWTClaims,
+    authenticated_user: AuthenticatedUser,
 ) -> Response {
-    if claims.role != Role::Admin {
+    if authenticated_user.role != Role::Admin {
         return (StatusCode::FORBIDDEN, "Insufficient permissions").into_response();
     }
 
@@ -223,27 +202,21 @@ async fn delete_accession(
     put,
     path = "/api/v1/accessions/{accession_id}",
     tag = "Accessions",
-    params(
-        ("accession_id" = i32, Path, description = "Accession ID")
-    ),
     request_body = UpdateAccessionRequest,
     responses(
         (status = 200, description = "OK", body = GetOneAccessionResponse),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden"),
         (status = 404, description = "Not found")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn update_accession(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-    claims: JWTClaims,
+    authenticated_user: AuthenticatedUser,
     Json(payload): Json<UpdateAccessionRequest>,
 ) -> Response {
-    if !validate_at_least_researcher(&claims.role) {
+    if !validate_at_least_researcher(&authenticated_user.role) {
         return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
     }
     let subjects_exist = state

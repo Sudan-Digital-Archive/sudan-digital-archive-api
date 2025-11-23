@@ -7,7 +7,7 @@
 
 use crate::app_factory::AppState;
 use crate::auth::validate_at_least_researcher;
-use crate::models::auth::JWTClaims;
+use crate::models::auth::AuthenticatedUser;
 use crate::models::request::{CreateSubjectRequest, DeleteSubjectRequest, SubjectPagination};
 use crate::models::response::{ListSubjectsArResponse, ListSubjectsEnResponse, SubjectResponse};
 use ::entity::sea_orm_active_enums::Role;
@@ -38,17 +38,14 @@ pub fn get_subjects_routes() -> Router<AppState> {
         (status = 201, description = "Created", body = SubjectResponse),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn create_subject(
     State(state): State<AppState>,
-    claims: JWTClaims,
+    authenticated_user: AuthenticatedUser,
     Json(payload): Json<CreateSubjectRequest>,
 ) -> Response {
-    if !validate_at_least_researcher(&claims.role) {
+    if !validate_at_least_researcher(&authenticated_user.role) {
         return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
     }
     if let Err(err) = payload.validate() {
@@ -92,27 +89,21 @@ async fn list_subjects(
     delete,
     path = "/api/v1/metadata-subjects/{subject_id}",
     tag = "Subjects",
-    params(
-        ("subject_id" = i32, Path, description = "Subject ID")
-    ),
     request_body = DeleteSubjectRequest,
     responses(
         (status = 200, description = "Subject deleted"),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden"),
         (status = 404, description = "Not found")
-    ),
-    security(
-        ("jwt_cookie_auth" = [])
     )
 )]
 async fn delete_subject(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-    claims: JWTClaims,
+    authenticated_user: AuthenticatedUser,
     Json(payload): Json<DeleteSubjectRequest>,
 ) -> Response {
-    if claims.role != Role::Admin {
+    if authenticated_user.role != Role::Admin {
         return (StatusCode::FORBIDDEN, "Insufficient permissions").into_response();
     }
     if let Err(err) = payload.validate() {
