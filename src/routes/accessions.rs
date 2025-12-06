@@ -12,14 +12,17 @@ use crate::models::request::{
 };
 use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use ::entity::sea_orm_active_enums::Role;
-use axum::extract::{BodyStream, Path, State};
+use axum::extract::{ Path, Multipart, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use axum_extra::extract::Query;
 use validator::Validate;
-
+use tokio_util::io::StreamReader;
+use futures::TryStreamExt;
+use tracing::info;
+use tokio::io::AsyncReadExt;
 /// Creates routes for accession-related endpoints under `/accessions`.
 pub fn get_accessions_routes() -> Router<AppState> {
     Router::new().nest(
@@ -46,33 +49,30 @@ pub fn get_accessions_routes() -> Router<AppState> {
         (status = 403, description = "Forbidden")
     )
 )]
+// https://users.rust-lang.org/t/axum-server-handling-body-stream/121081
 async fn create_accession_raw(
     State(state): State<AppState>,
     authenticated_user: AuthenticatedUser,
-    stream: BodyStream,
-) -> Response {
-    if !validate_at_least_researcher(&authenticated_user.role) {
-        return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
-    }
-    if let Err(err) = payload.validate() {
-        return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
-    }
-    let subjects_exist = state
-        .subjects_service
-        .clone()
-        .verify_subjects_exist(payload.metadata_subjects.clone(), payload.metadata_language)
-        .await;
-    match subjects_exist {
-        Err(err) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response();
-        }
-        Ok(flag) => {
-            if !flag {
-                return (StatusCode::BAD_REQUEST, "Subjects do not exist").into_response();
+mut multipart: Multipart) -> Response {
+    // if !validate_at_least_researcher(&authenticated_user.role) {
+    //     return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
+    // }
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        let filename = if let Some(filename) = field.file_name() {
+            filename.to_string()
+        } else {
+            continue;
+        };
+
+        let body_with_io_error = field.map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err));
+        let body_reader = StreamReader::new(body_with_io_error);
+        futures::pin_mut!(body_reader);
+        let mut buf = [0; 5];
+
+        body_reader.read(&mut buf).await.unwrap();
+        info!("Read stuff from file {} data: {:?}", filename, buf);
             }
-        }
-    };
-    state.accessions_service.upload_from_stream(stream).await
+    (StatusCode::CREATED, "Started stream!").into_response()
     
 }
 

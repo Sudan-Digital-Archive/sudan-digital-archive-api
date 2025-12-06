@@ -20,7 +20,6 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info};
 use uuid::Uuid;
-use axum::extract::BodyStream;
 
 /// Service for managing archival accessions and their associated web crawls.
 /// Uses dynamic traits for dependency injection
@@ -332,9 +331,9 @@ impl AccessionsService {
         }
     }
 
-    pub async fn upload_from_stream(self, stream: BodyStream) -> Response{
-    self.s3_repo.upload_from_stream(stream).await;
+    // pub async fn upload_from_stream(self, stream: BodyStream) -> Response{
+    // self.s3_repo.upload_from_stream(stream).await;
     
-    (StatusCode::CREATED, "Accession created!").into_response()
-    }
+    // (StatusCode::CREATED, "Accession created!").into_response()
+    // }
 }
