@@ -12,17 +12,17 @@ use crate::models::request::{
 };
 use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use ::entity::sea_orm_active_enums::Role;
-use axum::extract::{ Path, Multipart, State};
+use axum::extract::{Multipart, Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use axum_extra::extract::Query;
-use validator::Validate;
-use tokio_util::io::StreamReader;
 use futures::TryStreamExt;
-use tracing::info;
 use tokio::io::AsyncReadExt;
+use tokio_util::io::StreamReader;
+use tracing::info;
+use validator::Validate;
 /// Creates routes for accession-related endpoints under `/accessions`.
 pub fn get_accessions_routes() -> Router<AppState> {
     Router::new().nest(
@@ -31,6 +31,7 @@ pub fn get_accessions_routes() -> Router<AppState> {
             .route("/", get(list_accessions))
             .route("/private", get(list_accessions_private))
             .route("/", post(create_accession))
+            .route("/raw", post(create_accession_raw))
             .route("/{accession_id}", get(get_one_accession))
             .route("/private/{accession_id}", get(get_one_private_accession))
             .route("/{accession_id}", delete(delete_accession))
@@ -52,8 +53,9 @@ pub fn get_accessions_routes() -> Router<AppState> {
 // https://users.rust-lang.org/t/axum-server-handling-body-stream/121081
 async fn create_accession_raw(
     State(state): State<AppState>,
-    authenticated_user: AuthenticatedUser,
-mut multipart: Multipart) -> Response {
+    // authenticated_user: AuthenticatedUser,
+    mut multipart: Multipart,
+) -> Response {
     // if !validate_at_least_researcher(&authenticated_user.role) {
     //     return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
     // }
@@ -64,16 +66,16 @@ mut multipart: Multipart) -> Response {
             continue;
         };
 
-        let body_with_io_error = field.map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err));
+        let body_with_io_error =
+            field.map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err));
         let body_reader = StreamReader::new(body_with_io_error);
         futures::pin_mut!(body_reader);
         let mut buf = [0; 5];
 
         body_reader.read(&mut buf).await.unwrap();
         info!("Read stuff from file {} data: {:?}", filename, buf);
-            }
+    }
     (StatusCode::CREATED, "Started stream!").into_response()
-    
 }
 
 #[utoipa::path(

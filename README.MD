@@ -1,3 +1,8 @@
+# TODOs
+
+- Test you can upload file and get some data out
+- Then implement the s3 upload part
+
 # Overview
 
 This is the API for the Sudan Digital Archive.

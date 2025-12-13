@@ -333,7 +333,7 @@ impl AccessionsService {
 
     // pub async fn upload_from_stream(self, stream: BodyStream) -> Response{
     // self.s3_repo.upload_from_stream(stream).await;
-    
+
     // (StatusCode::CREATED, "Accession created!").into_response()
     // }
 }

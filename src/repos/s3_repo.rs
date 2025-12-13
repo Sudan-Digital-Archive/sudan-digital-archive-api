@@ -39,7 +39,7 @@ pub trait S3Repo: Send + Sync {
         bytes: Bytes,
         content_type: &str,
     ) -> Result<String, Box<dyn Error>>;
-    // https://docs.aws.amazon.com/sdk-for-rust/latest/dg/rust_s3_code_examples.html 
+    // https://docs.aws.amazon.com/sdk-for-rust/latest/dg/rust_s3_code_examples.html
     // async fn upload_from_stream(&self, stream: BodyStream) -> Result<String, Box<dyn Error>>;
 
     /// Generates a presigned URL for an S3 object that allows temporary access without credentials
@@ -179,83 +179,82 @@ impl S3Repo for DigitalOceanSpacesRepo {
         Ok(presigned_request.uri().to_string())
     }
 
-//     // based off docs here https://docs.aws.amazon.com/sdk-for-rust/latest/dg/rust_s3_code_examples.html
-// async fn upload_from_stream(
-//     &self,
-//     mut stream: BodyStream,
-// ) -> Result<String, Box<dyn Error>> {
-//     // Define constants
-//     // TODO: This should not be here put elsewhere 
-//     const CHUNK_SIZE: usize = 5 * 1024 * 1024; // 5MB
-//     // TODO: Tidy up types and iport this
-//     let mut upload_parts: Vec<aws_sdk_s3::types::CompletedPart> = Vec::new();
-    
-//     // Create a multipart upload
-//     let multipart_upload_res = self
-//         .client
-//         .create_multipart_upload()
-//         .bucket(&self.bucket)
-//         .key("your_object_key") // TODO: Change this to your desired key from json metadata
-//         .content_type("application/octet-stream") // TODO: Change this to your desired key from json metadata
-//         .send()
-//         .await?;
-    
-//     let upload_id = multipart_upload_res.upload_id().ok_or("Missing upload_id")?;
+    //     // based off docs here https://docs.aws.amazon.com/sdk-for-rust/latest/dg/rust_s3_code_examples.html
+    // async fn upload_from_stream(
+    //     &self,
+    //     mut stream: BodyStream,
+    // ) -> Result<String, Box<dyn Error>> {
+    //     // Define constants
+    //     // TODO: This should not be here put elsewhere
+    //     const CHUNK_SIZE: usize = 5 * 1024 * 1024; // 5MB
+    //     // TODO: Tidy up types and iport this
+    //     let mut upload_parts: Vec<aws_sdk_s3::types::CompletedPart> = Vec::new();
 
-//     let mut part_number = 1;
-    
-//     // Stream chunks from the incoming BodyStream
-//     while let Some(chunk) = stream.next().await {
-//         match chunk {
-//             Ok(data) => {
-//                 // TODO: Tidy this up or make sure that if it's under chunk size it still works
-//                 // Split the chunk into parts if it exceeds CHUNK_SIZE
-//                 let mut offset = 0;
-//                 while offset < data.len() {
-//                     let end = std::cmp::min(offset + CHUNK_SIZE, data.len());
-//                     let part_data = data.slice(offset..end);
-                    
-//                     // Upload part
-//                     let upload_part_res = self
-//                         .client
-//                         .upload_part()
-//                         .bucket(&self.bucket)
-//                         .key("your_object_key") // TODO: Think this should be filename from JSON?
-//                         .upload_id(upload_id)
-//                         .part_number(part_number)
-//                         .body(part_data.into())
-//                         .send()
-//                         .await?;
-                    
-//                     upload_parts.push(
-//                         // TODO: Import this so it's cleaner
-//                         aws_sdk_s3::types::CompletedPart::builder()
-//                             .e_tag(upload_part_res.e_tag.unwrap_or_default())
-//                             .part_number(part_number)
-//                             .build(),
-//                     );
+    //     // Create a multipart upload
+    //     let multipart_upload_res = self
+    //         .client
+    //         .create_multipart_upload()
+    //         .bucket(&self.bucket)
+    //         .key("your_object_key") // TODO: Change this to your desired key from json metadata
+    //         .content_type("application/octet-stream") // TODO: Change this to your desired key from json metadata
+    //         .send()
+    //         .await?;
 
-//                     offset += CHUNK_SIZE;
-//                     part_number += 1;
-//                 }
-//             }
-//             Err(err) => return Err(format!("Error reading chunk: {:#?}", err).into()),
-//         }
-//     }
-    
-//     // Complete the multipart upload
-//     self.client
-//         .complete_multipart_upload()
-//         .bucket(&self.bucket)
-//         .key("your_object_key")// TODO: Think this should be filename from JSON?
-//         .upload_id(upload_id)
-//         .multipart_upload(aws_sdk_s3::types::CompletedMultipartUpload::builder() // TODO: Import to tidy up
-//             .parts(upload_parts)
-//             .build())
-//         .send()
-//         .await?;
+    //     let upload_id = multipart_upload_res.upload_id().ok_or("Missing upload_id")?;
 
-//     Ok(upload_id.to_string())
-// }
+    //     let mut part_number = 1;
 
+    //     // Stream chunks from the incoming BodyStream
+    //     while let Some(chunk) = stream.next().await {
+    //         match chunk {
+    //             Ok(data) => {
+    //                 // TODO: Tidy this up or make sure that if it's under chunk size it still works
+    //                 // Split the chunk into parts if it exceeds CHUNK_SIZE
+    //                 let mut offset = 0;
+    //                 while offset < data.len() {
+    //                     let end = std::cmp::min(offset + CHUNK_SIZE, data.len());
+    //                     let part_data = data.slice(offset..end);
+
+    //                     // Upload part
+    //                     let upload_part_res = self
+    //                         .client
+    //                         .upload_part()
+    //                         .bucket(&self.bucket)
+    //                         .key("your_object_key") // TODO: Think this should be filename from JSON?
+    //                         .upload_id(upload_id)
+    //                         .part_number(part_number)
+    //                         .body(part_data.into())
+    //                         .send()
+    //                         .await?;
+
+    //                     upload_parts.push(
+    //                         // TODO: Import this so it's cleaner
+    //                         aws_sdk_s3::types::CompletedPart::builder()
+    //                             .e_tag(upload_part_res.e_tag.unwrap_or_default())
+    //                             .part_number(part_number)
+    //                             .build(),
+    //                     );
+
+    //                     offset += CHUNK_SIZE;
+    //                     part_number += 1;
+    //                 }
+    //             }
+    //             Err(err) => return Err(format!("Error reading chunk: {:#?}", err).into()),
+    //         }
+    //     }
+
+    //     // Complete the multipart upload
+    //     self.client
+    //         .complete_multipart_upload()
+    //         .bucket(&self.bucket)
+    //         .key("your_object_key")// TODO: Think this should be filename from JSON?
+    //         .upload_id(upload_id)
+    //         .multipart_upload(aws_sdk_s3::types::CompletedMultipartUpload::builder() // TODO: Import to tidy up
+    //             .parts(upload_parts)
+    //             .build())
+    //         .send()
+    //         .await?;
+
+    //     Ok(upload_id.to_string())
+    // }
 }
