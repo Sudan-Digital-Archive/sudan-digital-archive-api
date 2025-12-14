@@ -15,6 +15,8 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use entity::sea_orm_active_enums::{CrawlStatus, DublinMetadataFormat};
+use tokio::io::AsyncRead;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -331,9 +333,40 @@ impl AccessionsService {
         }
     }
 
-    // pub async fn upload_from_stream(self, stream: BodyStream) -> Response{
-    // self.s3_repo.upload_from_stream(stream).await;
-
-    // (StatusCode::CREATED, "Accession created!").into_response()
-    // }
+    /// Uploads a file from a stream to S3 and returns the upload ID.
+    ///
+    /// # Arguments
+    /// * `key` - The S3 object key where the file will be uploaded
+    /// * `content_type` - The MIME type of the file
+    /// * `reader` - The async read stream of the file
+    ///
+    /// # Returns
+    /// Result containing the upload ID or an error response
+    pub async fn upload_from_stream(
+        self,
+        key: String,
+        content_type: String,
+        reader: Pin<&mut (dyn AsyncRead + Send)>,
+    ) -> Result<String, Response> {
+        match self.s3_repo.upload_from_stream(&key, reader, &content_type).await {
+            Ok(upload_id) => {
+                info!(
+                    "Successfully uploaded file with key: {} and content type: {}",
+                    key, content_type
+                );
+                Ok(upload_id)
+            }
+            Err(err) => {
+                error!(
+                    %err,
+                    key,
+                    content_type,
+                    "Failed to upload file to S3. Key: {}, Content-Type: {}",
+                    key,
+                    content_type
+                );
+                Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to upload file").into_response())
+            }
+        }
+    }
 }

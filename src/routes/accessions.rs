@@ -19,9 +19,8 @@ use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use axum_extra::extract::Query;
 use futures::TryStreamExt;
-use tokio::io::AsyncReadExt;
 use tokio_util::io::StreamReader;
-use tracing::info;
+use tracing::{error,info};
 use validator::Validate;
 /// Creates routes for accession-related endpoints under `/accessions`.
 pub fn get_accessions_routes() -> Router<AppState> {
@@ -59,23 +58,43 @@ async fn create_accession_raw(
     // if !validate_at_least_researcher(&authenticated_user.role) {
     //     return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
     // }
-    while let Some(field) = multipart.next_field().await.unwrap() {
-        let filename = if let Some(filename) = field.file_name() {
-            filename.to_string()
+    while let Some(field) = multipart.next_field().await.unwrap_or_else(|err| {
+        error!("Failed to read multipart field: {:?}", err);
+        return None;
+    }) {
+        let field_name = field.name().unwrap_or("unknown").to_string();
+        let filename = field.file_name().map(|f| f.to_string());
+        let content_type = field.content_type().map(|ct| ct.to_string());
+
+        info!(
+            "Processing multipart field: name = {:?}, filename = {:?}, content_type = {:?}",
+            field_name, filename, content_type
+        );
+
+        if let Some(filename) = filename {
+            let body_with_io_error =
+                field.map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err));
+            let body_reader = StreamReader::new(body_with_io_error);
+            futures::pin_mut!(body_reader);
+
+            let upload_result = state
+                .accessions_service
+                .clone()
+                .upload_from_stream(filename.clone(), content_type.unwrap_or("application/octet-stream".to_string()), body_reader)
+                .await;
+
+            match upload_result {
+                Ok(_) => info!("Successfully uploaded file: {}", filename),
+                Err(err_response) => {
+                    error!("Failed to upload file: {}. Error: {:?}", filename, err_response);
+                    return err_response;
+                }
+            }
         } else {
-            continue;
-        };
-
-        let body_with_io_error =
-            field.map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err));
-        let body_reader = StreamReader::new(body_with_io_error);
-        futures::pin_mut!(body_reader);
-        let mut buf = [0; 5];
-
-        body_reader.read(&mut buf).await.unwrap();
-        info!("Read stuff from file {} data: {:?}", filename, buf);
+            error!("Skipping field without a filename: name = {:?}", field_name);
+        }
     }
-    (StatusCode::CREATED, "Started stream!").into_response()
+    (StatusCode::CREATED, "File(s) uploaded successfully!").into_response()
 }
 
 #[utoipa::path(
