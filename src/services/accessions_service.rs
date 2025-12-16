@@ -17,11 +17,8 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use bytes::Bytes;
 use entity::sea_orm_active_enums::{CrawlStatus, DublinMetadataFormat};
-use futures::StreamExt;
-use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::AsyncRead;
 use tokio::time::sleep;
 use tracing::{error, info};
 use uuid::Uuid;
@@ -336,85 +333,125 @@ impl AccessionsService {
         }
     }
 
-    /// Uploads a file from a stream to S3 and returns the upload ID.
+    /// Uploads a file from a multipart field to S3 with smart chunk handling.
+    ///
+    /// This method streams the file and decides on upload strategy as it reads:
+    /// - Files under 5MB: buffered and uploaded with a single request
+    /// - Files over 5MB: multipart upload initiated and chunks streamed directly to S3
     ///
     /// # Arguments
     /// * `key` - The S3 object key where the file will be uploaded
+    /// * `field` - The multipart field containing the file data
     /// * `content_type` - The MIME type of the file
-    /// * `reader` - The async read stream of the file
     ///
     /// # Returns
     /// Result containing the upload ID or an error response
-    pub async fn upload_from_stream(
+    pub async fn upload_from_multipart_field(
         self,
         key: String,
+        mut field: Field<'_>,
         content_type: String,
-        reader: Pin<&mut (dyn AsyncRead + Send)>,
     ) -> Result<String, Response> {
-        match self
-            .s3_repo
-            .upload_from_stream(&key, reader, &content_type)
-            .await
-        {
-            Ok(upload_id) => {
-                info!(
-                    "Successfully uploaded file with key: {} and content type: {}",
-                    key, content_type
-                );
-                Ok(upload_id)
+        const FIVE_MB: usize = 5 * 1024 * 1024;
+        
+        info!("Starting streaming upload for key: {} with content type: {}", key, content_type);
+        
+        let mut buffer = Vec::with_capacity(FIVE_MB);
+        let mut total_size = 0;
+        let mut upload_id: Option<String> = None;
+        let mut upload_parts: Vec<(String, i32)> = Vec::new();
+        let mut part_number = 1i32;
+
+        while let Some(chunk) = field.chunk().await.map_err(|err| {
+            error!("Failed to read chunk from field: {}", err);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to read file stream").into_response()
+        })? {
+            total_size += chunk.len();
+            buffer.extend_from_slice(&chunk);
+            info!("Received chunk of {} bytes, total so far: {}", chunk.len(), total_size);
+
+            // If we haven't exceeded 5MB yet and buffer is large, stay buffered
+            if upload_id.is_none() && total_size <= FIVE_MB {
+                continue;
             }
-            Err(err) => {
-                error!(
-                    %err,
-                    key,
-                    content_type,
-                    "Failed to upload file to S3. Key: {}, Content-Type: {}",
-                    key,
-                    content_type
-                );
-                Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to upload file").into_response())
+
+            // If we just exceeded 5MB, initiate multipart upload
+            if upload_id.is_none() && total_size > FIVE_MB {
+                info!("File exceeded 5MB threshold at {} bytes, initiating multipart upload", total_size);
+                match self.s3_repo.initiate_multipart_upload(&key, &content_type).await {
+                    Ok(id) => {
+                        upload_id = Some(id);
+                        info!("Initiated multipart upload with id: {}", upload_id.as_ref().unwrap());
+                    }
+                    Err(err) => {
+                        error!(%err, "Failed to initiate multipart upload for key: {}", key);
+                        return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to initiate upload").into_response());
+                    }
+                }
+            }
+
+            // If using multipart upload and buffer reached 5MB, upload the part
+            if let Some(ref id) = upload_id {
+                if buffer.len() >= FIVE_MB {
+                    let part_bytes = Bytes::from(buffer.split_off(0));
+                    info!("Uploading part {} with {} bytes", part_number, part_bytes.len());
+                    match self.s3_repo.upload_part(&key, id, part_number, part_bytes).await {
+                        Ok((etag, _)) => {
+                            upload_parts.push((etag, part_number));
+                            part_number += 1;
+                        }
+                        Err(err) => {
+                            error!(%err, "Failed to upload part {} for key: {}", part_number, key);
+                            return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to upload file part").into_response());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Handle stream end: complete upload or do simple upload
+        if let Some(id) = upload_id {
+            // Multipart upload in progress - upload final part and complete
+            if !buffer.is_empty() {
+                info!("Uploading final part {} with {} bytes", part_number, buffer.len());
+                let part_bytes = Bytes::from(buffer);
+                match self.s3_repo.upload_part(&key, &id, part_number, part_bytes).await {
+                    Ok((etag, _)) => {
+                        upload_parts.push((etag, part_number));
+                    }
+                    Err(err) => {
+                        error!(%err, "Failed to upload final part for key: {}", key);
+                        return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to upload final part").into_response());
+                    }
+                }
+            }
+
+            // Complete the multipart upload
+            info!("Completing multipart upload for key: {} with {} parts", key, upload_parts.len());
+            match self.s3_repo.complete_multipart_upload(&key, &id, upload_parts).await {
+                Ok(_) => {
+                    info!("Successfully completed multipart upload for key: {}, total size: {} bytes", key, total_size);
+                    Ok(id)
+                }
+                Err(err) => {
+                    error!(%err, "Failed to complete multipart upload for key: {}", key);
+                    Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to complete upload").into_response())
+                }
+            }
+        } else {
+            // Simple upload for files <= 5MB
+            info!("Using simple upload for {} bytes", total_size);
+            match self.s3_repo.upload_from_bytes(&key, Bytes::from(buffer), &content_type).await {
+                Ok(_) => {
+                    info!("Successfully uploaded file with key: {} and content type: {}", key, content_type);
+                    Ok(key)
+                }
+                Err(err) => {
+                    error!(%err, "Failed to upload file to S3. Key: {}, Content-Type: {}", key, content_type);
+                    Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to upload file").into_response())
+                }
             }
         }
     }
 
-    /// Uploads chunks from a multipart field directly to S3.
-    ///
-    /// # Arguments
-    /// * `key` - The S3 object key where the file will be uploaded
-    /// * `chunks` - Vector of byte chunks to upload
-    /// * `content_type` - The MIME type of the file
-    ///
-    /// # Returns
-    /// Result containing the upload ID or an error response
-    pub async fn upload_from_chunks(
-        self,
-        key: String,
-        chunks: Vec<Bytes>,
-        content_type: String,
-    ) -> Result<String, Response> {
-        match self
-            .s3_repo
-            .upload_from_chunks(&key, chunks, &content_type)
-            .await
-        {
-            Ok(upload_id) => {
-                info!(
-                    "Successfully uploaded chunks with key: {} and content type: {}",
-                    key, content_type
-                );
-                Ok(upload_id)
-            }
-            Err(err) => {
-                error!(
-                    %err,
-                    key,
-                    content_type,
-                    "Failed to upload chunks to S3. Key: {}, Content-Type: {}",
-                    key,
-                    content_type
-                );
-                Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to upload file").into_response())
-            }
-        }
-    }
 }

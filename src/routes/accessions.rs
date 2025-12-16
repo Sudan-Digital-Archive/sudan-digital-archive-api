@@ -18,10 +18,6 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use axum_extra::extract::Query;
-use futures::TryStreamExt;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use tokio::io::AsyncRead;
 use tracing::{error, info};
 use validator::Validate;
 
@@ -34,7 +30,8 @@ pub fn get_accessions_routes() -> Router<AppState> {
             .route("/private", get(list_accessions_private))
             .route("/", post(create_accession))
             .route("/raw", post(create_accession_raw))
-               // Increase limit to 100MB; default is 2MB
+        // Increase limit to 100MB; default is 2MB; this only applies to raw upload endpoint
+        // see https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024))
             .route("/{accession_id}", get(get_one_accession))
             .route("/private/{accession_id}", get(get_one_private_accession))
@@ -77,26 +74,12 @@ async fn create_accession_raw(
         );
 
         if let Some(filename) = filename {
-            // Collect field chunks by reading them one at a time
-            let mut chunks = Vec::new();
-            let mut field = field;
-            loop {
-                match field.chunk().await {
-                    Ok(Some(chunk)) => chunks.push(chunk),
-                    Ok(None) => break,
-                    Err(err) => {
-                        error!("Failed to read multipart field chunk: {:?}", err);
-                        return (StatusCode::BAD_REQUEST, "Failed to read file data").into_response();
-                    }
-                }
-            }
-
             let upload_result = state
                 .accessions_service
                 .clone()
-                .upload_from_chunks(
+                .upload_from_multipart_field(
                     filename.clone(),
-                    chunks,
+                    field,
                     content_type.unwrap_or("application/octet-stream".to_string()),
                 )
                 .await;

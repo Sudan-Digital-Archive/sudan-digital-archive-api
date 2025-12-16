@@ -1,11 +1,17 @@
 # TODOs
 
 - Then implement the s3 upload part. Problems:
-    - So actually start there in a script since simpler
-    - Recall when doing dev you need to change cors on buckets to allow uploads. I think I got so far as writing uploads since size went up in DO
-      but just something wrong in aws sdk usage.    
-    - See https://github.com/awsdocs/aws-doc-sdk-examples/blob/main/rustv1/examples/s3/src/bin/s3-multipart-upload.rs for this
-    - Like actually just run their exact example cod eifrst to see if that works. Def reuse this https://github.com/awsdocs/aws-doc-sdk-examples/blob/main/rustv1/examples/s3/src/error.rs
+    - Remove unnecessary deps
+    - Tidy up imports
+    - Add tests
+    - Figure out how to get JSON data through in the multipart form
+    - Then write that JSON data to create an accession that points to s3 upload we just made
+    - Make the filenames unique
+    - Check you understand wtf is going on with boxing and readers and pinned futures and document it
+    - Delete incomplete multipart uploads using s3cmd https://docs.digitalocean.com/products/spaces/how-to/configure-lifecycle-rules/#remove-incomplete-multipart-uploads
+    - Should maybe put that in some kind of infra repo to track this stuff; put tickets like this there
+    - Cargo clean and cargo update
+    - Log in MB not bytes
 
 # Overview
 
