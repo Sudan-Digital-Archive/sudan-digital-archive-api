@@ -4469,6 +4469,7 @@ dependencies = [
  "async-trait",
  "aws-config",
  "aws-sdk-s3",
+ "aws-smithy-types",
  "aws-types",
  "axum",
  "axum-extra",

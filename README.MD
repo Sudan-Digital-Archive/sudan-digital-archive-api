@@ -1,7 +1,13 @@
 # TODOs
 
-- Test you can upload file and get some data out
-- Then implement the s3 upload part
+- Then implement the s3 upload part. Problems:
+    - Can't get this to work at all - try just a simple script based off amazon docs first.
+    - Figure out how you are supposed to get round 5MB upload issue (https://imfeld.dev/writing/rust_s3_streaming_upload) - just put when <5MB
+    - So actually start there in a script since simpler
+    - Recall when doing dev you need to change cors on buckets to allow uploads. I think I got so far as writing uploads since size went up in DO
+      but just something wrong in aws sdk usage.    
+    - See https://github.com/awsdocs/aws-doc-sdk-examples/blob/main/rustv1/examples/s3/src/bin/s3-multipart-upload.rs for this
+    - Like actually just run their exact example cod eifrst to see if that works. Def reuse this https://github.com/awsdocs/aws-doc-sdk-examples/blob/main/rustv1/examples/s3/src/error.rs
 
 # Overview
 
