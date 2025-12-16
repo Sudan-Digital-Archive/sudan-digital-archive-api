@@ -62,7 +62,7 @@ pub struct AppState {
 pub fn create_app(app_state: AppState, cors_origins: Vec<HeaderValue>, test: bool) -> Router {
     let subscriber = tracing_subscriber::fmt().with_target(false).pretty();
     // turn on if you want more verbose logs
-    // .with_max_level(tracing::Level::DEBUG)
+    // .with_max_level(tracing::Level::DEBUG);
 
     // this is a pain but it's because the tests are run in different threads
     // when you do cargo test; see
@@ -125,7 +125,8 @@ fn build_routes(api: utoipa::openapi::OpenApi) -> Router<AppState> {
         )
         .layer(TimeoutLayer::new(Duration::from_secs(120)))
         .layer(CompressionLayer::new())
-        .layer(ValidateRequestHeaderLayer::accept("application/json"));
+        .layer(ValidateRequestHeaderLayer::accept("application/json"))
+        ;
     let accessions_routes = get_accessions_routes();
     let subjects_routes = get_subjects_routes();
     let auth_routes = get_auth_routes();

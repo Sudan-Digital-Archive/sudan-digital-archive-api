@@ -1,8 +1,6 @@
 # TODOs
 
 - Then implement the s3 upload part. Problems:
-    - Can't get this to work at all - try just a simple script based off amazon docs first.
-    - Figure out how you are supposed to get round 5MB upload issue (https://imfeld.dev/writing/rust_s3_streaming_upload) - just put when <5MB
     - So actually start there in a script since simpler
     - Recall when doing dev you need to change cors on buckets to allow uploads. I think I got so far as writing uploads since size went up in DO
       but just something wrong in aws sdk usage.    

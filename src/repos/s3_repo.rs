@@ -4,61 +4,19 @@ use aws_sdk_s3::error::ProvideErrorMetadata;
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::put_object::PutObjectError;
 use aws_sdk_s3::presigning::PresigningConfig;
+use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use aws_sdk_s3::Client;
+use aws_smithy_types::byte_stream::ByteStream;
+use axum::extract::multipart::Field;
 use bytes::Bytes;
+use futures::StreamExt;
 use std::error::Error;
 use std::pin::Pin;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;
-use tracing::{error,info};
-use std::fs::File;
-use aws_sdk_s3::operation:: create_multipart_upload::{CreateMultipartUploadOutput};
-use rand::distributions::Alphanumeric;
-use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
-use rand::{thread_rng, Rng};
-use std::path::Path;
-use aws_smithy_types::byte_stream::{ByteStream, Length};
-use std::io::Write;
+use tracing::{error, info};
 //In bytes, minimum chunk size of 5MB. Increase CHUNK_SIZE to send larger chunks.
-const CHUNK_SIZE: u64 = 1024 * 1024 * 5;
-const MAX_CHUNKS: u64 = 10000;
-
-#[derive(Debug)]
-pub struct S3ExampleError(String);
-impl S3ExampleError {
-    pub fn new(value: impl Into<String>) -> Self {
-        S3ExampleError(value.into())
-    }
-
-    pub fn add_message(self, message: impl Into<String>) -> Self {
-        S3ExampleError(format!("{}: {}", message.into(), self.0))
-    }
-}
-
-impl<T: aws_sdk_s3::error::ProvideErrorMetadata> From<T> for S3ExampleError {
-    fn from(value: T) -> Self {
-        S3ExampleError(format!(
-            "{}: {}",
-            value
-                .code()
-                .map(String::from)
-                .unwrap_or("unknown code".into()),
-            value
-                .message()
-                .map(String::from)
-                .unwrap_or("missing reason".into()),
-        ))
-    }
-}
-
-impl std::error::Error for S3ExampleError {}
-
-impl std::fmt::Display for S3ExampleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
+const CHUNK_SIZE: usize = 1024 * 1024 * 5;
 
 // Repository trait for S3-compatible storage operations
 #[async_trait]
@@ -113,6 +71,25 @@ pub trait S3Repo: Send + Sync {
         expires_in: u64,
     ) -> Result<String, Box<dyn Error>>;
 
+    /// Uploads chunks to an S3 bucket
+    ///
+    /// # Arguments
+    /// * `key` - The object key (path) in the S3 bucket
+    /// * `chunks` - Vector of byte chunks to upload
+    /// * `content_type` - MIME type of the content (e.g. "application/pdf")
+    ///
+    /// # Returns
+    /// Result containing the object's upload ID on success
+    ///
+    /// # Errors
+    /// Returns Error if the upload fails
+    async fn upload_from_chunks(
+        &self,
+        key: &str,
+        chunks: Vec<Bytes>,
+        content_type: &str,
+    ) -> Result<String, Box<dyn Error>>;
+
     /// Uploads a stream to an S3 bucket
     ///
     /// # Arguments
@@ -130,7 +107,7 @@ pub trait S3Repo: Send + Sync {
         key: &str,
         reader: Pin<&mut (dyn AsyncRead + Send)>,
         content_type: &str,
-    ) -> Result<String, S3ExampleError>;
+    ) -> Result<String, Box<dyn Error>>;
 }
 
 /// Implementation for DigitalOcean Spaces (S3-compatible storage)
@@ -248,230 +225,271 @@ impl S3Repo for DigitalOceanSpacesRepo {
         Ok(presigned_request.uri().to_string())
     }
 
+    async fn upload_from_chunks(
+        &self,
+        key: &str,
+        chunks: Vec<Bytes>,
+        content_type: &str,
+    ) -> Result<String, Box<dyn Error>> {
+        info!("Starting multipart upload from chunks for key: {}, content_type: {}", key, content_type);
+        
+        let mut buffer = Vec::with_capacity(CHUNK_SIZE);
+        let mut part_number = 1;
+        let mut upload_parts: Vec<aws_sdk_s3::types::CompletedPart> = Vec::new();
+        let mut total_size = 0;
+
+        let multipart_upload_res = self
+            .client
+            .create_multipart_upload()
+            .bucket(&self.bucket)
+            .key(key)
+            .content_type(content_type)
+            .send()
+            .await
+            .map_err(|err| {
+                format!(
+                    "Failed to create multipart upload: {}",
+                    err.into_service_error().code().unwrap_or("unknown")
+                )
+            })?;
+
+        let upload_id = multipart_upload_res
+            .upload_id()
+            .ok_or("Missing upload_id after CreateMultipartUpload")?;
+
+        info!("Created multipart upload with id: {}", upload_id);
+
+        // Process each chunk
+        for chunk in chunks {
+            buffer.extend_from_slice(&chunk);
+            total_size += chunk.len();
+            info!("Added {} bytes to buffer, total so far: {}", chunk.len(), total_size);
+
+            // Upload a part if buffer has reached chunk size
+            if buffer.len() >= CHUNK_SIZE {
+                info!("Uploading part {} with {} bytes", part_number, buffer.len());
+                let upload_part_res = self
+                    .client
+                    .upload_part()
+                    .key(key)
+                    .bucket(&self.bucket)
+                    .upload_id(upload_id)
+                    .body(ByteStream::from(buffer.split_off(0)))
+                    .part_number(part_number)
+                    .send()
+                    .await
+                    .map_err(|err| {
+                        format!(
+                            "Failed to upload part {}: {}",
+                            part_number,
+                            err.into_service_error().code().unwrap_or("unknown")
+                        )
+                    })?;
+
+                upload_parts.push(
+                    CompletedPart::builder()
+                        .e_tag(upload_part_res.e_tag.unwrap_or_default())
+                        .part_number(part_number)
+                        .build(),
+                );
+
+                part_number += 1;
+            }
+        }
+
+        // Upload any remaining data in buffer as the final part
+        if !buffer.is_empty() {
+            info!("Uploading final part {} with {} bytes", part_number, buffer.len());
+            let upload_part_res = self
+                .client
+                .upload_part()
+                .key(key)
+                .bucket(&self.bucket)
+                .upload_id(upload_id)
+                .body(ByteStream::from(buffer))
+                .part_number(part_number)
+                .send()
+                .await
+                .map_err(|err| {
+                    format!(
+                        "Failed to upload final part {}: {}",
+                        part_number,
+                        err.into_service_error().code().unwrap_or("unknown")
+                    )
+                })?;
+
+            upload_parts.push(
+                CompletedPart::builder()
+                    .e_tag(upload_part_res.e_tag.unwrap_or_default())
+                    .part_number(part_number)
+                    .build(),
+            );
+        }
+
+        let completed_multipart_upload = CompletedMultipartUpload::builder()
+            .set_parts(Some(upload_parts))
+            .build();
+
+        self.client
+            .complete_multipart_upload()
+            .bucket(&self.bucket)
+            .key(key)
+            .multipart_upload(completed_multipart_upload)
+            .upload_id(upload_id)
+            .send()
+            .await
+            .map_err(|err| {
+                format!(
+                    "Failed to complete multipart upload: {}",
+                    err.into_service_error().code().unwrap_or("unknown")
+                )
+            })?;
+
+        info!("Multipart chunks upload completed successfully for key: {}, total size: {} bytes", key, total_size);
+        Ok(upload_id.to_string())
+    }
+
     // based off docs here https://docs.aws.amazon.com/sdk-for-rust/latest/dg/rust_s3_code_examples.html
     async fn upload_from_stream(
         &self,
         key: &str,
         mut reader: Pin<&mut (dyn AsyncRead + Send)>,
         content_type: &str,
-    ) -> Result<String, S3ExampleError> {
-        // const MIN_PART_SIZE: usize = 5 * 1024 * 1024; // 5MB
-        // const CHUNK_SIZE: usize = MIN_PART_SIZE; // Ensure each part is at least 5MB
-        // let mut upload_parts = Vec::new();
+    ) -> Result<String, Box<dyn Error>> {
+        info!("Starting multipart upload for key: {}, content_type: {}", key, content_type);
+        let mut buffer = Vec::with_capacity(CHUNK_SIZE);
+        let mut total_size = 0;
+        let mut part_number = 1;
+        let mut upload_parts: Vec<aws_sdk_s3::types::CompletedPart> = Vec::new();
 
-        // info!("Starting multipart upload for key: {}", key);
-        // let multipart_upload_res = self
-        //     .client
-        //     .create_multipart_upload()
-        //     .bucket(&self.bucket)
-        //     .key(key)
-        //     .content_type(content_type)
-        //     .send()
-        //     .await?;
-
-        // let upload_id = multipart_upload_res.upload_id().ok_or("Missing upload_id")?;
-        // info!("Multipart upload initiated. Upload ID: {}", upload_id);
-
-        // let mut part_number = 1;
-        // let mut buffer = vec![0; CHUNK_SIZE];
-
-        // loop {
-        //     let bytes_read = reader.read(&mut buffer).await?;
-        //     if bytes_read == 0 {
-        //         info!("End of file stream reached for key: {}", key);
-        //         break;
-        //     }
-
-        //     info!("Read {} bytes for part number: {}", bytes_read, part_number);
-        //     let part_data = Bytes::copy_from_slice(&buffer[..bytes_read]);
-
-        //     let upload_part_res = self
-        //         .client
-        //         .upload_part()
-        //         .bucket(&self.bucket)
-        //         .key(key)
-        //         .upload_id(upload_id)
-        //         .part_number(part_number)
-        //         .body(part_data.into())
-        //         .send()
-        //         .await;
-
-        //     match upload_part_res {
-        //         Ok(res) => {
-        //             info!(
-        //                 "Uploaded part number: {}. ETag: {}",
-        //                 part_number,
-        //                 res.e_tag().unwrap_or_default()
-        //             );
-        //             upload_parts.push(
-        //                 aws_sdk_s3::types::CompletedPart::builder()
-        //                     .e_tag(res.e_tag().unwrap_or_default())
-        //                     .part_number(part_number)
-        //                     .build(),
-        //             );
-        //         }
-        //         Err(err) => {
-        //             error!(
-        //                 %err,
-        //                 "Failed to upload part number: {} for key: {}",
-        //                 part_number,
-        //                 key
-        //             );
-        //             return Err(err.into());
-        //         }
-        //     }
-
-        //     part_number += 1;
-        // }
-
-        // info!("Completing multipart upload for key: {}", key);
-        // info!("Upload ID: {}", upload_id);
-        // info!("Parts to finalize: {:#?}", upload_parts);
-
-        // let result = self
-        //     .client
-        //     .complete_multipart_upload()
-        //     .bucket(&self.bucket)
-        //     .key(key)
-        //     .upload_id(upload_id)
-        //     .multipart_upload(
-        //         aws_sdk_s3::types::CompletedMultipartUpload::builder()
-        //             .set_parts(Some(upload_parts))
-        //             .build(),
-        //     )
-        //     .send()
-        //     .await;
-
-        // match result {
-        //     Ok(response) => {
-        //         info!(
-        //             "Multipart upload completed successfully for key: {}. Response: {:?}",
-        //             key,
-        //             response
-        //         );
-        //         Ok(upload_id.to_string())
-        //     }
-        //     Err(err) => {
-        //         error!(
-        //             %err,
-        //             "Failed to complete multipart upload. Key: {}, Upload ID: {}",
-        //             key,
-        //             upload_id
-        //         );
-        //         if let Some(service_error) = err.as_service_error() {
-        //             error!("Service error details: {:?}", service_error);
-        //         }
-        //         Err(err.into())
-        //     }
-        // }
-
-    let key = "sample.txt".to_string();
-    // snippet-start:[s3.rust.create_multipart_upload]
-    // Create a multipart upload. Use UploadPart and CompleteMultipartUpload to
-    // upload the file.
-    let multipart_upload_res: CreateMultipartUploadOutput = self.client
-        .create_multipart_upload()
-        .bucket(&self.bucket)
-        .key(&key)
-        .send()
-        .await?;
-
-    let upload_id = multipart_upload_res.upload_id().ok_or(S3ExampleError::new(
-        "Missing upload_id after CreateMultipartUpload",
-    ))?;
-    // snippet-end:[s3.rust.create_multipart_upload]
-
-    //Create a file of random characters for the upload.
-    let mut file = File::create(&key).expect("Could not create sample file.");
-    // Loop until the file is 5 chunks.
-    while file.metadata().unwrap().len() <= CHUNK_SIZE * 4 {
-        let rand_string: String = thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(256)
-            .map(char::from)
-            .collect();
-        let return_string: String = "\n".to_string();
-        file.write_all(rand_string.as_ref())
-            .expect("Error writing to file.");
-        file.write_all(return_string.as_ref())
-            .expect("Error writing to file.");
-    }
-
-    let path = Path::new(&key);
-    let file_size = tokio::fs::metadata(path)
-        .await
-        .expect("it exists I swear")
-        .len();
-
-    let mut chunk_count = (file_size / CHUNK_SIZE) + 1;
-    let mut size_of_last_chunk = file_size % CHUNK_SIZE;
-    if size_of_last_chunk == 0 {
-        size_of_last_chunk = CHUNK_SIZE;
-        chunk_count -= 1;
-    }
-
-    if file_size == 0 {
-        return Err(S3ExampleError::new("Bad file size."));
-    }
-    if chunk_count > MAX_CHUNKS {
-        return Err(S3ExampleError::new(
-            "Too many chunks! Try increasing your chunk size.",
-        ));
-    }
-
-    // snippet-start:[s3.rust.upload_part]
-    let mut upload_parts: Vec<aws_sdk_s3::types::CompletedPart> = Vec::new();
-
-    for chunk_index in 0..chunk_count {
-        let this_chunk = if chunk_count - 1 == chunk_index {
-            size_of_last_chunk
-        } else {
-            CHUNK_SIZE
-        };
-        let stream = ByteStream::read_from()
-            .path(path)
-            .offset(chunk_index * CHUNK_SIZE)
-            .length(Length::Exact(this_chunk))
-            .build()
-            .await
-            .unwrap();
-
-        // Chunk index needs to start at 0, but part numbers start at 1.
-        let part_number = (chunk_index as i32) + 1;
-        let upload_part_res = self.client
-            .upload_part()
-            .key(&key)
+        let multipart_upload_res = self
+            .client
+            .create_multipart_upload()
             .bucket(&self.bucket)
-            .upload_id(upload_id)
-            .body(stream)
-            .part_number(part_number)
+            .key(key)
+            .content_type(content_type)
             .send()
-            .await?;
+            .await
+            .map_err(|err| {
+                format!(
+                    "Failed to create multipart upload: {}",
+                    err.into_service_error().code().unwrap_or("unknown")
+                )
+            })?;
 
-        upload_parts.push(
-            CompletedPart::builder()
-                .e_tag(upload_part_res.e_tag.unwrap_or_default())
+        let upload_id = multipart_upload_res
+            .upload_id()
+            .ok_or("Missing upload_id after CreateMultipartUpload")?;
+
+        info!("Created multipart upload with id: {}", upload_id);
+
+        loop {
+            info!("Reading chunk {}, current buffer size: {}", part_number, buffer.len());
+            let bytes_read = reader
+                .read_buf(&mut buffer)
+                .await
+                .map_err(|err| {
+                    let err_msg = format!("Failed to read from stream: {}", err);
+                    error!("{}", err_msg);
+                    err_msg
+                })?;
+            
+            info!("Read {} bytes from stream, total so far: {}", bytes_read, total_size + bytes_read);
+            
+            if bytes_read == 0 {
+                // EOF reached - check if file is small enough for simple upload
+                if total_size <= CHUNK_SIZE {
+                    info!("File is small enough for simple upload, uploading {} bytes", total_size);
+                    return self
+                        .upload_from_bytes(key, buffer.into(), content_type)
+                        .await;
+                }
+                break;
+            }
+
+            total_size += bytes_read;
+
+            // Only upload a part if buffer has reached chunk size
+            if buffer.len() >= CHUNK_SIZE {
+                info!("Uploading part {} with {} bytes", part_number, buffer.len());
+                let upload_part_res = self
+                    .client
+                    .upload_part()
+                    .key(key)
+                    .bucket(&self.bucket)
+                    .upload_id(upload_id)
+                    .body(ByteStream::from(buffer.split_off(0)))
+                    .part_number(part_number)
+                    .send()
+                    .await
+                    .map_err(|err| {
+                        format!(
+                            "Failed to upload part {}: {}",
+                            part_number,
+                            err.into_service_error().code().unwrap_or("unknown")
+                        )
+                    })?;
+
+                upload_parts.push(
+                    CompletedPart::builder()
+                        .e_tag(upload_part_res.e_tag.unwrap_or_default())
+                        .part_number(part_number)
+                        .build(),
+                );
+
+                part_number += 1;
+            }
+        }
+
+        // Upload any remaining data in buffer as the final part
+        if !buffer.is_empty() {
+            info!("Uploading final part {} with {} bytes", part_number, buffer.len());
+            let upload_part_res = self
+                .client
+                .upload_part()
+                .key(key)
+                .bucket(&self.bucket)
+                .upload_id(upload_id)
+                .body(ByteStream::from(buffer))
                 .part_number(part_number)
-                .build(),
-        );
-    }
-    // snippet-end:[s3.rust.upload_part]
+                .send()
+                .await
+                .map_err(|err| {
+                    format!(
+                        "Failed to upload final part {}: {}",
+                        part_number,
+                        err.into_service_error().code().unwrap_or("unknown")
+                    )
+                })?;
 
-    // snippet-start:[s3.rust.complete_multipart_upload]
-    // upload_parts: Vec<aws_sdk_s3::types::CompletedPart>
-    let completed_multipart_upload: CompletedMultipartUpload = CompletedMultipartUpload::builder()
-        .set_parts(Some(upload_parts))
-        .build();
+            upload_parts.push(
+                CompletedPart::builder()
+                    .e_tag(upload_part_res.e_tag.unwrap_or_default())
+                    .part_number(part_number)
+                    .build(),
+            );
+        }
 
-    let _complete_multipart_upload_res = self.client
-        .complete_multipart_upload()
-        .bucket(&self.bucket)
-        .key(&key)
-        .multipart_upload(completed_multipart_upload)
-        .upload_id(upload_id)
-        .send()
-        .await?;
-    info!("Multipart upload completed successfully.");
-    Ok(upload_id.to_string())
+        let completed_multipart_upload = CompletedMultipartUpload::builder()
+            .set_parts(Some(upload_parts))
+            .build();
+
+        self.client
+            .complete_multipart_upload()
+            .bucket(&self.bucket)
+            .key(key)
+            .multipart_upload(completed_multipart_upload)
+            .upload_id(upload_id)
+            .send()
+            .await
+            .map_err(|err| {
+                format!(
+                    "Failed to complete multipart upload: {}",
+                    err.into_service_error().code().unwrap_or("unknown")
+                )
+            })?;
+
+        info!("Multipart upload completed successfully for key: {}, total size: {} bytes", key, total_size);
+        Ok(upload_id.to_string())
     }
 }

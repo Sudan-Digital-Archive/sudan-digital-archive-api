@@ -11,14 +11,17 @@ use crate::repos::browsertrix_repo::BrowsertrixRepo;
 use crate::repos::emails_repo::EmailsRepo;
 use crate::repos::s3_repo::S3Repo;
 use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
+use axum::extract::multipart::Field;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
+use bytes::Bytes;
 use entity::sea_orm_active_enums::{CrawlStatus, DublinMetadataFormat};
-use tokio::io::AsyncRead;
+use futures::StreamExt;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::io::AsyncRead;
 use tokio::time::sleep;
 use tracing::{error, info};
 use uuid::Uuid;
@@ -348,7 +351,11 @@ impl AccessionsService {
         content_type: String,
         reader: Pin<&mut (dyn AsyncRead + Send)>,
     ) -> Result<String, Response> {
-        match self.s3_repo.upload_from_stream(&key, reader, &content_type).await {
+        match self
+            .s3_repo
+            .upload_from_stream(&key, reader, &content_type)
+            .await
+        {
             Ok(upload_id) => {
                 info!(
                     "Successfully uploaded file with key: {} and content type: {}",
@@ -362,6 +369,47 @@ impl AccessionsService {
                     key,
                     content_type,
                     "Failed to upload file to S3. Key: {}, Content-Type: {}",
+                    key,
+                    content_type
+                );
+                Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to upload file").into_response())
+            }
+        }
+    }
+
+    /// Uploads chunks from a multipart field directly to S3.
+    ///
+    /// # Arguments
+    /// * `key` - The S3 object key where the file will be uploaded
+    /// * `chunks` - Vector of byte chunks to upload
+    /// * `content_type` - The MIME type of the file
+    ///
+    /// # Returns
+    /// Result containing the upload ID or an error response
+    pub async fn upload_from_chunks(
+        self,
+        key: String,
+        chunks: Vec<Bytes>,
+        content_type: String,
+    ) -> Result<String, Response> {
+        match self
+            .s3_repo
+            .upload_from_chunks(&key, chunks, &content_type)
+            .await
+        {
+            Ok(upload_id) => {
+                info!(
+                    "Successfully uploaded chunks with key: {} and content type: {}",
+                    key, content_type
+                );
+                Ok(upload_id)
+            }
+            Err(err) => {
+                error!(
+                    %err,
+                    key,
+                    content_type,
+                    "Failed to upload chunks to S3. Key: {}, Content-Type: {}",
                     key,
                     content_type
                 );

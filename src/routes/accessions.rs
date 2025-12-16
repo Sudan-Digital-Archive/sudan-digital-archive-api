@@ -12,16 +12,19 @@ use crate::models::request::{
 };
 use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use ::entity::sea_orm_active_enums::Role;
-use axum::extract::{Multipart, Path, State};
+use axum::extract::{Multipart, Path, State, DefaultBodyLimit};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use axum_extra::extract::Query;
 use futures::TryStreamExt;
-use tokio_util::io::StreamReader;
-use tracing::{error,info};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use tokio::io::AsyncRead;
+use tracing::{error, info};
 use validator::Validate;
+
 /// Creates routes for accession-related endpoints under `/accessions`.
 pub fn get_accessions_routes() -> Router<AppState> {
     Router::new().nest(
@@ -31,6 +34,8 @@ pub fn get_accessions_routes() -> Router<AppState> {
             .route("/private", get(list_accessions_private))
             .route("/", post(create_accession))
             .route("/raw", post(create_accession_raw))
+               // Increase limit to 100MB; default is 2MB
+        .layer(DefaultBodyLimit::max(100 * 1024 * 1024))
             .route("/{accession_id}", get(get_one_accession))
             .route("/private/{accession_id}", get(get_one_private_accession))
             .route("/{accession_id}", delete(delete_accession))
@@ -72,21 +77,37 @@ async fn create_accession_raw(
         );
 
         if let Some(filename) = filename {
-            let body_with_io_error =
-                field.map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err));
-            let body_reader = StreamReader::new(body_with_io_error);
-            futures::pin_mut!(body_reader);
+            // Collect field chunks by reading them one at a time
+            let mut chunks = Vec::new();
+            let mut field = field;
+            loop {
+                match field.chunk().await {
+                    Ok(Some(chunk)) => chunks.push(chunk),
+                    Ok(None) => break,
+                    Err(err) => {
+                        error!("Failed to read multipart field chunk: {:?}", err);
+                        return (StatusCode::BAD_REQUEST, "Failed to read file data").into_response();
+                    }
+                }
+            }
 
             let upload_result = state
                 .accessions_service
                 .clone()
-                .upload_from_stream(filename.clone(), content_type.unwrap_or("application/octet-stream".to_string()), body_reader)
+                .upload_from_chunks(
+                    filename.clone(),
+                    chunks,
+                    content_type.unwrap_or("application/octet-stream".to_string()),
+                )
                 .await;
 
             match upload_result {
                 Ok(_) => info!("Successfully uploaded file: {}", filename),
                 Err(err_response) => {
-                    error!("Failed to upload file: {}. Error: {:?}", filename, err_response);
+                    error!(
+                        "Failed to upload file: {}. Error: {:?}",
+                        filename, err_response
+                    );
                     return err_response;
                 }
             }
