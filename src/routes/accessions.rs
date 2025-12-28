@@ -8,17 +8,18 @@ use crate::auth::validate_at_least_researcher;
 use crate::models::auth::AuthenticatedUser;
 use crate::models::request::{
     AccessionPagination, AccessionPaginationWithPrivate, CreateAccessionRequest,
-    UpdateAccessionRequest,
+    CreateAccessionRequestRaw, UpdateAccessionRequest,
 };
 use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use ::entity::sea_orm_active_enums::Role;
-use axum::extract::{Multipart, Path, State, DefaultBodyLimit};
+use axum::extract::{DefaultBodyLimit, Multipart, Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use axum_extra::extract::Query;
-use tracing::{error, info};
+use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 use validator::Validate;
 
 /// Creates routes for accession-related endpoints under `/accessions`.
@@ -30,14 +31,165 @@ pub fn get_accessions_routes() -> Router<AppState> {
             .route("/private", get(list_accessions_private))
             .route("/", post(create_accession))
             .route("/raw", post(create_accession_raw))
-        // Increase limit to 100MB; default is 2MB; this only applies to raw upload endpoint
-        // see https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html
-        .layer(DefaultBodyLimit::max(100 * 1024 * 1024))
+            // Increase limit to 100MB; default is 2MB; this only applies to raw upload endpoint
+            // see https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html
+            .layer(DefaultBodyLimit::max(100 * 1024 * 1024))
             .route("/{accession_id}", get(get_one_accession))
             .route("/private/{accession_id}", get(get_one_private_accession))
             .route("/{accession_id}", delete(delete_accession))
             .route("/{accession_id}", put(update_accession)),
     )
+}
+
+// ---------------------------------------------------------------------------
+// Helper – a tiny state machine for the two‑step multipart parsing
+// ---------------------------------------------------------------------------
+#[derive(PartialEq, Eq)]
+enum Step {
+    ExpectMetadata,
+    ExpectFile,
+}
+
+// ---------------------------------------------------------------------------
+// The refactored handler
+// ---------------------------------------------------------------------------
+pub async fn extract_multipart_data(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> Result<CreateAccessionRequestRaw, Response> {
+    // -----------------------------------------------------------------------
+    // 1️⃣  Prepare mutable containers
+    // -----------------------------------------------------------------------
+    let mut metadata_payload: Option<CreateAccessionRequestRaw> = None;
+    let mut uploaded_key: Option<String> = None;
+    let mut step = Step::ExpectMetadata; // first field must be the metadata JSON
+
+    // -----------------------------------------------------------------------
+    // 2️⃣  Iterate over the multipart stream
+    // -----------------------------------------------------------------------
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        error!("Failed to read multipart field: {e:?}");
+        (StatusCode::BAD_REQUEST, "Malformed multipart request").into_response()
+    })? {
+        // ---------------------------------------------------------------
+        // Common field meta‑information (name, filename, content‑type)
+        // ---------------------------------------------------------------
+        let field_name = field.name().unwrap_or("unknown").to_owned(); // name is always present in a well‑formed form
+
+        let filename_opt = field.file_name().map(str::to_owned);
+        let content_type = field
+            .content_type()
+            .map(str::to_owned)
+            .unwrap_or_else(|| "application/octet-stream".to_string());
+
+        debug!(
+            "Processing multipart field: name={:?}, filename={:?}, content_type={:?}",
+            field_name, filename_opt, content_type
+        );
+
+        // ---------------------------------------------------------------
+        // 2️⃣a  Metadata (first part)
+        // ---------------------------------------------------------------
+        if step == Step::ExpectMetadata {
+            if field_name != "metadata" {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "Metadata field should be the first form field",
+                )
+                    .into_response());
+            }
+
+            // Grab the whole text body of the field
+            let text = field.text().await.map_err(|e| {
+                error!("Failed to read metadata text: {e:?}");
+                (StatusCode::BAD_REQUEST, "Unable to read metadata field").into_response()
+            })?;
+
+            // ----------------------------------------------------------------
+            // Parse JSON **with an explicit type** – this fixes the E0282 error
+            // ----------------------------------------------------------------
+            let parsed: CreateAccessionRequestRaw = serde_json::from_str(&text).map_err(|e| {
+                error!("Failed to parse metadata JSON: {e:?}");
+                (StatusCode::BAD_REQUEST, "Metadata JSON is invalid").into_response()
+            })?;
+
+            if let Err(v_err) = parsed.validate() {
+                warn!("Invalid create accession request payload: {v_err:?}");
+                return Err((StatusCode::BAD_REQUEST, v_err.to_string()).into_response());
+            }
+
+            info!("Extracted and validated metadata JSON");
+            metadata_payload = Some(parsed);
+            step = Step::ExpectFile; // next part must be the file
+            continue; // go to the next field
+        }
+
+        // ---------------------------------------------------------------
+        // 2️⃣b  File upload (any field that carries a filename)
+        // ---------------------------------------------------------------
+        if let Some(_filename) = filename_opt {
+            // At this point we *must* already have a parsed request
+            let create_request = metadata_payload.as_mut().ok_or_else(|| {
+                (StatusCode::BAD_REQUEST, "File part arrived before metadata").into_response()
+            })?;
+
+            // Determine the extension based on the metadata format
+            let file_ext = match create_request.metadata_format {
+                entity::sea_orm_active_enums::DublinMetadataFormat::Wacz => "wacz",
+            };
+
+            // Build a unique filename and store it back into the request
+            let unique_name = format!("{}.{}", Uuid::new_v4(), file_ext);
+            create_request.s3_filename = unique_name.clone();
+
+            // ----------------------------------------------------------------
+            // Upload the file via your service
+            // ----------------------------------------------------------------
+            let upload_res = state
+                .accessions_service
+                .clone()
+                .upload_from_multipart_field(unique_name.clone(), field, content_type.clone())
+                .await
+                .map_err(|e| {
+                    error!("Failed to upload file {unique_name}: {e:?}");
+                    e // already a `Response`
+                })?;
+
+            uploaded_key = Some(upload_res);
+            info!("Successfully uploaded file: {unique_name}");
+            // No need to change `step`; we still accept further fields (e.g. extra files)
+            continue;
+        }
+
+        // ---------------------------------------------------------------
+        // 2️⃣c  Anything else – just log and ignore
+        // ---------------------------------------------------------------
+        error!("Skipping unexpected field without filename: name={field_name}");
+    }
+
+    // -----------------------------------------------------------------------
+    // 3️⃣  Post‑processing checks
+    // -----------------------------------------------------------------------
+    let file_key = uploaded_key.ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Missing name of file uploaded to S3",
+        )
+            .into_response()
+    })?;
+
+    if let Some(ref mut req) = metadata_payload {
+        req.s3_filename = file_key;
+    }
+
+    // Finally, return the built request (or an internal‑error if something went wrong)
+    metadata_payload.ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Could not extract metadata",
+        )
+            .into_response()
+    })
 }
 
 #[utoipa::path(
@@ -51,54 +203,60 @@ pub fn get_accessions_routes() -> Router<AppState> {
         (status = 403, description = "Forbidden")
     )
 )]
-// https://users.rust-lang.org/t/axum-server-handling-body-stream/121081
 async fn create_accession_raw(
     State(state): State<AppState>,
-    // authenticated_user: AuthenticatedUser,
-    mut multipart: Multipart,
+    authenticated_user: AuthenticatedUser,
+    multipart: Multipart,
 ) -> Response {
-    // if !validate_at_least_researcher(&authenticated_user.role) {
-    //     return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
-    // }
-    while let Some(field) = multipart.next_field().await.unwrap_or_else(|err| {
-        error!("Failed to read multipart field: {:?}", err);
-        return None;
-    }) {
-        let field_name = field.name().unwrap_or("unknown").to_string();
-        let filename = field.file_name().map(|f| f.to_string());
-        let content_type = field.content_type().map(|ct| ct.to_string());
+    if !validate_at_least_researcher(&authenticated_user.role) {
+        return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
+    }
+    // TODO: Don't need to clone whole steet here this is pretty ugly should put it all into accessions service and do there
+    let create_accession_raw_request =
+        match extract_multipart_data(State(state.clone()), multipart).await {
+            Ok(data) => data,
+            Err(response) => return response,
+        };
 
-        info!(
-            "Processing multipart field: name = {:?}, filename = {:?}, content_type = {:?}",
-            field_name, filename, content_type
-        );
+    let subjects_exist = state
+        .subjects_service
+        .clone()
+        .verify_subjects_exist(
+            create_accession_raw_request.metadata_subjects.clone(),
+            create_accession_raw_request.metadata_language,
+        )
+        .await;
 
-        if let Some(filename) = filename {
-            let upload_result = state
-                .accessions_service
-                .clone()
-                .upload_from_multipart_field(
-                    filename.clone(),
-                    field,
-                    content_type.unwrap_or("application/octet-stream".to_string()),
-                )
-                .await;
-
-            match upload_result {
-                Ok(_) => info!("Successfully uploaded file: {}", filename),
-                Err(err_response) => {
-                    error!(
-                        "Failed to upload file: {}. Error: {:?}",
-                        filename, err_response
-                    );
-                    return err_response;
-                }
+    match subjects_exist {
+        Err(err) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response();
+        }
+        Ok(flag) => {
+            if !flag {
+                return (StatusCode::BAD_REQUEST, "Subjects do not exist").into_response();
             }
-        } else {
-            error!("Skipping field without a filename: name = {:?}", field_name);
+        }
+    };
+
+    match state
+        .accessions_service
+        .clone()
+        .write_one_raw(create_accession_raw_request)
+        .await
+    {
+        Ok(id) => {
+            info!("Raw accession created with id: {}", id);
+            (
+                StatusCode::CREATED,
+                format!("Accession created with id: {}", id),
+            )
+                .into_response()
+        }
+        Err(err) => {
+            error!("Failed to create raw accession: {:?}", err);
+            err
         }
     }
-    (StatusCode::CREATED, "File(s) uploaded successfully!").into_response()
 }
 
 #[utoipa::path(

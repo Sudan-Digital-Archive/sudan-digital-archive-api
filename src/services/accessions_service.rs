@@ -4,7 +4,9 @@
 //! archival records, including their associated web crawls and metadata in both
 //! Arabic and English.
 use crate::models::request::AccessionPaginationWithPrivate;
-use crate::models::request::{CreateAccessionRequest, CreateCrawlRequest, UpdateAccessionRequest};
+use crate::models::request::{
+    CreateAccessionRequest, CreateAccessionRequestRaw, CreateCrawlRequest, UpdateAccessionRequest,
+};
 use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use crate::repos::accessions_repo::AccessionsRepo;
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
@@ -333,6 +335,31 @@ impl AccessionsService {
         }
     }
 
+    /// Writes a raw accession record (file-based, no crawl).
+    ///
+    /// # Arguments
+    /// * `payload` - The raw accession request with metadata and S3 filename
+    ///
+    /// # Returns
+    /// Result containing the accession ID or an error response
+    pub async fn write_one_raw(self, payload: CreateAccessionRequestRaw) -> Result<i32, Response> {
+        info!(
+            "Writing raw accession with title: {}",
+            payload.metadata_title
+        );
+        let write_result = self.accessions_repo.write_one_raw(payload).await;
+        match write_result {
+            Err(err) => {
+                error!(%err, "Error occurred writing raw accession to db");
+                Err((StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response())
+            }
+            Ok(id) => {
+                info!("Raw accession written to db successfully with id {id}");
+                Ok(id)
+            }
+        }
+    }
+
     /// Uploads a file from a multipart field to S3 with smart chunk handling.
     ///
     /// This method streams the file and decides on upload strategy as it reads:
@@ -353,9 +380,12 @@ impl AccessionsService {
         content_type: String,
     ) -> Result<String, Response> {
         const FIVE_MB: usize = 5 * 1024 * 1024;
-        
-        info!("Starting streaming upload for key: {} with content type: {}", key, content_type);
-        
+
+        info!(
+            "Starting streaming upload for key: {} with content type: {}",
+            key, content_type
+        );
+
         let mut buffer = Vec::with_capacity(FIVE_MB);
         let mut total_size = 0;
         let mut upload_id: Option<String> = None;
@@ -364,11 +394,20 @@ impl AccessionsService {
 
         while let Some(chunk) = field.chunk().await.map_err(|err| {
             error!("Failed to read chunk from field: {}", err);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to read file stream").into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to read file stream",
+            )
+                .into_response()
         })? {
             total_size += chunk.len();
             buffer.extend_from_slice(&chunk);
-            info!("Received chunk of {} bytes, total so far: {}", chunk.len(), total_size);
+            info!(
+                "Received chunk of {} bytes, total so far: {}",
+                chunk.len(),
+                total_size
+            );
+            // TODO: Consider refactoring into if/elif pattern for readability
 
             // If we haven't exceeded 5MB yet and buffer is large, stay buffered
             if upload_id.is_none() && total_size <= FIVE_MB {
@@ -377,15 +416,29 @@ impl AccessionsService {
 
             // If we just exceeded 5MB, initiate multipart upload
             if upload_id.is_none() && total_size > FIVE_MB {
-                info!("File exceeded 5MB threshold at {} bytes, initiating multipart upload", total_size);
-                match self.s3_repo.initiate_multipart_upload(&key, &content_type).await {
+                info!(
+                    "File exceeded 5MB threshold at {} bytes, initiating multipart upload",
+                    total_size
+                );
+                match self
+                    .s3_repo
+                    .initiate_multipart_upload(&key, &content_type)
+                    .await
+                {
                     Ok(id) => {
                         upload_id = Some(id);
-                        info!("Initiated multipart upload with id: {}", upload_id.as_ref().unwrap());
+                        info!(
+                            "Initiated multipart upload with id: {}",
+                            upload_id.as_ref().unwrap()
+                        );
                     }
                     Err(err) => {
                         error!(%err, "Failed to initiate multipart upload for key: {}", key);
-                        return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to initiate upload").into_response());
+                        return Err((
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Failed to initiate upload",
+                        )
+                            .into_response());
                     }
                 }
             }
@@ -394,15 +447,27 @@ impl AccessionsService {
             if let Some(ref id) = upload_id {
                 if buffer.len() >= FIVE_MB {
                     let part_bytes = Bytes::from(buffer.split_off(0));
-                    info!("Uploading part {} with {} bytes", part_number, part_bytes.len());
-                    match self.s3_repo.upload_part(&key, id, part_number, part_bytes).await {
+                    info!(
+                        "Uploading part {} with {} bytes",
+                        part_number,
+                        part_bytes.len()
+                    );
+                    match self
+                        .s3_repo
+                        .upload_part(&key, id, part_number, part_bytes)
+                        .await
+                    {
                         Ok((etag, _)) => {
                             upload_parts.push((etag, part_number));
                             part_number += 1;
                         }
                         Err(err) => {
                             error!(%err, "Failed to upload part {} for key: {}", part_number, key);
-                            return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to upload file part").into_response());
+                            return Err((
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                "Failed to upload file part",
+                            )
+                                .into_response());
                         }
                     }
                 }
@@ -413,45 +478,79 @@ impl AccessionsService {
         if let Some(id) = upload_id {
             // Multipart upload in progress - upload final part and complete
             if !buffer.is_empty() {
-                info!("Uploading final part {} with {} bytes", part_number, buffer.len());
+                info!(
+                    "Uploading final part {} with {} bytes",
+                    part_number,
+                    buffer.len()
+                );
                 let part_bytes = Bytes::from(buffer);
-                match self.s3_repo.upload_part(&key, &id, part_number, part_bytes).await {
+                match self
+                    .s3_repo
+                    .upload_part(&key, &id, part_number, part_bytes)
+                    .await
+                {
                     Ok((etag, _)) => {
                         upload_parts.push((etag, part_number));
                     }
                     Err(err) => {
                         error!(%err, "Failed to upload final part for key: {}", key);
-                        return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to upload final part").into_response());
+                        return Err((
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Failed to upload final part",
+                        )
+                            .into_response());
                     }
                 }
             }
 
             // Complete the multipart upload
-            info!("Completing multipart upload for key: {} with {} parts", key, upload_parts.len());
-            match self.s3_repo.complete_multipart_upload(&key, &id, upload_parts).await {
+            info!(
+                "Completing multipart upload for key: {} with {} parts",
+                key,
+                upload_parts.len()
+            );
+            match self
+                .s3_repo
+                .complete_multipart_upload(&key, &id, upload_parts)
+                .await
+            {
                 Ok(_) => {
-                    info!("Successfully completed multipart upload for key: {}, total size: {} bytes", key, total_size);
+                    info!(
+                        "Successfully completed multipart upload for key: {}, total size: {} bytes",
+                        key, total_size
+                    );
                     Ok(id)
                 }
                 Err(err) => {
                     error!(%err, "Failed to complete multipart upload for key: {}", key);
-                    Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to complete upload").into_response())
+                    Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Failed to complete upload",
+                    )
+                        .into_response())
                 }
             }
         } else {
             // Simple upload for files <= 5MB
             info!("Using simple upload for {} bytes", total_size);
-            match self.s3_repo.upload_from_bytes(&key, Bytes::from(buffer), &content_type).await {
+            match self
+                .s3_repo
+                .upload_from_bytes(&key, Bytes::from(buffer), &content_type)
+                .await
+            {
                 Ok(_) => {
-                    info!("Successfully uploaded file with key: {} and content type: {}", key, content_type);
+                    info!(
+                        "Successfully uploaded file with key: {} and content type: {}",
+                        key, content_type
+                    );
                     Ok(key)
                 }
                 Err(err) => {
                     error!(%err, "Failed to upload file to S3. Key: {}, Content-Type: {}", key, content_type);
-                    Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to upload file").into_response())
+                    Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to upload file")
+                        .into_response())
                 }
             }
         }
     }
-
 }

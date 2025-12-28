@@ -125,8 +125,7 @@ fn build_routes(api: utoipa::openapi::OpenApi) -> Router<AppState> {
         )
         .layer(TimeoutLayer::new(Duration::from_secs(120)))
         .layer(CompressionLayer::new())
-        .layer(ValidateRequestHeaderLayer::accept("application/json"))
-        ;
+        .layer(ValidateRequestHeaderLayer::accept("application/json"));
     let accessions_routes = get_accessions_routes();
     let subjects_routes = get_subjects_routes();
     let auth_routes = get_auth_routes();

@@ -64,7 +64,6 @@ pub trait S3Repo: Send + Sync {
         expires_in: u64,
     ) -> Result<String, Box<dyn Error>>;
 
-
     /// Initiates a multipart upload to S3.
     ///
     /// # Arguments
@@ -121,7 +120,6 @@ pub trait S3Repo: Send + Sync {
         upload_id: &str,
         parts: Vec<(String, i32)>,
     ) -> Result<String, Box<dyn Error>>;
-
 }
 
 /// Implementation for DigitalOcean Spaces (S3-compatible storage)
@@ -239,7 +237,6 @@ impl S3Repo for DigitalOceanSpacesRepo {
         Ok(presigned_request.uri().to_string())
     }
 
-
     async fn initiate_multipart_upload(
         &self,
         key: &str,
@@ -276,8 +273,13 @@ impl S3Repo for DigitalOceanSpacesRepo {
         part_number: i32,
         bytes: Bytes,
     ) -> Result<(String, i32), Box<dyn Error>> {
-        info!("Uploading part {} ({} bytes) for key: {}", part_number, bytes.len(), key);
-        
+        info!(
+            "Uploading part {} ({} bytes) for key: {}",
+            part_number,
+            bytes.len(),
+            key
+        );
+
         let upload_part_res = self
             .client
             .upload_part()
@@ -297,7 +299,10 @@ impl S3Repo for DigitalOceanSpacesRepo {
             })?;
 
         let etag = upload_part_res.e_tag().unwrap_or_default().to_string();
-        info!("Part {} uploaded successfully with ETag: {}", part_number, etag);
+        info!(
+            "Part {} uploaded successfully with ETag: {}",
+            part_number, etag
+        );
         Ok((etag, part_number))
     }
 
@@ -307,8 +312,12 @@ impl S3Repo for DigitalOceanSpacesRepo {
         upload_id: &str,
         parts: Vec<(String, i32)>,
     ) -> Result<String, Box<dyn Error>> {
-        info!("Completing multipart upload for key: {} with {} parts", key, parts.len());
-        
+        info!(
+            "Completing multipart upload for key: {} with {} parts",
+            key,
+            parts.len()
+        );
+
         let completed_parts: Vec<CompletedPart> = parts
             .into_iter()
             .map(|(etag, part_number)| {
@@ -340,7 +349,10 @@ impl S3Repo for DigitalOceanSpacesRepo {
             })?;
 
         let final_etag = result.e_tag().unwrap_or_default().to_string();
-        info!("Multipart upload completed for key: {} with ETag: {}", key, final_etag);
+        info!(
+            "Multipart upload completed for key: {} with ETag: {}",
+            key, final_etag
+        );
         Ok(final_etag)
     }
 }

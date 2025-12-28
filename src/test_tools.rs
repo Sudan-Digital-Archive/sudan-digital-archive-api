@@ -7,7 +7,8 @@ use crate::auth::JWT_KEYS;
 use crate::models::auth::JWTClaims;
 use crate::models::common::MetadataLanguage;
 use crate::models::request::{
-    AccessionPaginationWithPrivate, CreateAccessionRequest, CreateCrawlRequest,
+    AccessionPaginationWithPrivate, CreateAccessionRequest, CreateAccessionRequestRaw,
+    CreateCrawlRequest,
 };
 use crate::models::response::CreateCrawlResponse;
 use crate::repos::accessions_repo::AccessionsRepo;
@@ -49,6 +50,14 @@ impl AccessionsRepo for InMemoryAccessionsRepo {
         _crawl_id: Uuid,
         _job_run_id: String,
         _crawl_status: CrawlStatus,
+    ) -> Result<i32, DbErr> {
+        Ok(10)
+    }
+
+    /// Mock implementation for raw accession creation.
+    async fn write_one_raw(
+        &self,
+        _create_accession_request: CreateAccessionRequestRaw,
     ) -> Result<i32, DbErr> {
         Ok(10)
     }
@@ -290,6 +299,33 @@ impl S3Repo for InMemoryS3Repo {
         _expires_in: u64,
     ) -> Result<String, Box<dyn StdError>> {
         Ok("my url".to_string())
+    }
+
+    async fn initiate_multipart_upload(
+        &self,
+        key: &str,
+        _content_type: &str,
+    ) -> Result<String, Box<dyn StdError>> {
+        Ok(format!("mock-upload-id-{}", key))
+    }
+
+    async fn upload_part(
+        &self,
+        _key: &str,
+        _upload_id: &str,
+        part_number: i32,
+        _bytes: Bytes,
+    ) -> Result<(String, i32), Box<dyn StdError>> {
+        Ok((format!("mock-etag-part-{}", part_number), part_number))
+    }
+
+    async fn complete_multipart_upload(
+        &self,
+        key: &str,
+        _upload_id: &str,
+        _parts: Vec<(String, i32)>,
+    ) -> Result<String, Box<dyn StdError>> {
+        Ok(format!("mock-final-etag-{}", key))
     }
 }
 /// Builds a test accessions service with in-memory repositories.

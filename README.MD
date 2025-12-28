@@ -1,17 +1,14 @@
 # TODOs
 
-- Then implement the s3 upload part. Problems:
-    - Remove unnecessary deps
-    - Tidy up imports
-    - Add tests
-    - Figure out how to get JSON data through in the multipart form
-    - Then write that JSON data to create an accession that points to s3 upload we just made
-    - Make the filenames unique
-    - Check you understand wtf is going on with boxing and readers and pinned futures and document it
-    - Delete incomplete multipart uploads using s3cmd https://docs.digitalocean.com/products/spaces/how-to/configure-lifecycle-rules/#remove-incomplete-multipart-uploads
-    - Should maybe put that in some kind of infra repo to track this stuff; put tickets like this there
-    - Cargo clean and cargo update
-    - Log in MB not bytes
+- Move accession raw handling into service & refactor this hot mess
+- Log in MB not bytes
+- Read chunk size and upload raw limit from app config
+- Test E2E and fix any regressions
+- Cargo clean and cargo update
+- Ensure adequate logging for all the complex multipart stages
+- Ensure adequate handling for all the complex multipart stages
+- Add tests
+- Delete incomplete multipart uploads using s3cmd https://docs.digitalocean.com/products/spaces/how-to/configure-lifecycle-rules/#remove-incomplete-multipart-uploads and create a ticket in the infra repo to update this and the database diagram too
 
 # Overview
 
