@@ -1,8 +1,9 @@
 //! Test utilities for creating mock implementations and test fixtures.
-//! This module provides in-memory implementations of repositories and services
+//! This module provides in-memory implementations of repositories
 //! to facilitate testing without requiring actual database or external API connections.
 
 use crate::app_factory::{create_app, AppState};
+use crate::config::AppConfig;
 use crate::auth::JWT_KEYS;
 use crate::models::auth::JWTClaims;
 use crate::models::common::MetadataLanguage;
@@ -373,7 +374,7 @@ pub fn build_test_app() -> Router {
         subjects_service,
         auth_service,
     };
-    create_app(app_state, vec![], true)
+    create_app(app_state, AppConfig::default(), true)
 }
 
 /// Creates a mock paginated collection of English accessions.

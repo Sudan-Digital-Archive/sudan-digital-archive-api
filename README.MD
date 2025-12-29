@@ -2,10 +2,9 @@
 
 - Test E2E and fix any regressions
 - Cargo clean and cargo update
-- Ensure adequate logging for all the complex multipart stages
-- Ensure adequate handling for all the complex multipart stages
-- Add tests
-- Delete incomplete multipart uploads using s3cmd https://docs.digitalocean.com/products/spaces/how-to/configure-lifecycle-rules/#remove-incomplete-multipart-uploads and create a ticket in the infra repo to update this and the database diagram too
+- Add tests with appropriate mock repo implementations
+- Delete incomplete multipart uploads using s3cmd https://docs.digitalocean.com/products/spaces/how-to/configure-lifecycle-rules/#remove-incomplete-multipart-uploads 
+- Create a ticket in the infra repo to update this and the database diagram too
 
 # Overview
 
