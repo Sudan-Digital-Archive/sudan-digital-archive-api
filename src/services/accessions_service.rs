@@ -129,6 +129,16 @@ impl AccessionsService {
         }
     }
 
+    /// Enriches an accession with WACZ URL from Browsertrix service.
+    ///
+    /// This private helper function retrieves the WACZ URL for an accession
+    /// using the job_run_id and returns an appropriate HTTP response.
+    ///
+    /// # Arguments
+    /// * `query_result` - Optional accession model to enrich
+    ///
+    /// # Returns
+    /// HTTP response with the enriched accession or error status
     async fn enrich_one_with_browsertrix(
         self,
         query_result: Option<AccessionWithMetadataModel>,
@@ -566,6 +576,22 @@ impl AccessionsService {
         }
     }
 
+    /// Extracts and validates accession data from a multipart form submission.
+    ///
+    /// This method processes a multipart form containing metadata JSON and an optional file upload.
+    /// It validates the metadata, checks subject existence, uploads files to S3, and returns a
+    /// complete CreateAccessionRequestRaw object ready for database storage.
+    ///
+    /// The multipart form must have:
+    /// - First field: "metadata" containing JSON with accession metadata
+    /// - Optional subsequent fields: file uploads with filenames
+    ///
+    /// # Arguments
+    /// * `multipart` - The multipart form data from the HTTP request
+    /// * `subjects_service` - Service for validating metadata subjects exist
+    ///
+    /// # Returns
+    /// Result containing the parsed accession request or an HTTP error response
     pub async fn extract_accession_from_multipart_form(
         self,
         mut multipart: Multipart,
