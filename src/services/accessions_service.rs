@@ -12,8 +12,10 @@ use crate::repos::accessions_repo::AccessionsRepo;
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
 use crate::repos::emails_repo::EmailsRepo;
 use crate::repos::s3_repo::S3Repo;
+use crate::services::subjects_service::SubjectsService;
 use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
 use axum::extract::multipart::Field;
+use axum::extract::Multipart;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -22,8 +24,15 @@ use entity::sea_orm_active_enums::{CrawlStatus, DublinMetadataFormat};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
-use tracing::{error, info};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+use validator::Validate;
+
+#[derive(PartialEq, Eq)]
+enum MultiPartExtractionStep {
+    ExpectMetadata,
+    ExpectFile,
+}
 
 /// Service for managing archival accessions and their associated web crawls.
 /// Uses dynamic traits for dependency injection
@@ -552,5 +561,137 @@ impl AccessionsService {
                 }
             }
         }
+    }
+
+    pub async fn extract_accession_from_multipart_form(
+        self,
+        mut multipart: Multipart,
+        subjects_service: SubjectsService,
+    ) -> Result<CreateAccessionRequestRaw, Response> {
+        let mut metadata_payload: Option<CreateAccessionRequestRaw> = None;
+        let mut uploaded_key: Option<String> = None;
+        let mut step = MultiPartExtractionStep::ExpectMetadata; // first field must be the metadata JSON
+
+        while let Some(field) = multipart.next_field().await.map_err(|e| {
+            error!("Failed to read multipart field: {e:?}");
+            (StatusCode::BAD_REQUEST, "Malformed multipart request").into_response()
+        })? {
+            let field_name = field.name().unwrap_or("unknown").to_owned();
+            let filename_opt = field.file_name().map(str::to_owned);
+            let content_type = field
+                .content_type()
+                .map(str::to_owned)
+                .unwrap_or_else(|| "application/octet-stream".to_string());
+
+            debug!(
+                "Processing multipart field: name={:?}, filename={:?}, content_type={:?}",
+                field_name, filename_opt, content_type
+            );
+
+            if step == MultiPartExtractionStep::ExpectMetadata {
+                if field_name != "metadata" {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        "Metadata field should be the first form field",
+                    )
+                        .into_response());
+                }
+
+                let text = field.text().await.map_err(|e| {
+                    error!("Failed to read metadata text: {e:?}");
+                    (StatusCode::BAD_REQUEST, "Unable to read metadata field").into_response()
+                })?;
+
+                let parsed: CreateAccessionRequestRaw =
+                    serde_json::from_str(&text).map_err(|e| {
+                        error!("Failed to parse metadata JSON: {e:?}");
+                        (StatusCode::BAD_REQUEST, "Metadata JSON is invalid").into_response()
+                    })?;
+
+                if let Err(v_err) = parsed.validate() {
+                    warn!("Invalid create accession request payload: {v_err:?}");
+                    return Err((StatusCode::BAD_REQUEST, v_err.to_string()).into_response());
+                }
+
+                info!("Extracted and validated metadata JSON");
+                let subjects_exist = subjects_service
+                    .clone()
+                    .verify_subjects_exist(
+                        parsed.metadata_subjects.clone(),
+                        parsed.metadata_language,
+                    )
+                    .await;
+
+                match subjects_exist {
+                    Err(err) => {
+                        return Err(
+                            (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response()
+                        );
+                    }
+                    Ok(flag) => {
+                        if !flag {
+                            return Err(
+                                (StatusCode::BAD_REQUEST, "Subjects do not exist").into_response()
+                            );
+                        }
+                    }
+                };
+                info!("Validated metadata subjects exist");
+
+                metadata_payload = Some(parsed);
+                step = MultiPartExtractionStep::ExpectFile;
+                continue;
+            }
+
+            if let Some(_) = filename_opt {
+                let create_request = metadata_payload.as_mut().ok_or_else(|| {
+                    (StatusCode::BAD_REQUEST, "File part arrived before metadata").into_response()
+                })?;
+
+                let file_ext = match create_request.metadata_format {
+                    DublinMetadataFormat::Wacz => "wacz",
+                };
+
+                // Discard the original filename since we have all that from the metadata
+                // Use this to make sure there are no filename collisions between objects in s3
+                let unique_name = format!("{}.{}", Uuid::new_v4(), file_ext);
+                create_request.s3_filename = unique_name.clone();
+
+                let upload_res = self
+                    .clone()
+                    .upload_from_multipart_field(unique_name.clone(), field, content_type.clone())
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to upload file {unique_name}: {e:?}");
+                        e
+                    })?;
+
+                uploaded_key = Some(upload_res);
+                info!("Successfully uploaded file: {unique_name}");
+                continue;
+            }
+
+            error!("Skipping unexpected field without filename: name={field_name}");
+        }
+
+        let file_key = uploaded_key.ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Missing name of file uploaded to S3",
+            )
+                .into_response()
+        })?;
+
+        if let Some(ref mut req) = metadata_payload {
+            req.s3_filename = file_key;
+        }
+
+        metadata_payload.ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not extract metadata",
+            )
+                .into_response()
+        })
     }
 }

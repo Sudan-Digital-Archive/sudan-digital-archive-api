@@ -1,6 +1,5 @@
 # TODOs
 
-- Move accession raw handling into service & refactor this hot mess
 - Log in MB not bytes
 - Read chunk size and upload raw limit from app config
 - Test E2E and fix any regressions
