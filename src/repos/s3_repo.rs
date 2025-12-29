@@ -9,7 +9,6 @@ use aws_sdk_s3::Client;
 use aws_smithy_types::byte_stream::ByteStream;
 use bytes::Bytes;
 use std::error::Error;
-use tracing::info;
 
 // Repository trait for S3-compatible storage operations
 #[async_trait]
@@ -261,8 +260,6 @@ impl S3Repo for DigitalOceanSpacesRepo {
             .upload_id()
             .ok_or("Missing upload_id after CreateMultipartUpload")?
             .to_string();
-
-        info!("Created multipart upload with id: {}", upload_id);
         Ok(upload_id)
     }
 
@@ -273,13 +270,6 @@ impl S3Repo for DigitalOceanSpacesRepo {
         part_number: i32,
         bytes: Bytes,
     ) -> Result<(String, i32), Box<dyn Error>> {
-        info!(
-            "Uploading part {} ({} bytes) for key: {}",
-            part_number,
-            bytes.len(),
-            key
-        );
-
         let upload_part_res = self
             .client
             .upload_part()
@@ -299,10 +289,6 @@ impl S3Repo for DigitalOceanSpacesRepo {
             })?;
 
         let etag = upload_part_res.e_tag().unwrap_or_default().to_string();
-        info!(
-            "Part {} uploaded successfully with ETag: {}",
-            part_number, etag
-        );
         Ok((etag, part_number))
     }
 
@@ -312,12 +298,6 @@ impl S3Repo for DigitalOceanSpacesRepo {
         upload_id: &str,
         parts: Vec<(String, i32)>,
     ) -> Result<String, Box<dyn Error>> {
-        info!(
-            "Completing multipart upload for key: {} with {} parts",
-            key,
-            parts.len()
-        );
-
         let completed_parts: Vec<CompletedPart> = parts
             .into_iter()
             .map(|(etag, part_number)| {
@@ -347,12 +327,7 @@ impl S3Repo for DigitalOceanSpacesRepo {
                     err.into_service_error().code().unwrap_or("unknown")
                 )
             })?;
-
         let final_etag = result.e_tag().unwrap_or_default().to_string();
-        info!(
-            "Multipart upload completed for key: {} with ETag: {}",
-            key, final_etag
-        );
         Ok(final_etag)
     }
 }

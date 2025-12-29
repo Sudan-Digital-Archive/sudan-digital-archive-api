@@ -1,6 +1,5 @@
 # TODOs
 
-- Read chunk size and upload raw limit from app config
 - Test E2E and fix any regressions
 - Cargo clean and cargo update
 - Ensure adequate logging for all the complex multipart stages

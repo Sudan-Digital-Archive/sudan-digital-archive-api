@@ -13,6 +13,7 @@
 //!
 //! Note: Rate limiting is disabled in test mode.
 
+use crate::config::AppConfig;
 use crate::open_api_spec::ApiDoc;
 use crate::routes::accessions::get_accessions_routes;
 use crate::routes::auth::get_auth_routes;
@@ -26,7 +27,7 @@ use axum::http::Request;
 use axum::routing::get;
 use axum::Router;
 use http::header::CONTENT_TYPE;
-use http::{HeaderValue, Method};
+use http::Method;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
@@ -54,12 +55,12 @@ pub struct AppState {
 ///
 /// # Arguments
 /// * `app_state` - Shared application state containing service instances
-/// * `cors_origins` - List of allowed CORS origins
+/// * `app_config` - Application configuration
 /// * `test` - Boolean flag to disable rate limiting and modify logging for tests
 ///
 /// # Returns
 /// Configured Router instance with all routes, middleware, and rate limiting (if not in test mode)
-pub fn create_app(app_state: AppState, cors_origins: Vec<HeaderValue>, test: bool) -> Router {
+pub fn create_app(app_state: AppState, app_config: AppConfig, test: bool) -> Router {
     let subscriber = tracing_subscriber::fmt().with_target(false).pretty();
     // turn on if you want more verbose logs
     // .with_max_level(tracing::Level::DEBUG);
@@ -81,10 +82,10 @@ pub fn create_app(app_state: AppState, cors_origins: Vec<HeaderValue>, test: boo
     });
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PUT])
-        .allow_origin(cors_origins)
+        .allow_origin(app_config.cors_urls.clone())
         .allow_headers([CONTENT_TYPE])
         .allow_credentials(true);
-    let all_routes: Router<AppState> = build_routes(ApiDoc::openapi());
+    let all_routes: Router<AppState> = build_routes(ApiDoc::openapi(), app_config);
     let base_routes = all_routes.layer(cors);
     // rate limiting breaks tests *sigh* #security #pita
     if test {
@@ -107,7 +108,7 @@ pub fn create_app(app_state: AppState, cors_origins: Vec<HeaderValue>, test: boo
 /// - JSON content type validation
 /// - Health check endpoint
 /// - API routes
-fn build_routes(api: utoipa::openapi::OpenApi) -> Router<AppState> {
+fn build_routes(api: utoipa::openapi::OpenApi, app_config: AppConfig) -> Router<AppState> {
     let middleware = ServiceBuilder::new()
         .layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
@@ -126,7 +127,7 @@ fn build_routes(api: utoipa::openapi::OpenApi) -> Router<AppState> {
         .layer(TimeoutLayer::new(Duration::from_secs(120)))
         .layer(CompressionLayer::new())
         .layer(ValidateRequestHeaderLayer::accept("application/json"));
-    let accessions_routes = get_accessions_routes();
+    let accessions_routes = get_accessions_routes(app_config.max_file_upload_size);
     let subjects_routes = get_subjects_routes();
     let auth_routes = get_auth_routes();
     Router::new()

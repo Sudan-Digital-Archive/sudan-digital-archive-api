@@ -22,7 +22,7 @@ use tracing::{error, info};
 use validator::Validate;
 
 /// Creates routes for accession-related endpoints under `/accessions`.
-pub fn get_accessions_routes() -> Router<AppState> {
+pub fn get_accessions_routes(max_file_upload_size: usize) -> Router<AppState> {
     Router::new().nest(
         "/accessions",
         Router::new()
@@ -32,7 +32,7 @@ pub fn get_accessions_routes() -> Router<AppState> {
             .route("/raw", post(create_accession_raw))
             // Increase limit to 100MB; default is 2MB; this only applies to raw upload endpoint
             // see https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html
-            .layer(DefaultBodyLimit::max(100 * 1024 * 1024))
+            .layer(DefaultBodyLimit::max(max_file_upload_size))
             .route("/{accession_id}", get(get_one_accession))
             .route("/private/{accession_id}", get(get_one_private_accession))
             .route("/{accession_id}", delete(delete_accession))

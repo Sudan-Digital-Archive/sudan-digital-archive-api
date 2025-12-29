@@ -31,6 +31,7 @@ use tracing::info;
 #[tokio::main]
 async fn main() {
     let app_config = build_app_config();
+    let dolly_the_app_config = app_config.clone();
     let db_session = Database::connect(app_config.postgres_url)
         .await
         .expect("Could not connect to db");
@@ -86,7 +87,7 @@ async fn main() {
         auth_service,
         subjects_service,
     };
-    let app = create_app(app_state, app_config.cors_urls, false);
+    let app = create_app(app_state, dolly_the_app_config, false);
 
     let addr: SocketAddr = app_config
         .listener_address
