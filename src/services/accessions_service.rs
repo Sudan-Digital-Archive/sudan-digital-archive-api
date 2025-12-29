@@ -394,7 +394,7 @@ impl AccessionsService {
     ///
     /// # Returns
     /// Result containing the upload ID or an error response
-    pub async fn upload_from_multipart_field(
+    async fn upload_from_multipart_field(
         self,
         key: String,
         mut field: Field<'_>,
@@ -672,7 +672,7 @@ impl AccessionsService {
                 continue;
             }
 
-            if let Some(_) = filename_opt {
+            if filename_opt.is_some() {
                 let create_request = metadata_payload.as_mut().ok_or_else(|| {
                     (StatusCode::BAD_REQUEST, "File part arrived before metadata").into_response()
                 })?;

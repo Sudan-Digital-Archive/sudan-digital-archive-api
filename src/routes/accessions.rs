@@ -79,7 +79,7 @@ async fn create_accession_raw(
             info!("Raw accession created with id: {}", id);
             (
                 StatusCode::CREATED,
-                format!("Accession created with id: {}", id),
+                format!("Accession created with id: {id}"),
             )
                 .into_response()
         }
