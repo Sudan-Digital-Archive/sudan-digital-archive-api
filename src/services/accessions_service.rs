@@ -28,6 +28,8 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 use validator::Validate;
 
+static FIVE_MB: usize = 5 * 1024 * 1024;
+
 #[derive(PartialEq, Eq)]
 enum MultiPartExtractionStep {
     ExpectMetadata,
@@ -388,8 +390,6 @@ impl AccessionsService {
         mut field: Field<'_>,
         content_type: String,
     ) -> Result<String, Response> {
-        const FIVE_MB: usize = 5 * 1024 * 1024;
-
         info!(
             "Starting streaming upload for key: {} with content type: {}",
             key, content_type
@@ -412,22 +412,21 @@ impl AccessionsService {
             total_size += chunk.len();
             buffer.extend_from_slice(&chunk);
             info!(
-                "Received chunk of {} bytes, total so far: {}",
+                "Received chunk of {} bytes, total so far: {:.1} MB",
                 chunk.len(),
-                total_size
+                total_size / 1024
             );
-            // TODO: Consider refactoring into if/elif pattern for readability
 
-            // If we haven't exceeded 5MB yet and buffer is large, stay buffered
+            // case where we are under 5MB so we don't do multipart upload since this requires
+            // 5MB otherwise it fails
             if upload_id.is_none() && total_size <= FIVE_MB {
                 continue;
-            }
 
-            // If we just exceeded 5MB, initiate multipart upload
-            if upload_id.is_none() && total_size > FIVE_MB {
+            // Case where we haven't started a multipart upload but we're over 5MB, so we need to start one!
+            } else if upload_id.is_none() && total_size > FIVE_MB {
                 info!(
-                    "File exceeded 5MB threshold at {} bytes, initiating multipart upload",
-                    total_size
+                    "File exceeded 5MB threshold at {:.1} MB, initiating multipart upload",
+                    total_size / 1024
                 );
                 match self
                     .s3_repo
@@ -450,16 +449,14 @@ impl AccessionsService {
                             .into_response());
                     }
                 }
-            }
-
-            // If using multipart upload and buffer reached 5MB, upload the part
-            if let Some(ref id) = upload_id {
+            // Case where we have started a multipart upload already so we need to upload the next chunk!
+            } else if let Some(ref id) = upload_id {
                 if buffer.len() >= FIVE_MB {
                     let part_bytes = Bytes::from(buffer.split_off(0));
-                    info!(
-                        "Uploading part {} with {} bytes",
+                    debug!(
+                        "Uploading part {} with {:.1} MB",
                         part_number,
-                        part_bytes.len()
+                        part_bytes.len() / 1024
                     );
                     match self
                         .s3_repo
@@ -480,17 +477,24 @@ impl AccessionsService {
                         }
                     }
                 }
+            } else {
+                error!("Multipart upload hasn't started and size exceeded 5MB, which should not happen :-(");
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to broker stream into multipart or single upload",
+                )
+                    .into_response());
             }
         }
 
-        // Handle stream end: complete upload or do simple upload
+        // Handle stream end; we now either need to bundle up all the multipart upload parts into the final
+        // object or if we didn't do a multipart upload because it was under 5MB, we need to do a single upload
         if let Some(id) = upload_id {
-            // Multipart upload in progress - upload final part and complete
             if !buffer.is_empty() {
-                info!(
-                    "Uploading final part {} with {} bytes",
+                debug!(
+                    "Uploading final part {} with {:.1} MB",
                     part_number,
-                    buffer.len()
+                    buffer.len() / 1024
                 );
                 let part_bytes = Bytes::from(buffer);
                 match self
@@ -512,11 +516,10 @@ impl AccessionsService {
                 }
             }
 
-            // Complete the multipart upload
             info!(
-                "Completing multipart upload for key: {} with {} parts",
+                "Completing multipart upload for key: {} with {:.1} MB parts",
                 key,
-                upload_parts.len()
+                upload_parts.len() / 1024
             );
             match self
                 .s3_repo
@@ -525,8 +528,9 @@ impl AccessionsService {
             {
                 Ok(_) => {
                     info!(
-                        "Successfully completed multipart upload for key: {}, total size: {} bytes",
-                        key, total_size
+                        "Successfully completed multipart upload for key: {}, total size: {:.1} MB",
+                        key,
+                        total_size / 1024
                     );
                     Ok(id)
                 }
@@ -540,8 +544,7 @@ impl AccessionsService {
                 }
             }
         } else {
-            // Simple upload for files <= 5MB
-            info!("Using simple upload for {} bytes", total_size);
+            info!("Using simple upload for {:.1} MB", total_size / 1024);
             match self
                 .s3_repo
                 .upload_from_bytes(&key, Bytes::from(buffer), &content_type)
