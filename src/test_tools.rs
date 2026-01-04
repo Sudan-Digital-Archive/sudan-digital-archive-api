@@ -374,7 +374,9 @@ pub fn build_test_app() -> Router {
         subjects_service,
         auth_service,
     };
-    create_app(app_state, AppConfig::default(), true)
+    let mut app_config = AppConfig::default();
+    app_config.max_file_upload_size = 100 * 1024 * 1024;
+    create_app(app_state, app_config, true)
 }
 
 /// Creates a mock paginated collection of English accessions.

@@ -1,6 +1,6 @@
 # TODOs
 
-- Add tests with appropriate mock repo implementations
+- Deploy this
 - Create a ticket in the infra repo to update the database diagram too
 - Update docs to remove redoc
 
@@ -85,7 +85,7 @@ to main. So, both need to pass before releasing code.
 Note that at the time of writing, there are no integration tests - only unit. 
 You therefore should manually test anything that involves I/O to
 external resources e.g. database since none of that functionality
-will run itests.
+will run in tests.
 
 ## Deployment
 
