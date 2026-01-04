@@ -1,9 +1,3 @@
-# TODOs
-
-- Deploy this
-- Create a ticket in the infra repo to update the database diagram too
-- Update docs to remove redoc
-
 # Overview
 
 This is the API for the Sudan Digital Archive.
