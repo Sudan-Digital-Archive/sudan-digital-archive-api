@@ -130,6 +130,8 @@ fn build_routes(api: utoipa::openapi::OpenApi, app_config: AppConfig) -> Router<
     let accessions_routes = get_accessions_routes(app_config.max_file_upload_size);
     let subjects_routes = get_subjects_routes();
     let auth_routes = get_auth_routes();
+    // TODO: Make this prefix configurable from AppConfig
+    // Hardcoding the sda-api path here since Digital Ocean deploys it with this prefix
     let swagger_ui = SwaggerUi::new("/sda-api/docs").url("/sda-api/docs/openapi.json", api.clone());
     let api_v1 = Router::new()
         .merge(accessions_routes)

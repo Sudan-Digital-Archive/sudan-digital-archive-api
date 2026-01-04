@@ -138,6 +138,8 @@ impl S3Repo for DigitalOceanSpacesRepo {
         access_key: &str,
         secret_key: &str,
     ) -> Result<Self, Box<dyn Error>> {
+        // TODO: Inject this from app config rather than hardcoding here
+        // Should have these defaults in app config but be configurable by environment variables
         let timeout_config = TimeoutConfig::builder()
             .operation_timeout(Duration::from_secs(30))
             .operation_attempt_timeout(Duration::from_secs(10))

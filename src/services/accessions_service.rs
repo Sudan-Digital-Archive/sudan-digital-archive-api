@@ -414,6 +414,11 @@ impl AccessionsService {
         let mut upload_id: Option<String> = None;
         let mut upload_parts: Vec<(String, i32)> = Vec::new();
         let mut part_number = 1i32;
+
+        // This code gets pretty complex from here but in short it does this...
+        // 1. Read the stream, which corresponds to the file field in the multipart form
+        // 2. Write the results to a buffer and if it gets > 5MB, start a multipart upload, else wait for normal
+        // upload once we've exited the loop
         while let Some(chunk) = field.chunk().await.map_err(|err| {
             error!("Failed to read chunk from field: {}", err);
             (
@@ -427,6 +432,7 @@ impl AccessionsService {
             debug!(
                 "Received chunk of {} bytes, total so far: {:.1} MB",
                 chunk.len(),
+                // TODO: Replace this with a more elegant conversion utility since it's used everywhere
                 total_size as f64 / 1024.0 / 1024.0
             );
 

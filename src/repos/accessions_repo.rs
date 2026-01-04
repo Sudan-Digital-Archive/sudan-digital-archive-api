@@ -27,7 +27,7 @@ use entity::dublin_metadata_en_subjects::ActiveModel as DublinMetadataSubjectsEn
 use entity::dublin_metadata_en_subjects::Entity as DublinMetadataSubjectsEn;
 use entity::dublin_metadata_subject_ar::Entity as DublinMetadataSubjectAr;
 use entity::dublin_metadata_subject_en::Entity as DublinMetadataSubjectEn;
-use entity::sea_orm_active_enums::CrawlStatus;
+use entity::sea_orm_active_enums::{CrawlStatus, DublinMetadataFormat};
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
     PaginatorTrait, QueryFilter, TransactionTrait, TryIntoModel,
@@ -107,6 +107,106 @@ pub trait AccessionsRepo: Send + Sync {
     ) -> Result<Option<AccessionWithMetadataModel>, DbErr>;
 }
 
+/// A private struct that mirrors the fields required to create an accession
+/// in the database.
+///
+/// This acts as a unified data structure that can be created from either a
+/// `CreateAccessionRequest` (for web crawls) or a `CreateAccessionRequestRaw`
+/// (for raw file uploads), decoupling the public-facing request models from
+/// the internal database repository logic.
+struct CreateAccessionData {
+    metadata_language: MetadataLanguage,
+    metadata_title: String,
+    metadata_description: Option<String>,
+    metadata_subjects: Vec<i32>,
+    metadata_time: chrono::NaiveDateTime,
+    crawl_status: CrawlStatus,
+    org_id: Uuid,
+    crawl_id: Uuid,
+    job_run_id: String,
+    seed_url: String,
+    is_private: bool,
+    metadata_format: DublinMetadataFormat,
+    s3_filename: Option<String>,
+}
+
+impl DBAccessionsRepo {
+    /// A private helper method to create a single accession record in the database.
+    ///
+    /// This method contains the shared logic for creating metadata and accession
+    /// entries within a single database transaction. It is called by the public-facing
+    /// `write_one` and `write_one_raw` methods.
+    async fn _create_one(&self, accession_data: CreateAccessionData) -> Result<i32, DbErr> {
+        let txn = self.db_session.begin().await?;
+        let (dublin_metadata_en_id, dublin_metadata_ar_id) = match accession_data.metadata_language
+        {
+            MetadataLanguage::English => {
+                let metadata = DublinMetadataEnActiveModel {
+                    id: Default::default(),
+                    title: ActiveValue::Set(accession_data.metadata_title),
+                    description: ActiveValue::Set(accession_data.metadata_description),
+                };
+                let inserted_metadata = metadata.save(&txn).await?;
+                let metadata_id = inserted_metadata.try_into_model()?.id;
+                let mut subject_links: Vec<DublinMetadataSubjectsEnActiveModel> = vec![];
+                for subject_id in accession_data.metadata_subjects.iter() {
+                    let subjects_link = DublinMetadataSubjectsEnActiveModel {
+                        metadata_id: ActiveValue::Set(metadata_id),
+                        subject_id: ActiveValue::Set(*subject_id),
+                    };
+                    subject_links.push(subjects_link);
+                }
+                DublinMetadataSubjectsEn::insert_many(subject_links)
+                    .exec(&txn)
+                    .await?;
+                (Some(metadata_id), None)
+            }
+            MetadataLanguage::Arabic => {
+                let metadata = DublinMetadataArActiveModel {
+                    id: Default::default(),
+                    title: ActiveValue::Set(accession_data.metadata_title),
+                    description: ActiveValue::Set(accession_data.metadata_description),
+                };
+                let inserted_metadata = metadata.save(&txn).await?;
+                let metadata_id = inserted_metadata.try_into_model()?.id;
+                let mut subject_links: Vec<DublinMetadataSubjectsArActiveModel> = vec![];
+                for subject_id in accession_data.metadata_subjects.iter() {
+                    let subjects_link = DublinMetadataSubjectsArActiveModel {
+                        metadata_id: ActiveValue::Set(metadata_id),
+                        subject_id: ActiveValue::Set(*subject_id),
+                    };
+                    subject_links.push(subjects_link);
+                }
+                DublinMetadataSubjectsAr::insert_many(subject_links)
+                    .exec(&txn)
+                    .await?;
+                (None, Some(metadata_id))
+            }
+        };
+
+        let utc_now = Utc::now();
+        let i_hate_timezones = utc_now.naive_utc();
+        let accession = AccessionActiveModel {
+            id: Default::default(),
+            dublin_metadata_en: ActiveValue::Set(dublin_metadata_en_id),
+            dublin_metadata_ar: ActiveValue::Set(dublin_metadata_ar_id),
+            dublin_metadata_date: ActiveValue::Set(accession_data.metadata_time),
+            crawl_status: ActiveValue::Set(accession_data.crawl_status),
+            crawl_timestamp: ActiveValue::Set(i_hate_timezones),
+            org_id: ActiveValue::Set(accession_data.org_id),
+            crawl_id: ActiveValue::Set(accession_data.crawl_id),
+            job_run_id: ActiveValue::Set(accession_data.job_run_id),
+            seed_url: ActiveValue::Set(accession_data.seed_url),
+            is_private: ActiveValue::Set(accession_data.is_private),
+            dublin_metadata_format: ActiveValue::Set(accession_data.metadata_format),
+            s3_filename: ActiveValue::Set(accession_data.s3_filename),
+        };
+        let saved_accession = accession.clone().save(&txn).await?;
+        txn.commit().await?;
+        Ok(*saved_accession.id.as_ref())
+    }
+}
+
 #[async_trait]
 impl AccessionsRepo for DBAccessionsRepo {
     async fn write_one(
@@ -117,148 +217,44 @@ impl AccessionsRepo for DBAccessionsRepo {
         job_run_id: String,
         crawl_status: CrawlStatus,
     ) -> Result<i32, DbErr> {
-        let txn = self.db_session.begin().await?;
-        let (dublin_metadata_en_id, dublin_metadata_ar_id) = match create_accession_request
-            .metadata_language
-        {
-            MetadataLanguage::English => {
-                let metadata = DublinMetadataEnActiveModel {
-                    id: Default::default(),
-                    title: ActiveValue::Set(create_accession_request.metadata_title),
-                    description: ActiveValue::Set(create_accession_request.metadata_description),
-                };
-                let inserted_metadata = metadata.save(&txn).await?;
-                let metadata_id = inserted_metadata.try_into_model()?.id;
-                let mut subject_links: Vec<DublinMetadataSubjectsEnActiveModel> = vec![];
-                for subject_id in create_accession_request.metadata_subjects.iter() {
-                    let subjects_link = DublinMetadataSubjectsEnActiveModel {
-                        metadata_id: ActiveValue::Set(metadata_id),
-                        subject_id: ActiveValue::Set(*subject_id),
-                    };
-                    subject_links.push(subjects_link);
-                }
-                DublinMetadataSubjectsEn::insert_many(subject_links)
-                    .exec(&txn)
-                    .await?;
-                (Some(metadata_id), None)
-            }
-            MetadataLanguage::Arabic => {
-                let metadata = DublinMetadataArActiveModel {
-                    id: Default::default(),
-                    title: ActiveValue::Set(create_accession_request.metadata_title),
-                    description: ActiveValue::Set(create_accession_request.metadata_description),
-                };
-                let inserted_metadata = metadata.save(&txn).await?;
-                let metadata_id = inserted_metadata.try_into_model()?.id;
-                let mut subject_links: Vec<DublinMetadataSubjectsArActiveModel> = vec![];
-                for subject_id in create_accession_request.metadata_subjects.iter() {
-                    let subjects_link = DublinMetadataSubjectsArActiveModel {
-                        metadata_id: ActiveValue::Set(metadata_id),
-                        subject_id: ActiveValue::Set(*subject_id),
-                    };
-                    subject_links.push(subjects_link);
-                }
-                DublinMetadataSubjectsAr::insert_many(subject_links)
-                    .exec(&txn)
-                    .await?;
-                (None, Some(metadata_id))
-            }
+        let accession_data = CreateAccessionData {
+            metadata_language: create_accession_request.metadata_language,
+            metadata_title: create_accession_request.metadata_title,
+            metadata_description: create_accession_request.metadata_description,
+            metadata_subjects: create_accession_request.metadata_subjects,
+            metadata_time: create_accession_request.metadata_time,
+            crawl_status,
+            org_id,
+            crawl_id,
+            job_run_id,
+            seed_url: create_accession_request.url,
+            is_private: create_accession_request.is_private,
+            metadata_format: create_accession_request.metadata_format,
+            s3_filename: create_accession_request.s3_filename,
         };
-
-        let utc_now = Utc::now();
-        let i_hate_timezones = utc_now.naive_utc();
-        let accession = AccessionActiveModel {
-            id: Default::default(),
-            dublin_metadata_en: ActiveValue::Set(dublin_metadata_en_id),
-            dublin_metadata_ar: ActiveValue::Set(dublin_metadata_ar_id),
-            dublin_metadata_date: ActiveValue::Set(create_accession_request.metadata_time),
-            crawl_status: ActiveValue::Set(crawl_status),
-            crawl_timestamp: ActiveValue::Set(i_hate_timezones),
-            org_id: ActiveValue::Set(org_id),
-            crawl_id: ActiveValue::Set(crawl_id),
-            job_run_id: ActiveValue::Set(job_run_id),
-            seed_url: ActiveValue::Set(create_accession_request.url),
-            is_private: ActiveValue::Set(create_accession_request.is_private),
-            dublin_metadata_format: ActiveValue::Set(create_accession_request.metadata_format),
-            s3_filename: ActiveValue::Set(create_accession_request.s3_filename),
-        };
-        let saved_accession = accession.clone().save(&txn).await?;
-        txn.commit().await?;
-        Ok(*saved_accession.id.as_ref())
+        self._create_one(accession_data).await
     }
 
     async fn write_one_raw(
         &self,
         create_accession_request: CreateAccessionRequestRaw,
     ) -> Result<i32, DbErr> {
-        let txn = self.db_session.begin().await?;
-        let (dublin_metadata_en_id, dublin_metadata_ar_id) = match create_accession_request
-            .metadata_language
-        {
-            MetadataLanguage::English => {
-                let metadata = DublinMetadataEnActiveModel {
-                    id: Default::default(),
-                    title: ActiveValue::Set(create_accession_request.metadata_title),
-                    description: ActiveValue::Set(create_accession_request.metadata_description),
-                };
-                let inserted_metadata = metadata.save(&txn).await?;
-                let metadata_id = inserted_metadata.try_into_model()?.id;
-                let mut subject_links: Vec<DublinMetadataSubjectsEnActiveModel> = vec![];
-                for subject_id in create_accession_request.metadata_subjects.iter() {
-                    let subjects_link = DublinMetadataSubjectsEnActiveModel {
-                        metadata_id: ActiveValue::Set(metadata_id),
-                        subject_id: ActiveValue::Set(*subject_id),
-                    };
-                    subject_links.push(subjects_link);
-                }
-                DublinMetadataSubjectsEn::insert_many(subject_links)
-                    .exec(&txn)
-                    .await?;
-                (Some(metadata_id), None)
-            }
-            MetadataLanguage::Arabic => {
-                let metadata = DublinMetadataArActiveModel {
-                    id: Default::default(),
-                    title: ActiveValue::Set(create_accession_request.metadata_title),
-                    description: ActiveValue::Set(create_accession_request.metadata_description),
-                };
-                let inserted_metadata = metadata.save(&txn).await?;
-                let metadata_id = inserted_metadata.try_into_model()?.id;
-                let mut subject_links: Vec<DublinMetadataSubjectsArActiveModel> = vec![];
-                for subject_id in create_accession_request.metadata_subjects.iter() {
-                    let subjects_link = DublinMetadataSubjectsArActiveModel {
-                        metadata_id: ActiveValue::Set(metadata_id),
-                        subject_id: ActiveValue::Set(*subject_id),
-                    };
-                    subject_links.push(subjects_link);
-                }
-                DublinMetadataSubjectsAr::insert_many(subject_links)
-                    .exec(&txn)
-                    .await?;
-                (None, Some(metadata_id))
-            }
+        let accession_data = CreateAccessionData {
+            metadata_language: create_accession_request.metadata_language,
+            metadata_title: create_accession_request.metadata_title,
+            metadata_description: create_accession_request.metadata_description,
+            metadata_subjects: create_accession_request.metadata_subjects,
+            metadata_time: create_accession_request.metadata_time,
+            crawl_status: CrawlStatus::Complete,
+            org_id: Uuid::nil(),
+            crawl_id: Uuid::nil(),
+            job_run_id: "raw_upload".to_string(),
+            seed_url: String::new(),
+            is_private: create_accession_request.is_private,
+            metadata_format: create_accession_request.metadata_format,
+            s3_filename: Some(create_accession_request.s3_filename),
         };
-
-        let utc_now = Utc::now();
-        let i_hate_timezones = utc_now.naive_utc();
-        let accession = AccessionActiveModel {
-            id: Default::default(),
-            dublin_metadata_en: ActiveValue::Set(dublin_metadata_en_id),
-            dublin_metadata_ar: ActiveValue::Set(dublin_metadata_ar_id),
-            dublin_metadata_date: ActiveValue::Set(create_accession_request.metadata_time),
-            crawl_status: ActiveValue::Set(CrawlStatus::Complete),
-            crawl_timestamp: ActiveValue::Set(i_hate_timezones),
-            org_id: ActiveValue::Set(Uuid::nil()),
-            crawl_id: ActiveValue::Set(Uuid::nil()),
-            job_run_id: ActiveValue::Set("raw_upload".to_string()),
-            seed_url: ActiveValue::Set(String::new()),
-            is_private: ActiveValue::Set(create_accession_request.is_private),
-            dublin_metadata_format: ActiveValue::Set(create_accession_request.metadata_format),
-            s3_filename: ActiveValue::Set(Some(create_accession_request.s3_filename)),
-        };
-        let saved_accession = accession.clone().save(&txn).await?;
-        txn.commit().await?;
-        Ok(*saved_accession.id.as_ref())
+        self._create_one(accession_data).await
     }
 
     async fn get_one(

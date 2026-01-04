@@ -1,5 +1,11 @@
 # Sudan Digital Archive API
 
+## Important - Workflows
+
+When working on this repo, you should make use of the fact that it's in Rust! You should always run 
+`cargo check` after doing some changes to make sure that stuff compiles. Once you've done that, you should
+run `export JWT_SECRET="test" && cargo test` to make sure you haven't broken the tests either.
+
 ## Project Overview
 
 This project is the backend API for the Sudan Digital Archive. 
