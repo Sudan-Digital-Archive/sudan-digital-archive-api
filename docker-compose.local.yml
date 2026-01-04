@@ -1,23 +1,12 @@
 services:
-  api:
-    build: 
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "5000:5000"
-    env_file:
-      - .env.local
-    environment:
-      - LISTENER_ADDRESS=0.0.0.0:5000
-    depends_on:
-      - db
-
   db:
     image: postgres:16-alpine
     ports:
       - "5432:5432"
-    env_file:
-      - .env.local
+    environment:
+      - POSTGRES_USER=archivist
+      - POSTGRES_DB=sudan_archives
+      - POSTGRES_PASSWORD=test
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

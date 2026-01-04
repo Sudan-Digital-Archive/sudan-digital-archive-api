@@ -34,6 +34,11 @@ pub struct AppConfig {
     pub digital_ocean_spaces_bucket: String,
     pub digital_ocean_spaces_access_key: String,
     pub digital_ocean_spaces_secret_key: String,
+    pub max_file_upload_size: usize,
+    pub s3_operation_timeout: u64,
+    pub s3_operation_attempt_timeout: u64,
+    pub s3_connect_timeout: u64,
+    pub api_prefix: String,
 }
 
 /// Builds application configuration from environment variables
@@ -83,6 +88,20 @@ pub fn build_app_config() -> AppConfig {
         env::var("DO_SPACES_ACCESS_KEY").expect("Missing DO_SPACES_ACCESS_KEY env var");
     let digital_ocean_spaces_secret_key =
         env::var("DO_SPACES_SECRET_KEY").expect("Missing DO_SPACES_SECRET_KEY env var");
+    let max_file_upload_size = 200 * 1024 * 1024;
+    let s3_operation_timeout = env::var("S3_OPERATION_TIMEOUT")
+        .unwrap_or("30".to_string())
+        .parse()
+        .expect("S3_OPERATION_TIMEOUT should be a number");
+    let s3_operation_attempt_timeout = env::var("S3_OPERATION_ATTEMPT_TIMEOUT")
+        .unwrap_or("10".to_string())
+        .parse()
+        .expect("S3_OPERATION_ATTEMPT_TIMEOUT should be a number");
+    let s3_connect_timeout = env::var("S3_CONNECT_TIMEOUT")
+        .unwrap_or("3".to_string())
+        .parse()
+        .expect("S3_CONNECT_TIMEOUT should be a number");
+    let api_prefix = env::var("API_PREFIX").unwrap_or("".to_string());
     AppConfig {
         archive_sender_email,
         browsertrix,
@@ -97,6 +116,11 @@ pub fn build_app_config() -> AppConfig {
         digital_ocean_spaces_bucket,
         digital_ocean_spaces_access_key,
         digital_ocean_spaces_secret_key,
+        max_file_upload_size,
+        s3_operation_timeout,
+        s3_operation_attempt_timeout,
+        s3_connect_timeout,
+        api_prefix,
     }
 }
 

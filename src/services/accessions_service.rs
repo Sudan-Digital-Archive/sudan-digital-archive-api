@@ -4,22 +4,41 @@
 //! archival records, including their associated web crawls and metadata in both
 //! Arabic and English.
 use crate::models::request::AccessionPaginationWithPrivate;
-use crate::models::request::{CreateAccessionRequest, CreateCrawlRequest, UpdateAccessionRequest};
+use crate::models::request::{
+    CreateAccessionRequest, CreateAccessionRequestRaw, CreateCrawlRequest, UpdateAccessionRequest,
+};
 use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use crate::repos::accessions_repo::AccessionsRepo;
 use crate::repos::browsertrix_repo::BrowsertrixRepo;
 use crate::repos::emails_repo::EmailsRepo;
 use crate::repos::s3_repo::S3Repo;
+use crate::services::subjects_service::SubjectsService;
 use ::entity::accessions_with_metadata::Model as AccessionWithMetadataModel;
+use axum::extract::multipart::Field;
+use axum::extract::Multipart;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
+use bytes::Bytes;
 use entity::sea_orm_active_enums::{CrawlStatus, DublinMetadataFormat};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
-use tracing::{error, info};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+use validator::Validate;
+
+// Using this as the min part size for multipart uploads to S3. This is low since this code is designed to run in
+// a very low memory container environment. Plus we don't want to allow too large uploads anyway, so we are mostly
+// using this to support streaming uploads of files that are slightly over 5MB, which will be the majority of uploads
+// to the archive
+static FIVE_MB: usize = 5 * 1024 * 1024;
+
+#[derive(PartialEq, Eq)]
+enum MultiPartExtractionStep {
+    ExpectMetadata,
+    ExpectFile,
+}
 
 /// Service for managing archival accessions and their associated web crawls.
 /// Uses dynamic traits for dependency injection
@@ -114,6 +133,16 @@ impl AccessionsService {
         }
     }
 
+    /// Enriches an accession with WACZ URL from Browsertrix service.
+    ///
+    /// This private helper function retrieves the WACZ URL for an accession
+    /// using the job_run_id and returns an appropriate HTTP response.
+    ///
+    /// # Arguments
+    /// * `query_result` - Optional accession model to enrich
+    ///
+    /// # Returns
+    /// HTTP response with the enriched accession or error status
     async fn enrich_one_with_browsertrix(
         self,
         query_result: Option<AccessionWithMetadataModel>,
@@ -329,5 +358,384 @@ impl AccessionsService {
                 }
             }
         }
+    }
+
+    /// Writes a raw accession record (file-based, no crawl).
+    ///
+    /// # Arguments
+    /// * `payload` - The raw accession request with metadata and S3 filename
+    ///
+    /// # Returns
+    /// Result containing the accession ID or an error response
+    pub async fn write_one_raw(self, payload: CreateAccessionRequestRaw) -> Result<i32, Response> {
+        info!(
+            "Writing raw accession with title: {}",
+            payload.metadata_title
+        );
+        let write_result = self.accessions_repo.write_one_raw(payload).await;
+        match write_result {
+            Err(err) => {
+                error!(%err, "Error occurred writing raw accession to db");
+                Err((StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response())
+            }
+            Ok(id) => {
+                info!("Raw accession written to db successfully with id {id}");
+                Ok(id)
+            }
+        }
+    }
+
+    /// Uploads a file from a multipart field to S3 with smart chunk handling.
+    ///
+    /// This method streams the file and decides on upload strategy as it reads:
+    /// - Files under 5MB: buffered and uploaded with a single request
+    /// - Files over 5MB: multipart upload initiated and chunks streamed directly to S3
+    ///
+    /// # Arguments
+    /// * `key` - The S3 object key where the file will be uploaded
+    /// * `field` - The multipart field containing the file data
+    /// * `content_type` - The MIME type of the file
+    ///
+    /// # Returns
+    /// Result containing the upload ID or an error response
+    async fn upload_from_multipart_field(
+        self,
+        key: String,
+        mut field: Field<'_>,
+        content_type: String,
+    ) -> Result<String, Response> {
+        debug!(
+            "Starting streaming upload for key: {} with content type: {}",
+            key, content_type
+        );
+
+        let mut buffer = Vec::with_capacity(FIVE_MB);
+        let mut total_size = 0;
+        let mut upload_id: Option<String> = None;
+        let mut upload_parts: Vec<(String, i32)> = Vec::new();
+        let mut part_number = 1i32;
+
+        // This code gets pretty complex from here but in short it does this...
+        // 1. Read the stream, which corresponds to the file field in the multipart form
+        // 2. Write the results to a buffer and if it gets > 5MB, start a multipart upload, else wait for normal
+        // upload once we've exited the loop
+        while let Some(chunk) = field.chunk().await.map_err(|err| {
+            error!("Failed to read chunk from field: {}", err);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to read file stream",
+            )
+                .into_response()
+        })? {
+            total_size += chunk.len();
+            buffer.extend_from_slice(&chunk);
+            debug!(
+                "Received chunk of {} bytes, total so far: {:.1} MB",
+                chunk.len(),
+                // TODO: Replace this with a more elegant conversion utility since it's used everywhere
+                total_size as f64 / 1024.0 / 1024.0
+            );
+
+            // case where we are under 5MB so we don't do multipart upload since this requires
+            // 5MB otherwise it fails
+            if upload_id.is_none() && total_size <= FIVE_MB {
+                continue;
+
+            // Case where we haven't started a multipart upload but we're over 5MB, so we need to start one!
+            } else if upload_id.is_none() && total_size > FIVE_MB {
+                debug!(
+                    "File exceeded 5MB threshold at {:.1} MB, initiating multipart upload.",
+                    total_size as f64 / 1024.0 / 1024.0
+                );
+                match self
+                    .s3_repo
+                    .initiate_multipart_upload(&key, &content_type)
+                    .await
+                {
+                    Ok(id) => {
+                        upload_id = Some(id.clone());
+                        info!("Initiated multipart upload with id: {}", id);
+                    }
+                    Err(err) => {
+                        error!(%err, "Failed to initiate multipart upload for key: {}", key);
+                        return Err((
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Failed to initiate upload",
+                        )
+                            .into_response());
+                    }
+                }
+            }
+            // Case where we have started a multipart upload already so we need to upload the next chunk!
+            if let Some(ref id) = upload_id {
+                if buffer.len() <= FIVE_MB {
+                    debug!("Waiting for chunk to reach five mb, the min size for each part");
+                    continue;
+                }
+                let part_bytes = Bytes::from(buffer.split_off(0));
+                debug!(
+                    "Uploading part {} with {:.1} MB.",
+                    part_number,
+                    part_bytes.len() as f64 / 1024.0 / 1024.0
+                );
+                match self
+                    .s3_repo
+                    .upload_part(&key, id, part_number, part_bytes)
+                    .await
+                {
+                    Ok((etag, _)) => {
+                        upload_parts.push((etag, part_number));
+                        debug!("Successfully uploaded part {}", part_number);
+                        part_number += 1;
+                    }
+                    Err(err) => {
+                        error!(%err, "Failed to upload part {} for key: {}", part_number, key);
+                        return Err((
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Failed to upload file part",
+                        )
+                            .into_response());
+                    }
+                }
+            } else {
+                error!("Multipart upload hasn't started and size exceeded 5MB, which should not happen :-(");
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to broker stream into multipart or single upload",
+                )
+                    .into_response());
+            }
+        }
+        debug!("Exited loop for reading stream for key: {}", key);
+        // Handle stream end; we now either need to bundle up all the multipart upload parts into the final
+        // object or if we didn't do a multipart upload because it was under 5MB, we need to do a single upload
+        if let Some(id) = upload_id {
+            if !buffer.is_empty() {
+                debug!(
+                    "Uploading final part {} with {:.1} MB",
+                    part_number,
+                    buffer.len() as f64 / 1024.0 / 1024.0
+                );
+                let part_bytes = Bytes::from(buffer.split_off(0));
+                match self
+                    .s3_repo
+                    .upload_part(&key, &id, part_number, part_bytes)
+                    .await
+                {
+                    Ok((etag, _)) => {
+                        upload_parts.push((etag, part_number));
+                        debug!("Successfully uploaded final part {}", part_number);
+                    }
+                    Err(err) => {
+                        error!(%err, "Failed to upload final part for key: {}", key);
+                        return Err((
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Failed to upload final part",
+                        )
+                            .into_response());
+                    }
+                }
+            }
+
+            debug!(
+                "Completing multipart upload for key: {} with  parts count: {}",
+                key,
+                upload_parts.len()
+            );
+            match self
+                .s3_repo
+                .complete_multipart_upload(&key, &id, upload_parts)
+                .await
+            {
+                Ok(_) => {
+                    info!(
+                        "Successfully completed multipart upload for key: {}, total size: {:.1} MB",
+                        key,
+                        total_size as f64 / 1024.0 / 1024.0
+                    );
+                    Ok(id)
+                }
+                Err(err) => {
+                    error!(%err, "Failed to complete multipart upload for key: {}", key);
+                    Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Failed to complete upload",
+                    )
+                        .into_response())
+                }
+            }
+        } else {
+            info!(
+                "Using simple upload for {:.1} MB",
+                total_size as f64 / 1024.0 / 1024.0
+            );
+            match self
+                .s3_repo
+                .upload_from_bytes(&key, Bytes::from(buffer), &content_type)
+                .await
+            {
+                Ok(_) => {
+                    info!(
+                        "Successfully uploaded file with key: {} and content type: {}",
+                        key, content_type
+                    );
+                    Ok(key)
+                }
+                Err(err) => {
+                    error!(%err, "Failed to upload file to S3. Key: {}, Content-Type: {}", key, content_type);
+                    Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to upload file")
+                        .into_response())
+                }
+            }
+        }
+    }
+
+    /// Extracts and validates accession data from a multipart form submission.
+    ///
+    /// This method processes a multipart form containing metadata JSON and an optional file upload.
+    /// It validates the metadata, checks subject existence, uploads files to S3, and returns a
+    /// complete CreateAccessionRequestRaw object ready for database storage.
+    ///
+    /// The multipart form must have:
+    /// - First field: "metadata" containing JSON with accession metadata
+    /// - Optional subsequent fields: file uploads with filenames
+    ///
+    /// # Arguments
+    /// * `multipart` - The multipart form data from the HTTP request
+    /// * `subjects_service` - Service for validating metadata subjects exist
+    ///
+    /// # Returns
+    /// Result containing the parsed accession request or an HTTP error response
+    pub async fn extract_accession_from_multipart_form(
+        self,
+        mut multipart: Multipart,
+        subjects_service: SubjectsService,
+    ) -> Result<CreateAccessionRequestRaw, Response> {
+        let mut metadata_payload: Option<CreateAccessionRequestRaw> = None;
+        let mut uploaded_key: Option<String> = None;
+        let mut step = MultiPartExtractionStep::ExpectMetadata; // first field must be the metadata JSON
+
+        while let Some(field) = multipart.next_field().await.map_err(|e| {
+            error!("Failed to read multipart field: {e:?}");
+            (StatusCode::BAD_REQUEST, "Malformed multipart request").into_response()
+        })? {
+            let field_name = field.name().unwrap_or("unknown").to_owned();
+            let filename_opt = field.file_name().map(str::to_owned);
+            let content_type = field
+                .content_type()
+                .map(str::to_owned)
+                .unwrap_or_else(|| "application/octet-stream".to_string());
+
+            info!(
+                "Processing multipart field: name={:?}, filename={:?}, content_type={:?}",
+                field_name, filename_opt, content_type
+            );
+
+            if step == MultiPartExtractionStep::ExpectMetadata {
+                if field_name != "metadata" {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        "Metadata field should be the first form field",
+                    )
+                        .into_response());
+                }
+
+                let text = field.text().await.map_err(|e| {
+                    error!("Failed to read metadata text: {e:?}");
+                    (StatusCode::BAD_REQUEST, "Unable to read metadata field").into_response()
+                })?;
+
+                let parsed: CreateAccessionRequestRaw =
+                    serde_json::from_str(&text).map_err(|e| {
+                        let error_msg = format!("Failed to parse metadata JSON: {e:?}");
+                        error!(error_msg);
+                        (StatusCode::BAD_REQUEST, error_msg).into_response()
+                    })?;
+
+                if let Err(v_err) = parsed.validate() {
+                    warn!("Invalid create accession request payload: {v_err:?}");
+                    return Err((StatusCode::BAD_REQUEST, v_err.to_string()).into_response());
+                }
+
+                info!("Extracted and validated metadata JSON");
+                let subjects_exist = subjects_service
+                    .clone()
+                    .verify_subjects_exist(
+                        parsed.metadata_subjects.clone(),
+                        parsed.metadata_language,
+                    )
+                    .await;
+
+                match subjects_exist {
+                    Err(err) => {
+                        return Err(
+                            (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response()
+                        );
+                    }
+                    Ok(flag) => {
+                        if !flag {
+                            return Err(
+                                (StatusCode::BAD_REQUEST, "Subjects do not exist").into_response()
+                            );
+                        }
+                    }
+                };
+                info!("Validated metadata subjects exist");
+
+                metadata_payload = Some(parsed);
+                step = MultiPartExtractionStep::ExpectFile;
+                continue;
+            }
+
+            if filename_opt.is_some() {
+                let create_request = metadata_payload.as_mut().ok_or_else(|| {
+                    (StatusCode::BAD_REQUEST, "File part arrived before metadata").into_response()
+                })?;
+
+                let file_ext = match create_request.metadata_format {
+                    DublinMetadataFormat::Wacz => "wacz",
+                };
+
+                // Discard the original filename since we have all that from the metadata
+                // Use this to make sure there are no filename collisions between objects in s3
+                let unique_name = format!("{}.{}", Uuid::new_v4(), file_ext);
+                create_request.s3_filename = unique_name.clone();
+
+                let upload_res = self
+                    .clone()
+                    .upload_from_multipart_field(unique_name.clone(), field, content_type.clone())
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to upload file {unique_name}: {e:?}");
+                        e
+                    })?;
+
+                uploaded_key = Some(upload_res);
+                info!("Successfully uploaded file: {unique_name}");
+                continue;
+            }
+
+            error!("Skipping unexpected field without filename: name={field_name}");
+        }
+
+        let file_key = uploaded_key.ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Missing name of file uploaded to S3",
+            )
+                .into_response()
+        })?;
+
+        if let Some(ref mut req) = metadata_payload {
+            req.s3_filename = file_key;
+        }
+
+        metadata_payload.ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not extract metadata",
+            )
+                .into_response()
+        })
     }
 }

@@ -1,13 +1,15 @@
 //! Test utilities for creating mock implementations and test fixtures.
-//! This module provides in-memory implementations of repositories and services
+//! This module provides in-memory implementations of repositories
 //! to facilitate testing without requiring actual database or external API connections.
 
 use crate::app_factory::{create_app, AppState};
 use crate::auth::JWT_KEYS;
+use crate::config::AppConfig;
 use crate::models::auth::JWTClaims;
 use crate::models::common::MetadataLanguage;
 use crate::models::request::{
-    AccessionPaginationWithPrivate, CreateAccessionRequest, CreateCrawlRequest,
+    AccessionPaginationWithPrivate, CreateAccessionRequest, CreateAccessionRequestRaw,
+    CreateCrawlRequest,
 };
 use crate::models::response::CreateCrawlResponse;
 use crate::repos::accessions_repo::AccessionsRepo;
@@ -49,6 +51,14 @@ impl AccessionsRepo for InMemoryAccessionsRepo {
         _crawl_id: Uuid,
         _job_run_id: String,
         _crawl_status: CrawlStatus,
+    ) -> Result<i32, DbErr> {
+        Ok(10)
+    }
+
+    /// Mock implementation for raw accession creation.
+    async fn write_one_raw(
+        &self,
+        _create_accession_request: CreateAccessionRequestRaw,
     ) -> Result<i32, DbErr> {
         Ok(10)
     }
@@ -270,6 +280,9 @@ impl S3Repo for InMemoryS3Repo {
         _endpoint_url: &str,
         _access_key: &str,
         _secret_key: &str,
+        _operation_timeout: u64,
+        _operation_attempt_timeout: u64,
+        _connect_timeout: u64,
     ) -> Result<Self, Box<dyn StdError>> {
         Ok(Self { bucket })
     }
@@ -290,6 +303,33 @@ impl S3Repo for InMemoryS3Repo {
         _expires_in: u64,
     ) -> Result<String, Box<dyn StdError>> {
         Ok("my url".to_string())
+    }
+
+    async fn initiate_multipart_upload(
+        &self,
+        key: &str,
+        _content_type: &str,
+    ) -> Result<String, Box<dyn StdError>> {
+        Ok(format!("mock-upload-id-{}", key))
+    }
+
+    async fn upload_part(
+        &self,
+        _key: &str,
+        _upload_id: &str,
+        part_number: i32,
+        _bytes: Bytes,
+    ) -> Result<(String, i32), Box<dyn StdError>> {
+        Ok((format!("mock-etag-part-{}", part_number), part_number))
+    }
+
+    async fn complete_multipart_upload(
+        &self,
+        key: &str,
+        _upload_id: &str,
+        _parts: Vec<(String, i32)>,
+    ) -> Result<String, Box<dyn StdError>> {
+        Ok(format!("mock-final-etag-{}", key))
     }
 }
 /// Builds a test accessions service with in-memory repositories.
@@ -337,7 +377,9 @@ pub fn build_test_app() -> Router {
         subjects_service,
         auth_service,
     };
-    create_app(app_state, vec![], true)
+    let mut app_config = AppConfig::default();
+    app_config.max_file_upload_size = 100 * 1024 * 1024;
+    create_app(app_state, app_config, true)
 }
 
 /// Creates a mock paginated collection of English accessions.

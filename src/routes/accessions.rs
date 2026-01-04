@@ -12,27 +12,83 @@ use crate::models::request::{
 };
 use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use ::entity::sea_orm_active_enums::Role;
-use axum::extract::{Path, State};
+use axum::extract::{DefaultBodyLimit, Multipart, Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use axum_extra::extract::Query;
+use tracing::{error, info};
 use validator::Validate;
 
 /// Creates routes for accession-related endpoints under `/accessions`.
-pub fn get_accessions_routes() -> Router<AppState> {
+pub fn get_accessions_routes(max_file_upload_size: usize) -> Router<AppState> {
     Router::new().nest(
         "/accessions",
         Router::new()
             .route("/", get(list_accessions))
             .route("/private", get(list_accessions_private))
             .route("/", post(create_accession))
+            .route("/raw", post(create_accession_raw))
+            // Increase limit; default is 2MB; this only applies to raw upload endpoint
+            // see https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html
+            .layer(DefaultBodyLimit::max(max_file_upload_size))
             .route("/{accession_id}", get(get_one_accession))
             .route("/private/{accession_id}", get(get_one_private_accession))
             .route("/{accession_id}", delete(delete_accession))
             .route("/{accession_id}", put(update_accession)),
     )
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/accessions/raw",
+    tag = "Accessions",
+    request_body = CreateAccessionRequest,
+    responses(
+        (status = 201, description = "Accession created!"),
+        (status = 400, description = "Bad request"),
+        (status = 403, description = "Forbidden")
+    )
+)]
+async fn create_accession_raw(
+    State(state): State<AppState>,
+    authenticated_user: AuthenticatedUser,
+    multipart: Multipart,
+) -> Response {
+    if !validate_at_least_researcher(&authenticated_user.role) {
+        return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
+    }
+    info!("Received raw accession creation request via multipart/form-data");
+    let create_accession_raw_request = match state
+        .accessions_service
+        .clone()
+        .extract_accession_from_multipart_form(multipart, state.subjects_service)
+        .await
+    {
+        Ok(data) => data,
+        Err(response) => return response,
+    };
+
+    match state
+        .accessions_service
+        .clone()
+        .write_one_raw(create_accession_raw_request)
+        .await
+    {
+        Ok(id) => {
+            info!("Raw accession created with id: {}", id);
+            (
+                StatusCode::CREATED,
+                format!("Accession created with id: {id}"),
+            )
+                .into_response()
+        }
+        Err(err) => {
+            error!("Failed to create raw accession: {:?}", err);
+            err
+        }
+    }
 }
 
 #[utoipa::path(
@@ -250,11 +306,53 @@ mod tests {
         body::Body,
         http::{Request, StatusCode},
     };
+    use bytes::Bytes;
     use entity::sea_orm_active_enums::DublinMetadataFormat;
     use http_body_util::BodyExt;
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use tower::ServiceExt;
+
+    async fn build_multipart_form_data(
+        metadata_json: serde_json::Value,
+        file_bytes: Vec<u8>,
+        file_name: &str,
+        file_content_type: &str,
+        metadata_first: bool,
+    ) -> Body {
+        let boundary = "------------------------abcdef1234567890";
+        let mut form_body_parts: Vec<Bytes> = Vec::new();
+
+        let metadata_part = format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"metadata\"\r\nContent-Type: application/json\r\n\r\n{metadata_json}\r\n",
+            boundary = boundary,
+            metadata_json = metadata_json.to_string()
+        );
+
+        let file_part_header = format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{file_name}\"\r\nContent-Type: {file_content_type}\r\n\r\n",
+            boundary = boundary,
+            file_name = file_name,
+            file_content_type = file_content_type
+        );
+        let file_part_footer = "\r\n";
+
+        if metadata_first {
+            form_body_parts.push(Bytes::from(metadata_part.into_bytes()));
+            form_body_parts.push(Bytes::from(file_part_header.into_bytes()));
+            form_body_parts.push(Bytes::from(file_bytes));
+            form_body_parts.push(Bytes::from(file_part_footer.as_bytes()));
+        } else {
+            form_body_parts.push(Bytes::from(file_part_header.into_bytes()));
+            form_body_parts.push(Bytes::from(file_bytes));
+            form_body_parts.push(Bytes::from(file_part_footer.as_bytes()));
+            form_body_parts.push(Bytes::from(metadata_part.into_bytes()));
+        }
+
+        form_body_parts.push(Bytes::from(format!("--{}--\r\n", boundary).into_bytes()));
+
+        Body::from(form_body_parts.concat())
+    }
 
     #[tokio::test]
     async fn run_one_crawl() {
@@ -677,5 +775,227 @@ mod tests {
             wacz_url: "my url".to_owned(),
         };
         assert_eq!(actual, expected)
+    }
+
+    #[tokio::test]
+    async fn create_accession_raw_no_auth() {
+        let app = build_test_app();
+        let metadata = json!({
+            "metadata_language": "english",
+            "metadata_title": "Test Title",
+            "metadata_description": "Test Description",
+            "metadata_time": "2024-01-01T00:00:00",
+            "metadata_subjects": [1],
+            "is_private": false,
+            "metadata_format": "wacz",
+            "s3_filename": "test-no-auth.wacz"
+        });
+        let file_bytes = vec![0; 100]; // 100 bytes file
+        let body = build_multipart_form_data(
+            metadata,
+            file_bytes,
+            "test-file.wacz",
+            "application/wacz",
+            true,
+        )
+        .await;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/api/v1/accessions/raw")
+                    .header(
+                        http::header::CONTENT_TYPE,
+                        "multipart/form-data; boundary=------------------------abcdef1234567890",
+                    )
+                    .body(body)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn create_accession_raw_small_file() {
+        let app = build_test_app();
+        let metadata = json!({
+            "metadata_language": "english",
+            "metadata_title": "Test Small File",
+            "metadata_description": "Small file description",
+            "metadata_time": "2024-01-01T00:00:00",
+            "metadata_subjects": [1],
+            "is_private": false,
+            "metadata_format": "wacz",
+            "s3_filename": "test-small.wacz"
+        });
+        let file_bytes = vec![0; 1024 * 1024]; // 1MB file
+        let body = build_multipart_form_data(
+            metadata,
+            file_bytes,
+            "small-file.wacz",
+            "application/wacz",
+            true,
+        )
+        .await;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/api/v1/accessions/raw")
+                    .header(
+                        http::header::CONTENT_TYPE,
+                        "multipart/form-data; boundary=------------------------abcdef1234567890",
+                    )
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
+                    .body(body)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let actual = String::from_utf8((&body).to_vec()).unwrap();
+        assert_eq!(actual, "Accession created with id: 10");
+    }
+
+    #[tokio::test]
+    async fn create_accession_raw_large_file() {
+        let app = build_test_app();
+        let metadata = json!({
+            "metadata_language": "english",
+            "metadata_title": "Test Large File",
+            "metadata_description": "Large file description",
+            "metadata_time": "2024-01-01T00:00:00",
+            "metadata_subjects": [1],
+            "is_private": false,
+            "metadata_format": "wacz",
+            "s3_filename": "test-large.wacz"
+        });
+        let file_bytes = vec![0; 6 * 1024 * 1024]; // 6MB file
+        let body = build_multipart_form_data(
+            metadata,
+            file_bytes,
+            "large-file.wacz",
+            "application/wacz",
+            true,
+        )
+        .await;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/api/v1/accessions/raw")
+                    .header(
+                        http::header::CONTENT_TYPE,
+                        "multipart/form-data; boundary=------------------------abcdef1234567890",
+                    )
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
+                    .body(body)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let actual = String::from_utf8((&body).to_vec()).unwrap();
+        assert_eq!(actual, "Accession created with id: 10");
+    }
+
+    #[tokio::test]
+    async fn create_accession_raw_metadata_order_invalid() {
+        let app = build_test_app();
+        let metadata = json!({
+            "metadata_language": "english",
+            "metadata_title": "Test Metadata Order",
+            "metadata_description": "Metadata order description",
+            "metadata_time": "2024-01-01T00:00:00",
+            "metadata_subjects": [1],
+            "is_private": false,
+            "metadata_format": "wacz",
+            "s3_filename": "test-order-invalid.wacz"
+        });
+        let file_bytes = vec![0; 100]; // 100 bytes file
+        let body = build_multipart_form_data(
+            metadata,
+            file_bytes,
+            "order-invalid-file.wacz",
+            "application/wacz",
+            false,
+        )
+        .await; // metadata_first = false
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/api/v1/accessions/raw")
+                    .header(
+                        http::header::CONTENT_TYPE,
+                        "multipart/form-data; boundary=------------------------abcdef1234567890",
+                    )
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
+                    .body(body)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let actual = String::from_utf8((&body).to_vec()).unwrap();
+        assert_eq!(actual, "Metadata field should be the first form field");
+    }
+
+    #[tokio::test]
+    async fn create_accession_raw_invalid_metadata() {
+        let app = build_test_app();
+        // Missing required field: metadata_title
+        let metadata = json!({
+            "metadata_language": "english",
+            "metadata_description": "Invalid metadata description",
+            "metadata_time": "2024-01-01T00:00:00",
+            "metadata_subjects": [1],
+            "is_private": false,
+            "metadata_format": "wacz",
+            "s3_filename": "test-invalid-metadata.wacz"
+        });
+        let file_bytes = vec![0; 100]; // 100 bytes file
+        let body = build_multipart_form_data(
+            metadata,
+            file_bytes,
+            "invalid-metadata-file.wacz",
+            "application/wacz",
+            true,
+        )
+        .await;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/api/v1/accessions/raw")
+                    .header(
+                        http::header::CONTENT_TYPE,
+                        "multipart/form-data; boundary=------------------------abcdef1234567890",
+                    )
+                    .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
+                    .body(body)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let actual = String::from_utf8((&body).to_vec()).unwrap();
+        assert!(actual
+            .contains("Failed to parse metadata JSON: Error(\"missing field `metadata_title`\""));
     }
 }

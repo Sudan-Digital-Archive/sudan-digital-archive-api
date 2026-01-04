@@ -11,7 +11,7 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use validator::Validate;
 
-/// Request for creating a new accession with metadata.
+/// Request for creating a new accession with crawl + metadata.
 #[derive(Debug, Clone, Validate, Deserialize, ToSchema)]
 pub struct CreateAccessionRequest {
     #[validate(url)]
@@ -28,6 +28,22 @@ pub struct CreateAccessionRequest {
     pub is_private: bool,
     pub metadata_format: DublinMetadataFormat,
     pub s3_filename: Option<String>,
+}
+
+/// Request for creating a new accession from raw file + metadata.
+#[derive(Debug, Clone, Validate, Deserialize, ToSchema)]
+pub struct CreateAccessionRequestRaw {
+    pub metadata_language: MetadataLanguage,
+    #[validate(length(min = 1, max = 200))]
+    pub metadata_title: String,
+    #[validate(length(min = 1, max = 2000))]
+    pub metadata_description: Option<String>,
+    pub metadata_time: NaiveDateTime,
+    #[validate(length(min = 1, max = 200))]
+    pub metadata_subjects: Vec<i32>,
+    pub is_private: bool,
+    pub metadata_format: DublinMetadataFormat,
+    pub s3_filename: String,
 }
 
 /// Request for initiating a new Browsertrix crawl.
