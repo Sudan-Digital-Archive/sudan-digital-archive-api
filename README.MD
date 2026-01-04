@@ -19,27 +19,31 @@ export $(cat .env | xargs)
 cargo run
 ```
 
-Here is an exmple `.env` file:
+Here is an example `.env` file:
 
 ```
-POSTGRES_URL='<postgres connection string>'
-ARCHIVE_SENDER_EMAIL='<email>'
-POSTMARK_API_BASE='<api base>'
-POSTMARK_API_KEY='<api key>'
-BROWSERTRIX_USERNAME='<username>'
-BROWSERTRIX_PASSWORD='<password>'
-BROWSERTRIX_ORGID='<org id>'
-BROWSERTRIX_BROWSERTRIX_URL='<api base>'
-JWT_COOKIE_DOMAIN='<domain>'
-CORS_URL='<cors url>'
-LISTENER_ADDRESS='<api url>'
-JWT_EXPIRY_HOURS='<expiry hours>'
+POSTGRES_URL="<postgres connection string>"
+ARCHIVE_SENDER_EMAIL="<email>"
+POSTMARK_API_BASE="<api base>"
+POSTMARK_API_KEY="<api key>"
+BROWSERTRIX_USERNAME="<username>"
+BROWSERTRIX_PASSWORD="<username>"
+BROWSERTRIX_ORGID="<org id>"
+BROWSERTRIX_BROWSERTRIX_URL="<api base>"
+JWT_COOKIE_DOMAIN="<domain>"
+CORS_URL="<cors url>"
+LISTENER_ADDRESS="<api url>"
+JWT_EXPIRY_HOURS="<expiry hours>"
 JWT_SECRET="<secret>"
 DO_SPACES_ENDPOINT_URL="<url>"
 DO_SPACES_REGION="<region>"
 DO_SPACES_BUCKET="<bucket name>"
 DO_SPACES_ACCESS_KEY="<key>"
 DO_SPACES_SECRET_KEY="<secret>"
+S3_OPERATION_TIMEOUT="30"
+S3_OPERATION_ATTEMPT_TIMEOUT="10"
+S3_CONNECT_TIMEOUT="3"
+API_PREFIX=""
 ```
 Once the application is running, you can access swagger docs at `localhost:port/sda-api/docs`. The `sda-api` prefix is
 there since it gets deployed to this prefix on Digital Ocean, however note that you can toggle to a local server in

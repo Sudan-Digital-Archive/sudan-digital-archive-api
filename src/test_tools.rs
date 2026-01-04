@@ -280,6 +280,9 @@ impl S3Repo for InMemoryS3Repo {
         _endpoint_url: &str,
         _access_key: &str,
         _secret_key: &str,
+        _operation_timeout: u64,
+        _operation_attempt_timeout: u64,
+        _connect_timeout: u64,
     ) -> Result<Self, Box<dyn StdError>> {
         Ok(Self { bucket })
     }

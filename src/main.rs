@@ -65,6 +65,9 @@ async fn main() {
         &app_config.digital_ocean_spaces_endpoint_url,
         &app_config.digital_ocean_spaces_access_key,
         &app_config.digital_ocean_spaces_secret_key,
+        app_config.s3_operation_timeout,
+        app_config.s3_operation_attempt_timeout,
+        app_config.s3_connect_timeout,
     )
     .await
     .expect("Could not create DigitalOcean Spaces repo");

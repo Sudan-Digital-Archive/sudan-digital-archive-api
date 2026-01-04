@@ -20,6 +20,9 @@ pub trait S3Repo: Send + Sync {
         endpoint_url: &str,
         access_key: &str,
         secret_key: &str,
+        operation_timeout: u64,
+        operation_attempt_timeout: u64,
+        connect_timeout: u64,
     ) -> Result<Self, Box<dyn Error>>
     where
         Self: Sized;
@@ -129,7 +132,6 @@ pub struct DigitalOceanSpacesRepo {
     bucket: String,
 }
 
-// TODO: Add https://github.com/awsdocs/aws-doc-sdk-examples/blob/main/rustv1/examples/s3/src/bin/s3-multipart-upload.rs#L48
 #[async_trait]
 impl S3Repo for DigitalOceanSpacesRepo {
     async fn new(
@@ -137,13 +139,14 @@ impl S3Repo for DigitalOceanSpacesRepo {
         endpoint_url: &str,
         access_key: &str,
         secret_key: &str,
+        operation_timeout: u64,
+        operation_attempt_timeout: u64,
+        connect_timeout: u64,
     ) -> Result<Self, Box<dyn Error>> {
-        // TODO: Inject this from app config rather than hardcoding here
-        // Should have these defaults in app config but be configurable by environment variables
         let timeout_config = TimeoutConfig::builder()
-            .operation_timeout(Duration::from_secs(30))
-            .operation_attempt_timeout(Duration::from_secs(10))
-            .connect_timeout(Duration::from_secs(3))
+            .operation_timeout(Duration::from_secs(operation_timeout))
+            .operation_attempt_timeout(Duration::from_secs(operation_attempt_timeout))
+            .connect_timeout(Duration::from_secs(connect_timeout))
             .build();
         if access_key.is_empty() || secret_key.is_empty() {
             return Err("DO Spaces credentials cannot be empty".into());
