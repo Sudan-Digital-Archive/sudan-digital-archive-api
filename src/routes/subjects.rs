@@ -42,12 +42,12 @@ pub fn get_subjects_routes() -> Router<AppState> {
 )]
 async fn create_subject(
     State(state): State<AppState>,
-    // authenticated_user: AuthenticatedUser,
+    authenticated_user: AuthenticatedUser,
     Json(payload): Json<CreateSubjectRequest>,
 ) -> Response {
-    // if !validate_at_least_researcher(&authenticated_user.role) {
-    //     return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
-    // }
+    if !validate_at_least_researcher(&authenticated_user.role) {
+        return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
+    }
     if let Err(err) = payload.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
     }

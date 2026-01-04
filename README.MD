@@ -1,11 +1,8 @@
 # TODOs
 
-- Test E2E and fix any regressions
-- Cargo clean and cargo update
 - Fix why swagger docs not showing new endpoint and correct built urls
 - Add tests with appropriate mock repo implementations
-- Delete incomplete multipart uploads using s3cmd https://docs.digitalocean.com/products/spaces/how-to/configure-lifecycle-rules/#remove-incomplete-multipart-uploads 
-- Create a ticket in the infra repo to update this and the database diagram too
+- Create a ticket in the infra repo to update the database diagram too
 
 # Overview
 

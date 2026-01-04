@@ -84,7 +84,7 @@ pub fn build_app_config() -> AppConfig {
         env::var("DO_SPACES_ACCESS_KEY").expect("Missing DO_SPACES_ACCESS_KEY env var");
     let digital_ocean_spaces_secret_key =
         env::var("DO_SPACES_SECRET_KEY").expect("Missing DO_SPACES_SECRET_KEY env var");
-    let max_file_upload_size = 100 * 1024 * 1024;
+    let max_file_upload_size = 200 * 1024 * 1024;
     AppConfig {
         archive_sender_email,
         browsertrix,

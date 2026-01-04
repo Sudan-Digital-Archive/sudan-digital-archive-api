@@ -11,7 +11,6 @@ use aws_smithy_types::timeout::TimeoutConfig;
 use bytes::Bytes;
 use std::error::Error;
 use std::time::Duration;
-use tracing::info;
 // Repository trait for S3-compatible storage operations
 #[async_trait]
 pub trait S3Repo: Send + Sync {
@@ -278,10 +277,6 @@ impl S3Repo for DigitalOceanSpacesRepo {
         part_number: i32,
         bytes: Bytes,
     ) -> Result<(String, i32), Box<dyn Error>> {
-        info!(
-            "Uploading part number {} for upload ID {}",
-            part_number, upload_id
-        );
         let upload_part_res = self
             .client
             .upload_part()
@@ -300,7 +295,6 @@ impl S3Repo for DigitalOceanSpacesRepo {
                     err.into_service_error().code().unwrap_or("unknown")
                 )
             })?;
-        info!("Successfully uploaded part number {}", part_number);
         let etag = upload_part_res.e_tag().unwrap_or_default().to_string();
         Ok((etag, part_number))
     }

@@ -28,6 +28,10 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 use validator::Validate;
 
+// Using this as the min part size for multipart uploads to S3. This is low since this code is designed to run in
+// a very low memory container environment. Plus we don't want to allow too large uploads anyway, so we are mostly
+// using this to support streaming uploads of files that are slightly over 5MB, which will be the majority of uploads
+// to the archive
 static FIVE_MB: usize = 5 * 1024 * 1024;
 
 #[derive(PartialEq, Eq)]
@@ -400,7 +404,7 @@ impl AccessionsService {
         mut field: Field<'_>,
         content_type: String,
     ) -> Result<String, Response> {
-        info!(
+        debug!(
             "Starting streaming upload for key: {} with content type: {}",
             key, content_type
         );
@@ -410,7 +414,6 @@ impl AccessionsService {
         let mut upload_id: Option<String> = None;
         let mut upload_parts: Vec<(String, i32)> = Vec::new();
         let mut part_number = 1i32;
-        let mut loop_iteration_counter = 0;
         while let Some(chunk) = field.chunk().await.map_err(|err| {
             error!("Failed to read chunk from field: {}", err);
             (
@@ -419,11 +422,10 @@ impl AccessionsService {
             )
                 .into_response()
         })? {
-            loop_iteration_counter += 1;
             total_size += chunk.len();
             buffer.extend_from_slice(&chunk);
-            info!(
-                "Received chunk of {} bytes, total so far: {:.1} MB, loop count {loop_iteration_counter}",
+            debug!(
+                "Received chunk of {} bytes, total so far: {:.1} MB",
                 chunk.len(),
                 total_size as f64 / 1024.0 / 1024.0
             );
@@ -431,13 +433,12 @@ impl AccessionsService {
             // case where we are under 5MB so we don't do multipart upload since this requires
             // 5MB otherwise it fails
             if upload_id.is_none() && total_size <= FIVE_MB {
-                info!("Skipping on loop iteration {loop_iteration_counter}");
                 continue;
 
             // Case where we haven't started a multipart upload but we're over 5MB, so we need to start one!
             } else if upload_id.is_none() && total_size > FIVE_MB {
-                info!(
-                    "File exceeded 5MB threshold at {:.1} MB, initiating multipart upload. Loop count {loop_iteration_counter}",
+                debug!(
+                    "File exceeded 5MB threshold at {:.1} MB, initiating multipart upload.",
                     total_size as f64 / 1024.0 / 1024.0
                 );
                 match self
@@ -462,13 +463,12 @@ impl AccessionsService {
             // Case where we have started a multipart upload already so we need to upload the next chunk!
             if let Some(ref id) = upload_id {
                 if buffer.len() <= FIVE_MB {
-                    warn!("Waiting for chunk to reach five mb, the min size for each part {loop_iteration_counter}");
+                    debug!("Waiting for chunk to reach five mb, the min size for each part");
                     continue;
                 }
-                info!("Trying to upload next chunk on {loop_iteration_counter}");
                 let part_bytes = Bytes::from(buffer.split_off(0));
-                info!(
-                    "Uploading part {} with {:.1} MB. Loop count {loop_iteration_counter}",
+                debug!(
+                    "Uploading part {} with {:.1} MB.",
                     part_number,
                     part_bytes.len() as f64 / 1024.0 / 1024.0
                 );
@@ -479,7 +479,7 @@ impl AccessionsService {
                 {
                     Ok((etag, _)) => {
                         upload_parts.push((etag, part_number));
-                        info!("Successfully uploaded part {}, loop iteration {loop_iteration_counter}", part_number);
+                        debug!("Successfully uploaded part {}", part_number);
                         part_number += 1;
                     }
                     Err(err) => {
@@ -500,12 +500,12 @@ impl AccessionsService {
                     .into_response());
             }
         }
-        info!("Exited loop");
+        debug!("Exited loop for reading stream for key: {}", key);
         // Handle stream end; we now either need to bundle up all the multipart upload parts into the final
         // object or if we didn't do a multipart upload because it was under 5MB, we need to do a single upload
         if let Some(id) = upload_id {
             if !buffer.is_empty() {
-                info!(
+                debug!(
                     "Uploading final part {} with {:.1} MB",
                     part_number,
                     buffer.len() as f64 / 1024.0 / 1024.0
@@ -518,7 +518,7 @@ impl AccessionsService {
                 {
                     Ok((etag, _)) => {
                         upload_parts.push((etag, part_number));
-                        info!("Successfully uploaded final part {}", part_number);
+                        debug!("Successfully uploaded final part {}", part_number);
                     }
                     Err(err) => {
                         error!(%err, "Failed to upload final part for key: {}", key);
@@ -531,7 +531,7 @@ impl AccessionsService {
                 }
             }
 
-            info!(
+            debug!(
                 "Completing multipart upload for key: {} with  parts count: {}",
                 key,
                 upload_parts.len()

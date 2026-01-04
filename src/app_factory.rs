@@ -27,7 +27,7 @@ use axum::http::Request;
 use axum::routing::get;
 use axum::Router;
 use http::header::CONTENT_TYPE;
-use http::Method;
+use http::{Method, StatusCode};
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
@@ -124,7 +124,10 @@ fn build_routes(api: utoipa::openapi::OpenApi, app_config: AppConfig) -> Router<
                 )
             }),
         )
-        .layer(TimeoutLayer::new(Duration::from_secs(120)))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(120),
+        ))
         .layer(CompressionLayer::new())
         .layer(ValidateRequestHeaderLayer::accept("application/json"));
     let accessions_routes = get_accessions_routes(app_config.max_file_upload_size);
