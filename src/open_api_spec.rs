@@ -1,7 +1,7 @@
 use crate::models::request::{
     AccessionPagination, AccessionPaginationWithPrivate, AuthorizeRequest, CreateAccessionRequest,
-    CreateSubjectRequest, DeleteSubjectRequest, LoginRequest, SubjectPagination,
-    UpdateAccessionRequest,
+    CreateAccessionRequestRaw, CreateSubjectRequest, DeleteSubjectRequest, LoginRequest,
+    SubjectPagination, UpdateAccessionRequest,
 };
 use crate::models::response::{
     CreateApiKeyResponse, GetOneAccessionResponse, ListAccessionsResponse, ListSubjectsArResponse,
@@ -32,6 +32,7 @@ impl Modify for SecurityAddon {
     paths(
         crate::routes::health::healthcheck,
         crate::routes::accessions::create_accession,
+        crate::routes::accessions::create_accession_raw,
         crate::routes::accessions::get_one_accession,
         crate::routes::accessions::get_one_private_accession,
         crate::routes::accessions::list_accessions,
@@ -51,6 +52,7 @@ impl Modify for SecurityAddon {
             AccessionPagination,
             AccessionPaginationWithPrivate,
             CreateAccessionRequest,
+            CreateAccessionRequestRaw,
             UpdateAccessionRequest,
             GetOneAccessionResponse,
             ListAccessionsResponse,
@@ -71,6 +73,10 @@ impl Modify for SecurityAddon {
         (name = "Auth", description = "User authentication endpoints"),
         (name = "Subjects", description = "Subject management endpoints")
     ),
-    modifiers(&SecurityAddon)
+    modifiers(&SecurityAddon),
+    servers(
+        (url = "/sda-api", description = "Production deployment with prefix"),
+        (url = "/", description = "Local development without prefix")
+    )
 )]
 pub struct ApiDoc;

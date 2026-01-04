@@ -28,7 +28,6 @@ use axum::routing::get;
 use axum::Router;
 use http::header::CONTENT_TYPE;
 use http::{Method, StatusCode};
-use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use tower::ServiceBuilder;
@@ -41,7 +40,6 @@ use tower_http::{
 use tracing::info_span;
 use tracing_subscriber::util::SubscriberInitExt;
 use utoipa::OpenApi;
-use utoipa_redoc::{Redoc, Servable};
 use utoipa_swagger_ui::SwaggerUi;
 /// Application state shared across routes
 #[derive(Clone)]
@@ -128,21 +126,19 @@ fn build_routes(api: utoipa::openapi::OpenApi, app_config: AppConfig) -> Router<
             StatusCode::REQUEST_TIMEOUT,
             Duration::from_secs(120),
         ))
-        .layer(CompressionLayer::new())
-        .layer(ValidateRequestHeaderLayer::accept("application/json"));
+        .layer(CompressionLayer::new());
     let accessions_routes = get_accessions_routes(app_config.max_file_upload_size);
     let subjects_routes = get_subjects_routes();
     let auth_routes = get_auth_routes();
+    let swagger_ui = SwaggerUi::new("/sda-api/docs").url("/sda-api/docs/openapi.json", api.clone());
+    let api_v1 = Router::new()
+        .merge(accessions_routes)
+        .merge(subjects_routes)
+        .merge(auth_routes)
+        .layer(ValidateRequestHeaderLayer::accept("application/json"));
     Router::new()
-        .merge(SwaggerUi::new("/docs").url("/docs/openapi.json", api.clone()))
-        .merge(Redoc::with_url_and_config(
-            "/redoc",
-            api,
-            || json!({ "hideLogo": true }),
-        ))
-        .nest("/api/v1", accessions_routes)
-        .nest("/api/v1", subjects_routes)
-        .nest("/api/v1", auth_routes)
-        .nest("/health", Router::new().route("/", get(healthcheck)))
+        .merge(swagger_ui)
+        .nest("/api/v1", api_v1)
+        .route("/health", get(healthcheck))
         .layer(middleware)
 }

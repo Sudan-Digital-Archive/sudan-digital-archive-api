@@ -1,8 +1,8 @@
 # TODOs
 
-- Fix why swagger docs not showing new endpoint and correct built urls
 - Add tests with appropriate mock repo implementations
 - Create a ticket in the infra repo to update the database diagram too
+- Update docs to remove redoc
 
 # Overview
 
@@ -47,6 +47,9 @@ DO_SPACES_BUCKET="<bucket name>"
 DO_SPACES_ACCESS_KEY="<key>"
 DO_SPACES_SECRET_KEY="<secret>"
 ```
+Once the application is running, you can access swagger docs at `localhost:port/sda-api/docs`. The `sda-api` prefix is
+there since it gets deployed to this prefix on Digital Ocean, however note that you can toggle to a local server in
+Swagger so the requests go through without the prefix, which is required for local development.
 
 ## Migrations
  To run migrations:

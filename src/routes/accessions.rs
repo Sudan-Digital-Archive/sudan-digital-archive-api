@@ -30,7 +30,7 @@ pub fn get_accessions_routes(max_file_upload_size: usize) -> Router<AppState> {
             .route("/private", get(list_accessions_private))
             .route("/", post(create_accession))
             .route("/raw", post(create_accession_raw))
-            // Increase limit to 100MB; default is 2MB; this only applies to raw upload endpoint
+            // Increase limit; default is 2MB; this only applies to raw upload endpoint
             // see https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html
             .layer(DefaultBodyLimit::max(max_file_upload_size))
             .route("/{accession_id}", get(get_one_accession))
