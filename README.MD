@@ -2,6 +2,7 @@
 
 - Test E2E and fix any regressions
 - Cargo clean and cargo update
+- Fix why swagger docs not showing new endpoint and correct built urls
 - Add tests with appropriate mock repo implementations
 - Delete incomplete multipart uploads using s3cmd https://docs.digitalocean.com/products/spaces/how-to/configure-lifecycle-rules/#remove-incomplete-multipart-uploads 
 - Create a ticket in the infra repo to update this and the database diagram too
@@ -15,11 +16,48 @@ It is an axum web application that talks to a postgres database and
 
 ## Local Development 
 
-You will need a local postgres database running. To run migrations, 
+You will need a local postgres database running. You can use the `docker-compose.local.yml` file for this. Install
+[docker](https://www.docker.com/) and then run `docker compose -f docker-compose.local.yml up`.
+
+## Running the Application
+
+Create a `.env` file with the required environment variables. Then:
 
 ```shell
-export DATABASE_URL="postgresql://<your connection string>"
-sea-orm-cli migrate up
+export $(cat .env | xargs)
+cargo run
+```
+
+Here is an exmple `.env` file:
+
+```
+POSTGRES_URL='<postgres connection string>'
+ARCHIVE_SENDER_EMAIL='<email>'
+POSTMARK_API_BASE='<api base>'
+POSTMARK_API_KEY='<api key>'
+BROWSERTRIX_USERNAME='<username>'
+BROWSERTRIX_PASSWORD='<password>'
+BROWSERTRIX_ORGID='<org id>'
+BROWSERTRIX_BROWSERTRIX_URL='<api base>'
+JWT_COOKIE_DOMAIN='<domain>'
+CORS_URL='<cors url>'
+LISTENER_ADDRESS='<api url>'
+JWT_EXPIRY_HOURS='<expiry hours>'
+JWT_SECRET="<secret>"
+DO_SPACES_ENDPOINT_URL="<url>"
+DO_SPACES_REGION="<region>"
+DO_SPACES_BUCKET="<bucket name>"
+DO_SPACES_ACCESS_KEY="<key>"
+DO_SPACES_SECRET_KEY="<secret>"
+```
+
+## Migrations
+ To run migrations:
+
+```shell
+export DATABASE_URL="postgresql://archivist:test@localhost/sudan_archives"
+cd migration
+cargo run -- up
 ```
 
 ## Database
@@ -28,7 +66,7 @@ It's pretty useful to generate entities with sea orm. That way you
 get a rust model for exactly what is in your database. After running
 migrations, to generate entities:
 ```shell
-sea-orm-cli generate entity -u $DATABASE_URL -o entity/src
+cargo run -- generate entity -u $DATABASE_URL -o entity/src
 ```
 
 The code generation typically doesn't work with the layout of the app - it writes
@@ -37,13 +75,11 @@ modelling what's in the database, where it is perfect.
 
 ## Dockerfile
 
-To test the Dockerfile, install docker, add the required environment variables to
-`.env.local` and then run the compose file with 
-`docker compose -f docker-compose.local.yml up`.
+To test the Dockerfile, install [docker](https://www.docker.com/) and then run `docker build .`.
 
 ## Testing 
 
-Just run `cargo test`. Note that clippy and tests run in CI on pull and merge
+Just run `export JWT_SECRET="some string" && cargo test`. Note that clippy and tests run in CI on pull and merge
 to main. So, both need to pass before releasing code.
 
 Note that at the time of writing, there are no integration tests - only unit. 

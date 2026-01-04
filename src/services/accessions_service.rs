@@ -410,7 +410,7 @@ impl AccessionsService {
         let mut upload_id: Option<String> = None;
         let mut upload_parts: Vec<(String, i32)> = Vec::new();
         let mut part_number = 1i32;
-
+        let mut loop_iteration_counter = 0;
         while let Some(chunk) = field.chunk().await.map_err(|err| {
             error!("Failed to read chunk from field: {}", err);
             (
@@ -419,24 +419,26 @@ impl AccessionsService {
             )
                 .into_response()
         })? {
+            loop_iteration_counter += 1;
             total_size += chunk.len();
             buffer.extend_from_slice(&chunk);
             info!(
-                "Received chunk of {} bytes, total so far: {:.1} MB",
+                "Received chunk of {} bytes, total so far: {:.1} MB, loop count {loop_iteration_counter}",
                 chunk.len(),
-                total_size / 1024
+                total_size as f64 / 1024.0 / 1024.0
             );
 
             // case where we are under 5MB so we don't do multipart upload since this requires
             // 5MB otherwise it fails
             if upload_id.is_none() && total_size <= FIVE_MB {
+                info!("Skipping on loop iteration {loop_iteration_counter}");
                 continue;
 
             // Case where we haven't started a multipart upload but we're over 5MB, so we need to start one!
             } else if upload_id.is_none() && total_size > FIVE_MB {
                 info!(
-                    "File exceeded 5MB threshold at {:.1} MB, initiating multipart upload",
-                    total_size / 1024
+                    "File exceeded 5MB threshold at {:.1} MB, initiating multipart upload. Loop count {loop_iteration_counter}",
+                    total_size as f64 / 1024.0 / 1024.0
                 );
                 match self
                     .s3_repo
@@ -444,11 +446,8 @@ impl AccessionsService {
                     .await
                 {
                     Ok(id) => {
-                        upload_id = Some(id);
-                        info!(
-                            "Initiated multipart upload with id: {}",
-                            upload_id.as_ref().unwrap()
-                        );
+                        upload_id = Some(id.clone());
+                        info!("Initiated multipart upload with id: {}", id);
                     }
                     Err(err) => {
                         error!(%err, "Failed to initiate multipart upload for key: {}", key);
@@ -459,32 +458,37 @@ impl AccessionsService {
                             .into_response());
                     }
                 }
+            }
             // Case where we have started a multipart upload already so we need to upload the next chunk!
-            } else if let Some(ref id) = upload_id {
-                if buffer.len() >= FIVE_MB {
-                    let part_bytes = Bytes::from(buffer.split_off(0));
-                    debug!(
-                        "Uploading part {} with {:.1} MB",
-                        part_number,
-                        part_bytes.len() / 1024
-                    );
-                    match self
-                        .s3_repo
-                        .upload_part(&key, id, part_number, part_bytes)
-                        .await
-                    {
-                        Ok((etag, _)) => {
-                            upload_parts.push((etag, part_number));
-                            part_number += 1;
-                        }
-                        Err(err) => {
-                            error!(%err, "Failed to upload part {} for key: {}", part_number, key);
-                            return Err((
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                "Failed to upload file part",
-                            )
-                                .into_response());
-                        }
+            if let Some(ref id) = upload_id {
+                if buffer.len() <= FIVE_MB {
+                    warn!("Waiting for chunk to reach five mb, the min size for each part {loop_iteration_counter}");
+                    continue;
+                }
+                info!("Trying to upload next chunk on {loop_iteration_counter}");
+                let part_bytes = Bytes::from(buffer.split_off(0));
+                info!(
+                    "Uploading part {} with {:.1} MB. Loop count {loop_iteration_counter}",
+                    part_number,
+                    part_bytes.len() as f64 / 1024.0 / 1024.0
+                );
+                match self
+                    .s3_repo
+                    .upload_part(&key, id, part_number, part_bytes)
+                    .await
+                {
+                    Ok((etag, _)) => {
+                        upload_parts.push((etag, part_number));
+                        info!("Successfully uploaded part {}, loop iteration {loop_iteration_counter}", part_number);
+                        part_number += 1;
+                    }
+                    Err(err) => {
+                        error!(%err, "Failed to upload part {} for key: {}", part_number, key);
+                        return Err((
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Failed to upload file part",
+                        )
+                            .into_response());
                     }
                 }
             } else {
@@ -496,17 +500,17 @@ impl AccessionsService {
                     .into_response());
             }
         }
-
+        info!("Exited loop");
         // Handle stream end; we now either need to bundle up all the multipart upload parts into the final
         // object or if we didn't do a multipart upload because it was under 5MB, we need to do a single upload
         if let Some(id) = upload_id {
             if !buffer.is_empty() {
-                debug!(
+                info!(
                     "Uploading final part {} with {:.1} MB",
                     part_number,
-                    buffer.len() / 1024
+                    buffer.len() as f64 / 1024.0 / 1024.0
                 );
-                let part_bytes = Bytes::from(buffer);
+                let part_bytes = Bytes::from(buffer.split_off(0));
                 match self
                     .s3_repo
                     .upload_part(&key, &id, part_number, part_bytes)
@@ -514,6 +518,7 @@ impl AccessionsService {
                 {
                     Ok((etag, _)) => {
                         upload_parts.push((etag, part_number));
+                        info!("Successfully uploaded final part {}", part_number);
                     }
                     Err(err) => {
                         error!(%err, "Failed to upload final part for key: {}", key);
@@ -527,9 +532,9 @@ impl AccessionsService {
             }
 
             info!(
-                "Completing multipart upload for key: {} with {:.1} MB parts",
+                "Completing multipart upload for key: {} with  parts count: {}",
                 key,
-                upload_parts.len() / 1024
+                upload_parts.len()
             );
             match self
                 .s3_repo
@@ -540,7 +545,7 @@ impl AccessionsService {
                     info!(
                         "Successfully completed multipart upload for key: {}, total size: {:.1} MB",
                         key,
-                        total_size / 1024
+                        total_size as f64 / 1024.0 / 1024.0
                     );
                     Ok(id)
                 }
@@ -554,7 +559,10 @@ impl AccessionsService {
                 }
             }
         } else {
-            info!("Using simple upload for {:.1} MB", total_size / 1024);
+            info!(
+                "Using simple upload for {:.1} MB",
+                total_size as f64 / 1024.0 / 1024.0
+            );
             match self
                 .s3_repo
                 .upload_from_bytes(&key, Bytes::from(buffer), &content_type)
@@ -612,7 +620,7 @@ impl AccessionsService {
                 .map(str::to_owned)
                 .unwrap_or_else(|| "application/octet-stream".to_string());
 
-            debug!(
+            info!(
                 "Processing multipart field: name={:?}, filename={:?}, content_type={:?}",
                 field_name, filename_opt, content_type
             );
@@ -633,8 +641,9 @@ impl AccessionsService {
 
                 let parsed: CreateAccessionRequestRaw =
                     serde_json::from_str(&text).map_err(|e| {
-                        error!("Failed to parse metadata JSON: {e:?}");
-                        (StatusCode::BAD_REQUEST, "Metadata JSON is invalid").into_response()
+                        let error_msg = format!("Failed to parse metadata JSON: {e:?}");
+                        error!(error_msg);
+                        (StatusCode::BAD_REQUEST, error_msg).into_response()
                     })?;
 
                 if let Err(v_err) = parsed.validate() {

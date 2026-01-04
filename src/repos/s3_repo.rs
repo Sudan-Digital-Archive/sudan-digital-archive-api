@@ -7,9 +7,11 @@ use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use aws_sdk_s3::Client;
 use aws_smithy_types::byte_stream::ByteStream;
+use aws_smithy_types::timeout::TimeoutConfig;
 use bytes::Bytes;
 use std::error::Error;
-
+use std::time::Duration;
+use tracing::info;
 // Repository trait for S3-compatible storage operations
 #[async_trait]
 pub trait S3Repo: Send + Sync {
@@ -137,6 +139,11 @@ impl S3Repo for DigitalOceanSpacesRepo {
         access_key: &str,
         secret_key: &str,
     ) -> Result<Self, Box<dyn Error>> {
+        let timeout_config = TimeoutConfig::builder()
+            .operation_timeout(Duration::from_secs(30))
+            .operation_attempt_timeout(Duration::from_secs(10))
+            .connect_timeout(Duration::from_secs(3))
+            .build();
         if access_key.is_empty() || secret_key.is_empty() {
             return Err("DO Spaces credentials cannot be empty".into());
         }
@@ -147,6 +154,7 @@ impl S3Repo for DigitalOceanSpacesRepo {
         let s3_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
             .endpoint_url(endpoint_url)
             .region("us-east-1")
+            .timeout_config(timeout_config)
             .load()
             .await;
 
@@ -270,13 +278,18 @@ impl S3Repo for DigitalOceanSpacesRepo {
         part_number: i32,
         bytes: Bytes,
     ) -> Result<(String, i32), Box<dyn Error>> {
+        info!(
+            "Uploading part number {} for upload ID {}",
+            part_number, upload_id
+        );
         let upload_part_res = self
             .client
             .upload_part()
             .key(key)
             .bucket(&self.bucket)
             .upload_id(upload_id)
-            .body(ByteStream::from(bytes))
+            .body(ByteStream::from(bytes.clone()))
+            .content_length(bytes.len() as i64)
             .part_number(part_number)
             .send()
             .await
@@ -287,7 +300,7 @@ impl S3Repo for DigitalOceanSpacesRepo {
                     err.into_service_error().code().unwrap_or("unknown")
                 )
             })?;
-
+        info!("Successfully uploaded part number {}", part_number);
         let etag = upload_part_res.e_tag().unwrap_or_default().to_string();
         Ok((etag, part_number))
     }

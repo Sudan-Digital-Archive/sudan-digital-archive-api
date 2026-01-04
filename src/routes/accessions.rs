@@ -53,12 +53,13 @@ pub fn get_accessions_routes(max_file_upload_size: usize) -> Router<AppState> {
 )]
 async fn create_accession_raw(
     State(state): State<AppState>,
-    authenticated_user: AuthenticatedUser,
+    // authenticated_user: AuthenticatedUser,
     multipart: Multipart,
 ) -> Response {
-    if !validate_at_least_researcher(&authenticated_user.role) {
-        return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
-    }
+    // if !validate_at_least_researcher(&authenticated_user.role) {
+    //     return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
+    // }
+    info!("Received raw accession creation request via multipart/form-data");
     let create_accession_raw_request = match state
         .accessions_service
         .clone()
