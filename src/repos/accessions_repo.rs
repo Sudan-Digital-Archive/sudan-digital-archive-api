@@ -249,7 +249,7 @@ impl AccessionsRepo for DBAccessionsRepo {
             org_id: Uuid::nil(),
             crawl_id: Uuid::nil(),
             job_run_id: "raw_upload".to_string(),
-            seed_url: String::new(),
+            seed_url: create_accession_request.original_url,
             is_private: create_accession_request.is_private,
             metadata_format: create_accession_request.metadata_format,
             s3_filename: Some(create_accession_request.s3_filename),

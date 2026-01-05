@@ -612,7 +612,6 @@ impl AccessionsService {
         subjects_service: SubjectsService,
     ) -> Result<CreateAccessionRequestRaw, Response> {
         let mut metadata_payload: Option<CreateAccessionRequestRaw> = None;
-        let mut uploaded_key: Option<String> = None;
         let mut step = MultiPartExtractionStep::ExpectMetadata; // first field must be the metadata JSON
 
         while let Some(field) = multipart.next_field().await.map_err(|e| {
@@ -700,9 +699,7 @@ impl AccessionsService {
                 // Use this to make sure there are no filename collisions between objects in s3
                 let unique_name = format!("{}.{}", Uuid::new_v4(), file_ext);
                 create_request.s3_filename = unique_name.clone();
-
-                let upload_res = self
-                    .clone()
+                self.clone()
                     .upload_from_multipart_field(unique_name.clone(), field, content_type.clone())
                     .await
                     .map_err(|e| {
@@ -710,24 +707,14 @@ impl AccessionsService {
                         e
                     })?;
 
-                uploaded_key = Some(upload_res);
                 info!("Successfully uploaded file: {unique_name}");
+                if let Some(ref mut req) = metadata_payload {
+                    req.s3_filename = unique_name;
+                }
                 continue;
             }
 
             error!("Skipping unexpected field without filename: name={field_name}");
-        }
-
-        let file_key = uploaded_key.ok_or_else(|| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Missing name of file uploaded to S3",
-            )
-                .into_response()
-        })?;
-
-        if let Some(ref mut req) = metadata_payload {
-            req.s3_filename = file_key;
         }
 
         metadata_payload.ok_or_else(|| {
