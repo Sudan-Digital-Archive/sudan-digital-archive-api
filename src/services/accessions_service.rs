@@ -100,32 +100,7 @@ impl AccessionsService {
             }
             Ok(query_result) => {
                 if let Some(accession) = query_result {
-                    let accession_for_enrich = accession.clone();
-                    match (
-                        accession_for_enrich.s3_filename,
-                        accession_for_enrich.dublin_metadata_format,
-                    ) {
-                        (Some(s3_filename), DublinMetadataFormat::Wacz) => {
-                            match self.s3_repo.get_presigned_url(&s3_filename, 3600).await {
-                                Ok(presigned_url) => {
-                                    let resp = GetOneAccessionResponse {
-                                        accession: accession.into(),
-                                        wacz_url: presigned_url,
-                                    };
-                                    Json(resp).into_response()
-                                }
-                                Err(err) => {
-                                    error!(%err, "Error occurred generating presigned url");
-                                    (
-                                        StatusCode::INTERNAL_SERVER_ERROR,
-                                        "Could not retrieving wacz url from s3 storage",
-                                    )
-                                        .into_response()
-                                }
-                            }
-                        }
-                        _ => self.enrich_one_with_browsertrix(Some(accession)).await,
-                    }
+                    self.enrich_accession_with_wacz_url(accession).await
                 } else {
                     (StatusCode::NOT_FOUND, "No such record").into_response()
                 }
@@ -133,45 +108,73 @@ impl AccessionsService {
         }
     }
 
-    /// Enriches an accession with WACZ URL from Browsertrix service.
+    /// Enriches an accession with a WACZ URL.
     ///
-    /// This private helper function retrieves the WACZ URL for an accession
-    /// using the job_run_id and returns an appropriate HTTP response.
-    ///
-    /// # Arguments
-    /// * `query_result` - Optional accession model to enrich
-    ///
-    /// # Returns
-    /// HTTP response with the enriched accession or error status
-    async fn enrich_one_with_browsertrix(
+    /// This method determines the source of the WACZ file:
+    /// 1. If an `s3_filename` is present and the format is WACZ, the file is stored in our own
+    ///    DigitalOcean Spaces storage. We generate a presigned URL for direct access.
+    /// 2. If no `s3_filename` is present but a `job_run_id` exists, the file is still in Browsertrix.
+    ///    We retrieve the replay URL from the Browsertrix service.
+    /// 3. If neither is present return an error; this shouldn't happen
+    async fn enrich_accession_with_wacz_url(
         self,
-        query_result: Option<AccessionWithMetadataModel>,
+        accession: AccessionWithMetadataModel,
     ) -> Response {
-        match query_result {
-            Some(accession) => {
-                match self
-                    .browsertrix_repo
-                    .get_wacz_url(&accession.job_run_id)
-                    .await
-                {
-                    Ok(wacz_url) => {
+        let accession_for_response = accession.clone();
+        match (
+            accession.s3_filename.as_deref(),
+            &accession.dublin_metadata_format,
+        ) {
+            // If it has an s3 filename, then we know its in our own digital ocean spaces storage
+            (Some(s3_filename), DublinMetadataFormat::Wacz) => {
+                match self.s3_repo.get_presigned_url(s3_filename, 3600).await {
+                    Ok(presigned_url) => {
                         let resp = GetOneAccessionResponse {
-                            accession: accession.into(),
-                            wacz_url,
+                            accession: accession_for_response.into(),
+                            wacz_url: presigned_url,
                         };
                         Json(resp).into_response()
                     }
                     Err(err) => {
-                        error!(%err, "Error occurred retrieving wacz url");
+                        error!(%err, "Error occurred generating presigned url");
                         (
                             StatusCode::INTERNAL_SERVER_ERROR,
-                            "Error retrieving wacz url",
+                            "Could not retrieving wacz url from s3 storage",
                         )
                             .into_response()
                     }
                 }
             }
-            None => (StatusCode::NOT_FOUND, "No such record").into_response(),
+            _ => {
+                if let Some(ref job_run_id) = accession.job_run_id {
+                    match self.browsertrix_repo.get_wacz_url(job_run_id).await {
+                        Ok(wacz_url) => {
+                            let resp = GetOneAccessionResponse {
+                                accession: accession_for_response.into(),
+                                wacz_url,
+                            };
+                            Json(resp).into_response()
+                        }
+                        Err(err) => {
+                            error!(%err, "Error occurred retrieving wacz url");
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                "Error retrieving wacz url",
+                            )
+                                .into_response()
+                        }
+                    }
+                } else {
+                    error!(
+                        "Error occurred generating wacz URL, no s3 filename or job run id present"
+                    );
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Could not retrieving wacz url from s3 storage",
+                    )
+                        .into_response()
+                }
+            }
         }
     }
     /// Creates a new accession by initiating a web crawl and storing the metadata.
@@ -350,8 +353,8 @@ impl AccessionsService {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
             }
             Ok(update_result) => {
-                if update_result.is_some() {
-                    self.enrich_one_with_browsertrix(update_result).await
+                if let Some(accession) = update_result {
+                    self.enrich_accession_with_wacz_url(accession).await
                 } else {
                     error!("Error occurred finding accession in view after update");
                     (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
