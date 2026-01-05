@@ -75,6 +75,7 @@ impl Modify for SecurityAddon {
     ),
     modifiers(&SecurityAddon),
     servers(
+        // Deployed on Digital Ocean spaces which has a HTTP request config that slaps on this sda-api prefix
         (url = "/sda-api", description = "Production deployment with prefix"),
         (url = "/", description = "Local development without prefix")
     )

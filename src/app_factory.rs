@@ -40,7 +40,7 @@ use tower_http::{
 use tracing::info_span;
 use tracing_subscriber::util::SubscriberInitExt;
 use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
+use utoipa_swagger_ui::{Config, SwaggerUi};
 /// Application state shared across routes
 #[derive(Clone)]
 pub struct AppState {
@@ -130,10 +130,12 @@ fn build_routes(api: utoipa::openapi::OpenApi, app_config: AppConfig) -> Router<
     let accessions_routes = get_accessions_routes(app_config.max_file_upload_size);
     let subjects_routes = get_subjects_routes();
     let auth_routes = get_auth_routes();
-    let swagger_ui = SwaggerUi::new(format!("{}/docs", app_config.api_prefix)).url(
-        format!("{}/docs/openapi.json", app_config.api_prefix),
-        api.clone(),
-    );
+    let swagger_ui = SwaggerUi::new("/docs")
+        .url("/docs/openapi.json", api.clone())
+        .config(Config::from(format!(
+            "{}/docs/openapi.json",
+            app_config.api_prefix
+        )));
     let api_v1 = Router::new()
         .merge(accessions_routes)
         .merge(subjects_routes)
