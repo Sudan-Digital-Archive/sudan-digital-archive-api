@@ -8,6 +8,7 @@ mod m20250921_203431_add_full_text_search;
 mod m20251001_220752_rebuild_full_text_indices;
 mod m20251017_164508_add_s3_spaces_filename;
 mod m20251111_214709_add_api_keys;
+mod m20260105_012142_optional_browsertrix_fields_in_accessions;
 
 pub struct Migrator;
 
@@ -24,6 +25,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251001_220752_rebuild_full_text_indices::Migration),
             Box::new(m20251017_164508_add_s3_spaces_filename::Migration),
             Box::new(m20251111_214709_add_api_keys::Migration),
+            Box::new(m20260105_012142_optional_browsertrix_fields_in_accessions::Migration),
         ]
     }
 }
