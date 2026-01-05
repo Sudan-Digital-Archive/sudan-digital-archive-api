@@ -788,6 +788,7 @@ mod tests {
             "metadata_subjects": [1],
             "is_private": false,
             "metadata_format": "wacz",
+            "original_url": "https://coolurl.com",
             "s3_filename": "test-no-auth.wacz"
         });
         let file_bytes = vec![0; 100]; // 100 bytes file
@@ -829,6 +830,7 @@ mod tests {
             "metadata_subjects": [1],
             "is_private": false,
             "metadata_format": "wacz",
+            "original_url": "https://coolurl.com",
             "s3_filename": "test-small.wacz"
         });
         let file_bytes = vec![0; 1024 * 1024]; // 1MB file
@@ -874,6 +876,7 @@ mod tests {
             "metadata_subjects": [1],
             "is_private": false,
             "metadata_format": "wacz",
+            "original_url": "https://coolurl.com",
             "s3_filename": "test-large.wacz"
         });
         let file_bytes = vec![0; 6 * 1024 * 1024]; // 6MB file
@@ -919,6 +922,7 @@ mod tests {
             "metadata_subjects": [1],
             "is_private": false,
             "metadata_format": "wacz",
+            "original_url": "https://coolurl.com",
             "s3_filename": "test-order-invalid.wacz"
         });
         let file_bytes = vec![0; 100]; // 100 bytes file
@@ -964,6 +968,7 @@ mod tests {
             "metadata_subjects": [1],
             "is_private": false,
             "metadata_format": "wacz",
+            "original_url": "https://coolurl.com",
             "s3_filename": "test-invalid-metadata.wacz"
         });
         let file_bytes = vec![0; 100]; // 100 bytes file

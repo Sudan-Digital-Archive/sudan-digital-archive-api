@@ -132,19 +132,20 @@ fn build_routes(api: utoipa::openapi::OpenApi, app_config: AppConfig) -> Router<
     let subjects_routes = get_subjects_routes();
     let auth_routes = get_auth_routes();
     let api_prefix = app_config.api_prefix.clone();
-    let swagger_ui = SwaggerUi::new("/docs/")
-        .url("/docs/openapi.json", api.clone())
+    let swagger_ui = SwaggerUi::new("/")
+        .url("/openapi.json", api.clone())
         .config(Config::from(format!(
             "{}/docs/openapi.json",
             app_config.api_prefix
         )));
+
     let api_v1 = Router::new()
         .merge(accessions_routes)
         .merge(subjects_routes)
         .merge(auth_routes)
         .layer(ValidateRequestHeaderLayer::accept("application/json"));
     Router::new()
-        .merge(swagger_ui)
+        .nest("/docs/", swagger_ui.into())
         .route(
             "/docs",
             // This is a pain but required because Swagger registers to /docs/ but I forget this and always
