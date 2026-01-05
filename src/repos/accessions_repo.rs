@@ -246,10 +246,12 @@ impl AccessionsRepo for DBAccessionsRepo {
             metadata_subjects: create_accession_request.metadata_subjects,
             metadata_time: create_accession_request.metadata_time,
             crawl_status: CrawlStatus::Complete,
+            // TODO: Need to update the model rather than harcode rubbish like this
+            // https://github.com/Sudan-Digital-Archive/sudan-digital-archive-api/issues/41
             org_id: Uuid::nil(),
             crawl_id: Uuid::nil(),
             job_run_id: "raw_upload".to_string(),
-            seed_url: String::new(),
+            seed_url: create_accession_request.original_url,
             is_private: create_accession_request.is_private,
             metadata_format: create_accession_request.metadata_format,
             s3_filename: Some(create_accession_request.s3_filename),

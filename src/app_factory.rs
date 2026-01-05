@@ -24,6 +24,7 @@ use crate::services::auth_service::AuthService;
 use crate::services::subjects_service::SubjectsService;
 use axum::extract::MatchedPath;
 use axum::http::Request;
+use axum::response::Redirect;
 use axum::routing::get;
 use axum::Router;
 use http::header::CONTENT_TYPE;
@@ -130,19 +131,27 @@ fn build_routes(api: utoipa::openapi::OpenApi, app_config: AppConfig) -> Router<
     let accessions_routes = get_accessions_routes(app_config.max_file_upload_size);
     let subjects_routes = get_subjects_routes();
     let auth_routes = get_auth_routes();
-    let swagger_ui = SwaggerUi::new("/docs")
-        .url("/docs/openapi.json", api.clone())
+    let api_prefix = app_config.api_prefix.clone();
+    let swagger_ui = SwaggerUi::new("/")
+        .url("/openapi.json", api.clone())
         .config(Config::from(format!(
             "{}/docs/openapi.json",
             app_config.api_prefix
         )));
+
     let api_v1 = Router::new()
         .merge(accessions_routes)
         .merge(subjects_routes)
         .merge(auth_routes)
         .layer(ValidateRequestHeaderLayer::accept("application/json"));
     Router::new()
-        .merge(swagger_ui)
+        .nest("/docs/", swagger_ui.into())
+        .route(
+            "/docs",
+            // This is a pain but required because Swagger registers to /docs/ but I forget this and always
+            // navigate to just /docs and get a 404
+            get(move || async move { Redirect::to(&format!("{}/docs/", api_prefix)) }),
+        )
         .nest("/api/v1", api_v1)
         .route("/health", get(healthcheck))
         .layer(middleware)

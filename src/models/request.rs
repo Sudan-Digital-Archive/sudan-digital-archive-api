@@ -43,6 +43,8 @@ pub struct CreateAccessionRequestRaw {
     pub metadata_subjects: Vec<i32>,
     pub is_private: bool,
     pub metadata_format: DublinMetadataFormat,
+    #[validate(url)]
+    pub original_url: String,
     pub s3_filename: String,
 }
 
