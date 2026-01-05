@@ -25,8 +25,6 @@ use entity::dublin_metadata_en::ActiveModel as DublinMetadataEnActiveModel;
 use entity::dublin_metadata_en::Entity as DublinMetadataEn;
 use entity::dublin_metadata_en_subjects::ActiveModel as DublinMetadataSubjectsEnActiveModel;
 use entity::dublin_metadata_en_subjects::Entity as DublinMetadataSubjectsEn;
-use entity::dublin_metadata_subject_ar::Entity as DublinMetadataSubjectAr;
-use entity::dublin_metadata_subject_en::Entity as DublinMetadataSubjectEn;
 use entity::sea_orm_active_enums::{CrawlStatus, DublinMetadataFormat};
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
@@ -319,9 +317,6 @@ impl AccessionsRepo for DBAccessionsRepo {
                             .filter(<entity::dublin_metadata_en_subjects::Entity as EntityTrait>::Column::MetadataId.eq(metadata_record.id))
                             .exec(&txn)
                             .await?;
-                        DublinMetadataSubjectEn::delete_by_id(metadata_record.id)
-                            .exec(&txn)
-                            .await?;
                         DublinMetadataEn::delete_by_id(metadata_id)
                             .exec(&txn)
                             .await?;
@@ -331,9 +326,6 @@ impl AccessionsRepo for DBAccessionsRepo {
                     let metadata_ar = DublinMetadataAr::find_by_id(metadata_id).one(&txn).await?;
                     if let Some(metadata_record) = metadata_ar {
                         DublinMetadataSubjectsAr::delete_many().filter(<entity::dublin_metadata_ar_subjects::Entity as EntityTrait>::Column::MetadataId.eq(metadata_record.id))
-                            .exec(&txn)
-                            .await?;
-                        DublinMetadataSubjectAr::delete_by_id(metadata_record.id)
                             .exec(&txn)
                             .await?;
                         DublinMetadataAr::delete_by_id(metadata_id)
