@@ -24,6 +24,7 @@ pub struct CreateAccessionRequest {
     pub metadata_time: NaiveDateTime,
     pub browser_profile: Option<BrowserProfile>,
     #[validate(length(min = 1, max = 200))]
+    #[schema(example = json!([1, 2, 3]))]
     pub metadata_subjects: Vec<i32>,
     pub is_private: bool,
     pub metadata_format: DublinMetadataFormat,
@@ -40,6 +41,7 @@ pub struct CreateAccessionRequestRaw {
     pub metadata_description: Option<String>,
     pub metadata_time: NaiveDateTime,
     #[validate(length(min = 1, max = 200))]
+    #[schema(example = json!([1, 2, 3]))]
     pub metadata_subjects: Vec<i32>,
     pub is_private: bool,
     pub metadata_format: DublinMetadataFormat,
@@ -64,6 +66,7 @@ pub struct AccessionPagination {
     #[validate(range(min = 1, max = 200))]
     pub per_page: u64,
     pub lang: MetadataLanguage,
+    #[schema(example = json!([1, 2, 3]))]
     pub metadata_subjects: Vec<i32>,
     pub metadata_subjects_inclusive_filter: Option<bool>,
     #[validate(length(min = 1, max = 500))]
@@ -95,6 +98,7 @@ pub struct AccessionPaginationWithPrivate {
     #[validate(range(min = 1, max = 200))]
     pub per_page: u64,
     pub lang: MetadataLanguage,
+    #[schema(example = json!([1, 2, 3]))]
     pub metadata_subjects: Vec<i32>,
     pub metadata_subjects_inclusive_filter: Option<bool>,
     #[validate(length(min = 1, max = 500))]
@@ -161,6 +165,7 @@ pub struct UpdateAccessionRequest {
     pub metadata_description: Option<String>,
     pub metadata_time: NaiveDateTime,
     #[validate(length(min = 1, max = 200))]
+    #[schema(example = json!([1, 2, 3]))]
     pub metadata_subjects: Vec<i32>,
     pub is_private: bool,
 }
