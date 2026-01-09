@@ -62,14 +62,17 @@ pub struct CreateCrawlRequest {
 #[derive(Debug, Clone, Deserialize, Validate, IntoParams, ToSchema)]
 #[serde(default)]
 pub struct AccessionPagination {
+    #[schema(default = 0)]
     pub page: u64,
     #[validate(range(min = 1, max = 200))]
+    #[schema(default = 20, minimum = 1, maximum = 200)]
     pub per_page: u64,
     pub lang: MetadataLanguage,
     #[schema(example = json!([1, 2, 3]))]
     pub metadata_subjects: Vec<i32>,
     pub metadata_subjects_inclusive_filter: Option<bool>,
     #[validate(length(min = 1, max = 500))]
+    #[schema(nullable = false)]
     pub query_term: Option<String>,
     pub date_from: Option<NaiveDateTime>,
     pub date_to: Option<NaiveDateTime>,
@@ -94,14 +97,17 @@ impl Default for AccessionPagination {
 #[derive(Debug, Clone, Deserialize, Validate, IntoParams, ToSchema)]
 #[serde(default)]
 pub struct AccessionPaginationWithPrivate {
+    #[schema(default = 0)]
     pub page: u64,
     #[validate(range(min = 1, max = 200))]
+    #[schema(default = 20, minimum = 1, maximum = 200)]
     pub per_page: u64,
     pub lang: MetadataLanguage,
     #[schema(example = json!([1, 2, 3]))]
     pub metadata_subjects: Vec<i32>,
     pub metadata_subjects_inclusive_filter: Option<bool>,
     #[validate(length(min = 1, max = 500))]
+    #[schema(nullable = false)]
     pub query_term: Option<String>,
     pub date_from: Option<NaiveDateTime>,
     pub date_to: Option<NaiveDateTime>,
@@ -133,14 +139,29 @@ pub struct CreateSubjectRequest {
 }
 
 /// Pagination and filtering parameters for listing subjects.
-#[derive(Debug, Validate, Deserialize, IntoParams, ToSchema)]
+#[derive(Debug, Clone, Validate, Deserialize, IntoParams, ToSchema)]
+#[serde(default)]
 pub struct SubjectPagination {
+    #[schema(default = 0)]
     pub page: u64,
     #[validate(range(min = 1, max = 200))]
+    #[schema(default = 20, minimum = 1, maximum = 200)]
     pub per_page: u64,
     pub lang: MetadataLanguage,
     #[validate(length(min = 1, max = 500))]
+    #[schema(nullable = false)]
     pub query_term: Option<String>,
+}
+
+impl Default for SubjectPagination {
+    fn default() -> Self {
+        Self {
+            page: 0,
+            per_page: 20,
+            lang: MetadataLanguage::English,
+            query_term: None,
+        }
+    }
 }
 
 /// Request for creating a new subject category.

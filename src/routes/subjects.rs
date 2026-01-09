@@ -251,6 +251,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn list_subjects_defaults() {
+        let app = build_test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/metadata-subjects")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let actual: ListSubjectsEnResponse = serde_json::from_slice(&body).unwrap();
+        let mocked_resp = mock_paginated_subjects_en();
+        assert_eq!(actual.num_pages, mocked_resp.1);
+        assert_eq!(actual.items.len(), mocked_resp.0.len());
+    }
+
+    #[tokio::test]
     async fn delete_one_subject_no_auth() {
         let app = build_test_app();
         let response = app
