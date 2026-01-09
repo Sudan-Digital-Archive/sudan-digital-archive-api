@@ -133,7 +133,8 @@ pub struct CreateSubjectRequest {
 }
 
 /// Pagination and filtering parameters for listing subjects.
-#[derive(Debug, Validate, Deserialize, IntoParams, ToSchema)]
+#[derive(Debug, Clone, Validate, Deserialize, IntoParams, ToSchema)]
+#[serde(default)]
 pub struct SubjectPagination {
     pub page: u64,
     #[validate(range(min = 1, max = 200))]
@@ -141,6 +142,17 @@ pub struct SubjectPagination {
     pub lang: MetadataLanguage,
     #[validate(length(min = 1, max = 500))]
     pub query_term: Option<String>,
+}
+
+impl Default for SubjectPagination {
+    fn default() -> Self {
+        Self {
+            page: 0,
+            per_page: 20,
+            lang: MetadataLanguage::English,
+            query_term: None,
+        }
+    }
 }
 
 /// Request for creating a new subject category.
