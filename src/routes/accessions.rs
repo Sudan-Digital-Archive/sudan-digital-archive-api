@@ -211,6 +211,9 @@ async fn list_accessions(
     get,
     path = "/api/v1/accessions/private",
     tag = "Accessions",
+    params(
+        AccessionPaginationWithPrivate
+    ),
     responses(
         (status = 200, description = "OK", body = ListAccessionsResponse),
         (status = 400, description = "Bad request"),
