@@ -41,4 +41,6 @@ pub enum Role {
     Admin,
     #[sea_orm(string_value = "researcher")]
     Researcher,
+    #[sea_orm(string_value = "contributor")]
+    Contributor,
 }

@@ -37,14 +37,26 @@ pub fn validate_at_least_researcher(role: &Role) -> bool {
     matches!(role, Role::Admin | Role::Researcher)
 }
 
+/// Validates that a user has at least contributor permissions.
+/// Returns true if the role is Admin or Researcher or Contributor, false otherwise.
+pub fn validate_at_least_contributor(role: &Role) -> bool {
+    matches!(role, Role::Admin | Role::Researcher | Role::Contributor)
+}
 #[cfg(test)]
 mod tests {
-    use super::validate_at_least_researcher;
+    use super::{validate_at_least_contributor, validate_at_least_researcher};
     use ::entity::sea_orm_active_enums::Role;
 
     #[test]
     fn test_validate_at_least_researcher() {
         assert_eq!(validate_at_least_researcher(&Role::Admin), true);
         assert_eq!(validate_at_least_researcher(&Role::Researcher), true);
+    }
+
+    #[test]
+    fn test_validate_at_least_contributor() {
+        assert_eq!(validate_at_least_contributor(&Role::Admin), true);
+        assert_eq!(validate_at_least_contributor(&Role::Researcher), true);
+        assert_eq!(validate_at_least_contributor(&Role::Contributor), true);
     }
 }

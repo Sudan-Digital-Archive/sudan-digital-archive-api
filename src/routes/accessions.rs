@@ -4,7 +4,7 @@
 //! It uses in-memory repositories for testing to avoid I/O operations.
 
 use crate::app_factory::AppState;
-use crate::auth::validate_at_least_researcher;
+use crate::auth::{validate_at_least_contributor, validate_at_least_researcher};
 use crate::models::auth::AuthenticatedUser;
 use crate::models::request::{
     AccessionPagination, AccessionPaginationWithPrivate, CreateAccessionRawMultipartRequest,
@@ -60,8 +60,8 @@ async fn create_accession_raw(
     authenticated_user: AuthenticatedUser,
     multipart: Multipart,
 ) -> Response {
-    if !validate_at_least_researcher(&authenticated_user.role) {
-        return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
+    if !validate_at_least_contributor(&authenticated_user.role) {
+        return (StatusCode::FORBIDDEN, "Must have at least contributor role").into_response();
     }
     info!("Received raw accession creation request via multipart/form-data");
     let create_accession_raw_request = match state
@@ -111,8 +111,8 @@ async fn create_accession(
     authenticated_user: AuthenticatedUser,
     Json(payload): Json<CreateAccessionRequest>,
 ) -> Response {
-    if !validate_at_least_researcher(&authenticated_user.role) {
-        return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
+    if !validate_at_least_contributor(&authenticated_user.role) {
+        return (StatusCode::FORBIDDEN, "Must have at least contributor role").into_response();
     }
     if let Err(err) = payload.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();

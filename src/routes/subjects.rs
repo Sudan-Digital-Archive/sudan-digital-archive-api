@@ -6,7 +6,7 @@
 //! It uses in-memory repositories for testing to avoid I/O operations.
 
 use crate::app_factory::AppState;
-use crate::auth::validate_at_least_researcher;
+use crate::auth::validate_at_least_contributor;
 use crate::models::auth::AuthenticatedUser;
 use crate::models::request::{CreateSubjectRequest, DeleteSubjectRequest, SubjectPagination};
 use crate::models::response::{ListSubjectsArResponse, ListSubjectsEnResponse, SubjectResponse};
@@ -45,8 +45,8 @@ async fn create_subject(
     authenticated_user: AuthenticatedUser,
     Json(payload): Json<CreateSubjectRequest>,
 ) -> Response {
-    if !validate_at_least_researcher(&authenticated_user.role) {
-        return (StatusCode::FORBIDDEN, "Must have at least researcher role").into_response();
+    if !validate_at_least_contributor(&authenticated_user.role) {
+        return (StatusCode::FORBIDDEN, "Must have at least contributor role").into_response();
     }
     if let Err(err) = payload.validate() {
         return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
