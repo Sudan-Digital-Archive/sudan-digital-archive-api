@@ -50,6 +50,20 @@ pub struct CreateAccessionRequestRaw {
     pub s3_filename: String,
 }
 
+/// Request for creating a new accession from raw file + metadata via multipart upload.
+/// The `metadata` field must be the first part and contain the JSON metadata.
+/// The `file` field must be the second part and contain the file content.
+#[allow(dead_code)]
+#[derive(ToSchema)]
+pub struct CreateAccessionRawMultipartRequest {
+    /// The metadata JSON object.
+    #[schema(value_type = CreateAccessionRequestRaw)]
+    pub metadata: CreateAccessionRequestRaw,
+    /// The file to upload.
+    #[schema(value_type = String, format = Binary)]
+    pub file: Vec<u8>,
+}
+
 /// Request for initiating a new Browsertrix crawl.
 #[derive(Debug, Validate, Deserialize, ToSchema)]
 pub struct CreateCrawlRequest {

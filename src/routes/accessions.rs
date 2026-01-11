@@ -7,8 +7,8 @@ use crate::app_factory::AppState;
 use crate::auth::validate_at_least_researcher;
 use crate::models::auth::AuthenticatedUser;
 use crate::models::request::{
-    AccessionPagination, AccessionPaginationWithPrivate, CreateAccessionRequest,
-    UpdateAccessionRequest,
+    AccessionPagination, AccessionPaginationWithPrivate, CreateAccessionRawMultipartRequest,
+    CreateAccessionRequest, UpdateAccessionRequest,
 };
 use crate::models::response::{GetOneAccessionResponse, ListAccessionsResponse};
 use ::entity::sea_orm_active_enums::Role;
@@ -44,7 +44,11 @@ pub fn get_accessions_routes(max_file_upload_size: usize) -> Router<AppState> {
     post,
     path = "/api/v1/accessions/raw",
     tag = "Accessions",
-    request_body = CreateAccessionRequest,
+    request_body(
+        content = CreateAccessionRawMultipartRequest,
+        content_type = "multipart/form-data",
+        description = "Multipart upload request. \n\n**Important:** The `metadata` field MUST be the first part of the form and contain the JSON metadata. The `file` field MUST be the second part and contain the binary file content."
+    ),
     responses(
         (status = 201, description = "Accession created!"),
         (status = 400, description = "Bad request"),
