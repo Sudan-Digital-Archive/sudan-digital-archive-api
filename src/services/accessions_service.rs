@@ -331,6 +331,8 @@ impl AccessionsService {
                     if let Some(s3_filename) = accession.s3_filename {
                         if let Err(err) = self.s3_repo.delete_object(&s3_filename).await {
                             error!(%err, "Error deleting s3 object {s3_filename}");
+                            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error")
+                                .into_response();
                         } else {
                             info!("Deleted s3 object {s3_filename}");
                         }
