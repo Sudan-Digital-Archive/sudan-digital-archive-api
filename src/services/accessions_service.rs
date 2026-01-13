@@ -327,7 +327,16 @@ impl AccessionsService {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error").into_response()
             }
             Ok(delete_result) => {
-                if delete_result.is_some() {
+                if let Some(accession) = delete_result {
+                    if let Some(s3_filename) = accession.s3_filename {
+                        if let Err(err) = self.s3_repo.delete_object(&s3_filename).await {
+                            error!(%err, "Error deleting s3 object {s3_filename}");
+                            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error")
+                                .into_response();
+                        } else {
+                            info!("Deleted s3 object {s3_filename}");
+                        }
+                    }
                     (StatusCode::OK, "Accession deleted").into_response()
                 } else {
                     (StatusCode::NOT_FOUND, "No such record").into_response()

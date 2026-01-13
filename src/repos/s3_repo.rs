@@ -123,6 +123,18 @@ pub trait S3Repo: Send + Sync {
         upload_id: &str,
         parts: Vec<(String, i32)>,
     ) -> Result<String, Box<dyn Error>>;
+
+    /// Deletes an object from the S3 bucket
+    ///
+    /// # Arguments
+    /// * `key` - The object key (path) in the S3 bucket
+    ///
+    /// # Returns
+    /// Result on success
+    ///
+    /// # Errors
+    /// Returns Error if the deletion fails
+    async fn delete_object(&self, key: &str) -> Result<(), Box<dyn Error>>;
 }
 
 /// Implementation for DigitalOcean Spaces (S3-compatible storage)
@@ -164,6 +176,24 @@ impl S3Repo for DigitalOceanSpacesRepo {
 
         let client = Client::new(&s3_config);
         Ok(Self { client, bucket })
+    }
+
+    async fn delete_object(&self, key: &str) -> Result<(), Box<dyn Error>> {
+        self.client
+            .delete_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
+            .await
+            .map(|_| ())
+            .map_err(|err| {
+                format!(
+                    "Failed to delete object {}: {}",
+                    key,
+                    err.into_service_error()
+                )
+                .into()
+            })
     }
 
     async fn upload_from_bytes(
