@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use entity::accession::ActiveModel as AccessionActiveModel;
 use entity::accession::Entity as Accession;
+use entity::accession::Model as AccessionModel;
 
 use entity::accessions_with_metadata;
 use entity::accessions_with_metadata::Entity as AccessionWithMetadata;
@@ -91,7 +92,7 @@ pub trait AccessionsRepo: Send + Sync {
     ///
     /// # Arguments
     /// * `id` - The ID of the accession to delete
-    async fn delete_one(&self, id: i32) -> Result<Option<()>, DbErr>;
+    async fn delete_one(&self, id: i32) -> Result<Option<AccessionModel>, DbErr>;
 
     /// Updates an existing accession record with new metadata.
     ///
@@ -304,7 +305,7 @@ impl AccessionsRepo for DBAccessionsRepo {
         Ok((accession_pages.fetch_page(params.page).await?, num_pages))
     }
 
-    async fn delete_one(&self, id: i32) -> Result<Option<()>, DbErr> {
+    async fn delete_one(&self, id: i32) -> Result<Option<AccessionModel>, DbErr> {
         let txn = self.db_session.begin().await?;
         let accession = Accession::find_by_id(id).one(&txn).await?;
         Accession::delete_by_id(id).exec(&txn).await?;
@@ -334,7 +335,7 @@ impl AccessionsRepo for DBAccessionsRepo {
                     }
                 }
                 txn.commit().await?;
-                Ok(Some(()))
+                Ok(Some(accession_record))
             }
             None => Ok(None),
         }

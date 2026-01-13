@@ -26,6 +26,7 @@ use async_trait::async_trait;
 use axum::Router;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use entity::accession::Model as AccessionModel;
 use entity::accessions_with_metadata::Model as AccessionsWithMetadataModel;
 use entity::dublin_metadata_subject_ar::Model as DublinMetadataSubjectArModel;
 use entity::dublin_metadata_subject_en::Model as DublinMetadataSubjectEnModel;
@@ -80,8 +81,8 @@ impl AccessionsRepo for InMemoryAccessionsRepo {
         Ok(mock_paginated_en())
     }
 
-    async fn delete_one(&self, _id: i32) -> Result<Option<()>, DbErr> {
-        Ok(Some(()))
+    async fn delete_one(&self, _id: i32) -> Result<Option<AccessionModel>, DbErr> {
+        Ok(Some(mock_one_accession()))
     }
 
     async fn update_one(
@@ -331,6 +332,10 @@ impl S3Repo for InMemoryS3Repo {
     ) -> Result<String, Box<dyn StdError>> {
         Ok(format!("mock-final-etag-{}", key))
     }
+
+    async fn delete_object(&self, _key: &str) -> Result<(), Box<dyn StdError>> {
+        Ok(())
+    }
 }
 /// Builds a test accessions service with in-memory repositories.
 /// Useful for unit testing service functionality without database connections.
@@ -413,6 +418,24 @@ pub fn mock_one_accession_with_metadata() -> AccessionsWithMetadataModel {
         seed_url: "https://example.com".to_string(),
         subjects_en_ids: Some(vec![1]),
         subjects_ar_ids: Some(vec![3]),
+        is_private: true,
+        dublin_metadata_format: DublinMetadataFormat::Wacz,
+        s3_filename: Some("some_file.wacz".to_string()),
+    }
+}
+
+pub fn mock_one_accession() -> AccessionModel {
+    AccessionModel {
+        id: 1,
+        dublin_metadata_en: Some(1),
+        dublin_metadata_ar: Some(2),
+        crawl_status: CrawlStatus::Complete,
+        crawl_timestamp: Default::default(),
+        dublin_metadata_date: Default::default(),
+        crawl_id: Some(Default::default()),
+        org_id: Some(Default::default()),
+        job_run_id: Some("some_job_id".to_string()),
+        seed_url: "https://example.com".to_string(),
         is_private: true,
         dublin_metadata_format: DublinMetadataFormat::Wacz,
         s3_filename: Some("some_file.wacz".to_string()),
