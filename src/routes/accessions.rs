@@ -204,6 +204,7 @@ async fn list_accessions(
         metadata_subjects: pagination.0.metadata_subjects,
         metadata_subjects_inclusive_filter: pagination.0.metadata_subjects_inclusive_filter,
         query_term: pagination.0.query_term,
+        url_filter: pagination.0.url_filter,
         date_from: pagination.0.date_from,
         date_to: pagination.0.date_to,
         is_private: false,
