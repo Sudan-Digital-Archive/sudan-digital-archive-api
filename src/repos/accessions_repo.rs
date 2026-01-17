@@ -287,6 +287,7 @@ impl AccessionsRepo for DBAccessionsRepo {
             metadata_language: params.lang,
             metadata_subjects,
             query_term: params.query_term,
+            url_filter: params.url_filter,
             date_from: params.date_from,
             date_to: params.date_to,
             is_private: params.is_private,

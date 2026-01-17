@@ -18,6 +18,7 @@ pub struct FilterParams {
     pub metadata_language: MetadataLanguage,
     pub metadata_subjects: Option<MetadataSubjects>,
     pub query_term: Option<String>,
+    pub url_filter: Option<String>,
     pub date_from: Option<NaiveDateTime>,
     pub date_to: Option<NaiveDateTime>,
     pub is_private: bool,
@@ -94,7 +95,7 @@ pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
         MetadataLanguage::Arabic => ("full_text_ar", "arabic"),
     };
 
-    match (
+    let mut expression = match (
         params.query_term,
         params.date_from,
         params.date_to,
@@ -253,7 +254,15 @@ pub fn build_filter_expression(params: FilterParams) -> Option<SimpleExpr> {
                 .eq(true)
                 .and(accessions_with_metadata::Column::IsPrivate.eq(params.is_private)),
         ),
+    };
+
+    if let Some(url) = params.url_filter {
+        let url_like = format!("{}%", url);
+        expression =
+            expression.map(|e| e.and(accessions_with_metadata::Column::SeedUrl.like(url_like)));
     }
+
+    expression
 }
 
 #[cfg(test)]
@@ -262,11 +271,33 @@ mod tests {
     use chrono::NaiveDate;
 
     #[test]
+    fn test_build_filter_url_filter() {
+        let params = FilterParams {
+            metadata_language: MetadataLanguage::English,
+            metadata_subjects: None,
+            query_term: None,
+            url_filter: Some("https://example.com".to_string()),
+            date_from: None,
+            date_to: None,
+            is_private: false,
+        };
+        let actual = build_filter_expression(params);
+        let expected = Some(
+            Expr::col(accessions_with_metadata::Column::HasEnglishMetadata)
+                .eq(true)
+                .and(accessions_with_metadata::Column::IsPrivate.eq(false))
+                .and(accessions_with_metadata::Column::SeedUrl.like("https://example.com%")),
+        );
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn test_build_filter_none_params() {
         let params = FilterParams {
             metadata_language: MetadataLanguage::English,
             metadata_subjects: None,
             query_term: None,
+            url_filter: None,
             date_from: None,
             date_to: None,
             is_private: false,
@@ -282,6 +313,7 @@ mod tests {
             metadata_language: MetadataLanguage::Arabic,
             metadata_subjects: None,
             query_term: None,
+            url_filter: None,
             date_from: None,
             date_to: None,
             is_private: false,
@@ -301,6 +333,7 @@ mod tests {
             metadata_language: MetadataLanguage::English,
             metadata_subjects: None,
             query_term: Some("Test".to_string()),
+            url_filter: None,
             date_from: None,
             date_to: None,
             is_private: false,
@@ -330,6 +363,7 @@ mod tests {
             metadata_language: MetadataLanguage::Arabic,
             metadata_subjects: None,
             query_term: Some("اختبار".to_string()),
+            url_filter: None,
             date_from: None,
             date_to: None,
             is_private: false,
@@ -364,6 +398,7 @@ mod tests {
             metadata_language: MetadataLanguage::English,
             metadata_subjects: None,
             query_term: None,
+            url_filter: None,
             date_from: Some(from_date),
             date_to: Some(to_date),
             is_private: false,
@@ -391,6 +426,7 @@ mod tests {
             metadata_language: MetadataLanguage::English,
             metadata_subjects: None,
             query_term: None,
+            url_filter: None,
             date_from: Some(from_date),
             date_to: None,
             is_private: false,
@@ -417,6 +453,7 @@ mod tests {
             metadata_language: MetadataLanguage::English,
             metadata_subjects: None,
             query_term: None,
+            url_filter: None,
             date_from: None,
             date_to: Some(to_date),
             is_private: false,
@@ -447,6 +484,7 @@ mod tests {
             metadata_language: MetadataLanguage::English,
             metadata_subjects: None,
             query_term: Some("test".to_string()),
+            url_filter: None,
             date_from: Some(from_date),
             date_to: Some(to_date),
             is_private: false,
@@ -475,6 +513,7 @@ mod tests {
             metadata_language: MetadataLanguage::English,
             metadata_subjects: None,
             query_term: Some("test".to_string()),
+            url_filter: None,
             date_from: None,
             date_to: None,
             is_private: false,
@@ -484,6 +523,7 @@ mod tests {
             metadata_language: MetadataLanguage::English,
             metadata_subjects: None,
             query_term: Some("TEST".to_string()),
+            url_filter: None,
             date_from: None,
             date_to: None,
             is_private: false,
@@ -526,6 +566,7 @@ mod tests {
                 metadata_subjects_inclusive_filter: true,
             }),
             query_term: None,
+            url_filter: None,
             date_from: None,
             date_to: None,
             is_private: false,
@@ -553,6 +594,7 @@ mod tests {
                 metadata_subjects_inclusive_filter: false,
             }),
             query_term: None,
+            url_filter: None,
             date_from: None,
             date_to: None,
             is_private: false,
@@ -580,6 +622,7 @@ mod tests {
                 metadata_subjects_inclusive_filter: true,
             }),
             query_term: Some("test".to_string()),
+            url_filter: None,
             date_from: None,
             date_to: None,
             is_private: false,
