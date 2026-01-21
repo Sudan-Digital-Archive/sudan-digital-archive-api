@@ -91,6 +91,10 @@ async fn authorize(
     responses(
         (status = 200, description = "OK", body = String),
         (status = 401, description = "Unauthorized")
+    ),
+    security(
+        ("jwt_cookie_auth" = []),
+        ("api_key_auth" = [])
     )
 )]
 async fn verify(State(_state): State<AppState>, authenticated_user: AuthenticatedUser) -> Response {
@@ -106,6 +110,10 @@ async fn verify(State(_state): State<AppState>, authenticated_user: Authenticate
         (status = 201, description = "API key created", body = CreateApiKeyResponse),
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("jwt_cookie_auth" = []),
+        ("api_key_auth" = [])
     )
 )]
 async fn create_api_key(

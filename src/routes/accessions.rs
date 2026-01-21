@@ -53,6 +53,10 @@ pub fn get_accessions_routes(max_file_upload_size: usize) -> Router<AppState> {
         (status = 201, description = "Accession created!"),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("jwt_cookie_auth" = []),
+        ("api_key_auth" = [])
     )
 )]
 async fn create_accession_raw(
@@ -104,6 +108,10 @@ async fn create_accession_raw(
         (status = 201, description = "Started browsertrix crawl task!"),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("jwt_cookie_auth" = []),
+        ("api_key_auth" = [])
     )
 )]
 async fn create_accession(
@@ -165,6 +173,10 @@ async fn get_one_accession(State(state): State<AppState>, Path(id): Path<i32>) -
         (status = 200, description = "OK", body = GetOneAccessionResponse),
         (status = 404, description = "Not found"),
         (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("jwt_cookie_auth" = []),
+        ("api_key_auth" = [])
     )
 )]
 async fn get_one_private_accession(
@@ -223,6 +235,10 @@ async fn list_accessions(
         (status = 200, description = "OK", body = ListAccessionsResponse),
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("jwt_cookie_auth" = []),
+        ("api_key_auth" = [])
     )
 )]
 async fn list_accessions_private(
@@ -248,6 +264,10 @@ async fn list_accessions_private(
         (status = 200, description = "Accession deleted"),
         (status = 403, description = "Forbidden"),
         (status = 404, description = "Not found")
+    ),
+    security(
+        ("jwt_cookie_auth" = []),
+        ("api_key_auth" = [])
     )
 )]
 async fn delete_accession(
@@ -272,6 +292,10 @@ async fn delete_accession(
         (status = 400, description = "Bad request"),
         (status = 403, description = "Forbidden"),
         (status = 404, description = "Not found")
+    ),
+    security(
+        ("jwt_cookie_auth" = []),
+        ("api_key_auth" = [])
     )
 )]
 async fn update_accession(
