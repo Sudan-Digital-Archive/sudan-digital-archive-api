@@ -34,10 +34,7 @@ use std::time::Duration;
 use tower::ServiceBuilder;
 use tower_governor::{governor::GovernorConfig, GovernorLayer};
 use tower_http::cors::CorsLayer;
-use tower_http::{
-    compression::CompressionLayer, timeout::TimeoutLayer, trace::TraceLayer,
-    validate_request::ValidateRequestHeaderLayer,
-};
+use tower_http::{compression::CompressionLayer, timeout::TimeoutLayer, trace::TraceLayer};
 use tracing::info_span;
 use tracing_subscriber::util::SubscriberInitExt;
 use utoipa::OpenApi;
@@ -142,8 +139,7 @@ fn build_routes(api: utoipa::openapi::OpenApi, app_config: AppConfig) -> Router<
     let api_v1 = Router::new()
         .merge(accessions_routes)
         .merge(subjects_routes)
-        .merge(auth_routes)
-        .layer(ValidateRequestHeaderLayer::accept("application/json"));
+        .merge(auth_routes);
     Router::new()
         .nest("/docs/", swagger_ui.into())
         .route(
