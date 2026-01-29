@@ -10,7 +10,6 @@ use crate::models::response::{
     AuthResponse, CreateCrawlResponse, GetCrawlResponse, GetWaczUrlResponse,
 };
 use async_trait::async_trait;
-use bytes::Bytes;
 use reqwest::{Client, Error, RequestBuilder, Response, StatusCode};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -81,11 +80,11 @@ pub trait BrowsertrixRepo: Send + Sync {
     /// * `crawl_id` - The ID of the crawl to check
     async fn get_crawl_status(&self, crawl_id: Uuid) -> Result<String, Error>;
 
-    /// Downloads the WACZ file from a completed crawl.
+    /// Downloads the WACZ file from a completed crawl as a response for streaming.
     ///
     /// # Arguments
     /// * `crawl_id` - The ID of the completed crawl
-    async fn download_wacz(&self, crawl_id: &str) -> Result<Bytes, Error>;
+    async fn download_wacz_stream(&self, crawl_id: &str) -> Result<Response, Error>;
 }
 
 #[async_trait]
@@ -181,15 +180,12 @@ impl BrowsertrixRepo for HTTPBrowsertrixRepo {
         Ok(get_crawl_resp_json.last_crawl_state)
     }
 
-    async fn download_wacz(&self, crawl_id: &str) -> Result<Bytes, Error> {
+    async fn download_wacz_stream(&self, crawl_id: &str) -> Result<Response, Error> {
         let download_url = format!(
             "{}/orgs/{}/crawls/{crawl_id}/download?prefer_single_wacz=true",
             self.base_url, self.org_id
         );
         let req = self.client.get(download_url.clone());
-        let resp = self.make_request(req).await?;
-        let bytes = resp.bytes().await?;
-        info!("Successfully downloaded WACZ file of {} bytes", bytes.len());
-        Ok(bytes)
+        self.make_request(req).await
     }
 }

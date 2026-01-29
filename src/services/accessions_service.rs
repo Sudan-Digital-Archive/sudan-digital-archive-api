@@ -21,6 +21,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use bytes::Bytes;
 use entity::sea_orm_active_enums::{CrawlStatus, DublinMetadataFormat};
+use futures::StreamExt;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -223,12 +224,12 @@ impl AccessionsService {
                                     .metadata_description
                                     .map(|description| description.trim().to_string());
 
-                                let wacz_bytes = match self
+                                let wacz_response = match self
                                     .browsertrix_repo
-                                    .download_wacz(&resp.run_now_job)
+                                    .download_wacz_stream(&resp.run_now_job)
                                     .await
                                 {
-                                    Ok(bytes) => bytes,
+                                    Ok(response) => response,
                                     Err(err) => {
                                         error!(%err, "Error occurred downloading WACZ file, aborting accession creation");
                                         return;
@@ -237,15 +238,15 @@ impl AccessionsService {
 
                                 let unique_filename = format!("{}.wacz", Uuid::new_v4());
                                 if let Err(err) = self
-                                    .s3_repo
-                                    .upload_from_bytes(
-                                        &unique_filename,
-                                        wacz_bytes,
-                                        "application/wacz",
+                                    .clone()
+                                    .upload_from_stream(
+                                        unique_filename.clone(),
+                                        wacz_response.bytes_stream(),
+                                        "application/wacz".to_string(),
                                     )
                                     .await
                                 {
-                                    error!(%err, "Error occurred uploading WACZ file to S3, aborting accession creation");
+                                    error!("Error occurred uploading WACZ file to S3: {:?}, aborting accession creation", err);
                                     return;
                                 };
                                 info!("WACZ file uploaded to S3 with filename {}", unique_filename);
@@ -397,25 +398,29 @@ impl AccessionsService {
         }
     }
 
-    /// Uploads a file from a multipart field to S3 with smart chunk handling.
+    /// Uploads from a generic stream to S3 with smart chunk handling.
     ///
-    /// This method streams the file and decides on upload strategy as it reads:
-    /// - Files under 5MB: buffered and uploaded with a single request
-    /// - Files over 5MB: multipart upload initiated and chunks streamed directly to S3
+    /// This method streams the bytes and decides on upload strategy as it reads:
+    /// - Data under 5MB: buffered and uploaded with a single request
+    /// - Data over 5MB: multipart upload initiated and chunks streamed directly to S3
     ///
     /// # Arguments
     /// * `key` - The S3 object key where the file will be uploaded
-    /// * `field` - The multipart field containing the file data
+    /// * `stream` - The stream of byte chunks
     /// * `content_type` - The MIME type of the file
     ///
     /// # Returns
     /// Result containing the upload ID or an error response
-    async fn upload_from_multipart_field(
+    async fn upload_from_stream<S, E>(
         self,
         key: String,
-        mut field: Field<'_>,
+        mut stream: S,
         content_type: String,
-    ) -> Result<String, Response> {
+    ) -> Result<String, Response>
+    where
+        S: futures::Stream<Item = Result<Bytes, E>> + Unpin + Send,
+        E: std::fmt::Display,
+    {
         debug!(
             "Starting streaming upload for key: {} with content type: {}",
             key, content_type
@@ -427,24 +432,21 @@ impl AccessionsService {
         let mut upload_parts: Vec<(String, i32)> = Vec::new();
         let mut part_number = 1i32;
 
-        // This code gets pretty complex from here but in short it does this...
-        // 1. Read the stream, which corresponds to the file field in the multipart form
-        // 2. Write the results to a buffer and if it gets > 5MB, start a multipart upload, else wait for normal
-        // upload once we've exited the loop
-        while let Some(chunk) = field.chunk().await.map_err(|err| {
-            error!("Failed to read chunk from field: {}", err);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to read file stream",
-            )
-                .into_response()
-        })? {
+        while let Some(chunk_result) = stream.next().await {
+            let chunk = chunk_result.map_err(|err| {
+                error!("Failed to read chunk from stream: {}", err);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to read file stream",
+                )
+                    .into_response()
+            })?;
+
             total_size += chunk.len();
             buffer.extend_from_slice(&chunk);
             debug!(
                 "Received chunk of {} bytes, total so far: {:.1} MB",
                 chunk.len(),
-                // TODO: Replace this with a more elegant conversion utility since it's used everywhere
                 total_size as f64 / 1024.0 / 1024.0
             );
 
@@ -600,6 +602,28 @@ impl AccessionsService {
                 }
             }
         }
+    }
+
+    /// Uploads a file from a multipart field to S3 with smart chunk handling.
+    ///
+    /// This method streams the file and decides on upload strategy as it reads:
+    /// - Files under 5MB: buffered and uploaded with a single request
+    /// - Files over 5MB: multipart upload initiated and chunks streamed directly to S3
+    ///
+    /// # Arguments
+    /// * `key` - The S3 object key where the file will be uploaded
+    /// * `field` - The multipart field containing the file data
+    /// * `content_type` - The MIME type of the file
+    ///
+    /// # Returns
+    /// Result containing the upload ID or an error response
+    async fn upload_from_multipart_field(
+        self,
+        key: String,
+        field: Field<'_>,
+        content_type: String,
+    ) -> Result<String, Response> {
+        self.upload_from_stream(key, field, content_type).await
     }
 
     /// Extracts and validates accession data from a multipart form submission.
