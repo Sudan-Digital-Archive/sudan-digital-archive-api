@@ -430,13 +430,13 @@ mod tests {
             .await;
     }
     #[tokio::test]
-    async fn create_one_accession() {
+    async fn create_one_accession_crawl() {
         let app = build_test_app();
         let response = app
             .oneshot(
                 Request::builder()
                     .method(http::Method::POST)
-                    .uri("/api/v1/accessions")
+                    .uri("/api/v1/accessions/crawl")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
                     .body(Body::from(
@@ -467,13 +467,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn create_one_accession_no_description() {
+    async fn create_one_accession_crawl_no_description() {
         let app = build_test_app();
         let response = app
             .oneshot(
                 Request::builder()
                     .method(http::Method::POST)
-                    .uri("/api/v1/accessions")
+                    .uri("/api/v1/accessions/crawl")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .header(http::header::COOKIE, format!("jwt={}", get_mock_jwt()))
                     .body(Body::from(
