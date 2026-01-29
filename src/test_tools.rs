@@ -229,11 +229,12 @@ impl BrowsertrixRepo for InMemoryBrowsertrixRepo {
     async fn get_wacz_url(&self, _job_run_id: &str) -> Result<String, Error> {
         Ok("my url".to_owned())
     }
-    /// Returns fixed bytes for WACZ file content.
-    async fn download_wacz(&self, _crawl_id: &str) -> Result<bytes::Bytes, Error> {
-        // Return empty bytes for testing
-        Ok(bytes::Bytes::from_static(b"{}"))
+
+    /// Returns a mock stream for WACZ file content.
+    async fn download_wacz_stream(&self, _crawl_id: &str) -> Result<Response, Error> {
+        Ok(Response::from(http::Response::new("{}")))
     }
+
     /// Returns a mock response for any request.
     async fn make_request(&self, _req: RequestBuilder) -> Result<Response, Error> {
         Ok(reqwest::Response::from(http::Response::new(

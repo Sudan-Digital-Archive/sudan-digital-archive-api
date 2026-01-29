@@ -31,7 +31,7 @@ impl Modify for SecurityAddon {
 #[openapi(
     paths(
         crate::routes::health::healthcheck,
-        crate::routes::accessions::create_accession,
+        crate::routes::accessions::create_accession_crawl,
         crate::routes::accessions::create_accession_raw,
         crate::routes::accessions::get_one_accession,
         crate::routes::accessions::get_one_private_accession,

@@ -28,7 +28,7 @@ pub fn get_accessions_routes(max_file_upload_size: usize) -> Router<AppState> {
         Router::new()
             .route("/", get(list_accessions))
             .route("/private", get(list_accessions_private))
-            .route("/", post(create_accession))
+            .route("/crawl", post(create_accession_crawl))
             .route("/raw", post(create_accession_raw))
             // Increase limit; default is 2MB; this only applies to raw upload endpoint
             // see https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html
@@ -101,7 +101,7 @@ async fn create_accession_raw(
 
 #[utoipa::path(
     post,
-    path = "/api/v1/accessions",
+    path = "/api/v1/accessions/crawl",
     tag = "Accessions",
     request_body = CreateAccessionRequest,
     responses(
@@ -114,7 +114,7 @@ async fn create_accession_raw(
         ("api_key_auth" = [])
     )
 )]
-async fn create_accession(
+async fn create_accession_crawl(
     State(state): State<AppState>,
     authenticated_user: AuthenticatedUser,
     Json(payload): Json<CreateAccessionRequest>,
